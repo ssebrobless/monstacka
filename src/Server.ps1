@@ -102,6 +102,12 @@ function Process-TetrisRequest {
             Write-JsonResponse -Response $response -StatusCode 200 -Body (Get-PublicGameState -State $Context.State)
             return
         }
+        'POST /api/settings' {
+            $payload = ConvertFrom-Json -InputObject (Get-RequestBody -Request $request)
+            Update-GameSettings -State $Context.State -Settings $payload
+            Write-JsonResponse -Response $response -StatusCode 200 -Body (Get-PublicGameState -State $Context.State)
+            return
+        }
         'POST /api/quit' {
             Close-GameSession -State $Context.State
             $Context.ShutdownRequested = $true

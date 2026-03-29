@@ -39,6 +39,10 @@ $kickState = Initialize-GameState -HighScorePath $tempHighscores -SprintTimePath
 $kickState.ActivePiece = New-ActivePiece -Type 'T' -Rotation 0 -X -1 -Y 0
 Assert-True (Try-RotatePiece -State $kickState -Step 1 -UseKicks) 'SRS kicks should recover a valid rotation near the wall.'
 
+$wallState = Initialize-GameState -HighScorePath $tempHighscores -SprintTimePath $tempSprint
+Move-PieceToWall -State $wallState -DeltaX -1
+Assert-Equal $wallState.ActivePiece.X 0 'ARR-0 wall movement helper should slide pieces fully to the wall.'
+
 $ghostState = Initialize-GameState -HighScorePath $tempHighscores -SprintTimePath $tempSprint
 $ghostCells = @(Get-GhostCells -State $ghostState)
 Assert-True ($ghostCells.Count -gt 0) 'A visible piece should produce a ghost projection.'
@@ -70,6 +74,11 @@ Assert-True $completeState.SprintComplete 'Clearing the 40th line should complet
 Assert-True (Test-Path -LiteralPath $tempSprint) 'Completing a sprint should persist sprint times.'
 $sprintEntries = @(Load-SprintTimes -Path $tempSprint)
 Assert-True ($sprintEntries.Count -ge 1) 'Saved sprint runs should load back from disk.'
+
+$settingsState = Initialize-GameState -HighScorePath $tempHighscores -SprintTimePath $tempSprint
+Update-GameSettings -State $settingsState -Settings ([pscustomobject]@{ gravityMs = 333; countdownMs = 900 })
+Assert-Equal $settingsState.GravityMilliseconds 333 'Gravity setting updates should be applied.'
+Assert-Equal $settingsState.CountdownMilliseconds 900 'Countdown setting updates should be applied.'
 
 foreach ($path in @($tempHighscores, $tempSprint)) {
     if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }

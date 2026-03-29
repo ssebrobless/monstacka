@@ -99,6 +99,7 @@ function New-ActivePiece {
         Rotation = $Rotation
         X = $X
         Y = $Y
+        Id = $null
     }
 }
 
@@ -317,6 +318,7 @@ function Initialize-GameState {
         HighScoreSubmitted = $false
         FinalMessage = $null
         SessionId = [guid]::NewGuid().ToString()
+        ActivePieceIdSeed = 0
     }
 
     $state.HighScores = Load-HighScores -Path $HighScorePath
@@ -363,6 +365,8 @@ function Spawn-NewPiece {
     }
 
     $candidate = New-SpawnPiece -Type $Type
+    $State.ActivePieceIdSeed += 1
+    $candidate.Id = $State.ActivePieceIdSeed
     if (-not (Test-PiecePosition -State $State -Piece $candidate)) {
         $State.ActivePiece = $null
         return $false
@@ -380,6 +384,7 @@ function Try-MovePiece {
     param($State, [int]$DeltaX, [int]$DeltaY)
     if (-not $State.ActivePiece) { return $false }
     $candidate = New-ActivePiece -Type $State.ActivePiece.Type -Rotation $State.ActivePiece.Rotation -X ($State.ActivePiece.X + $DeltaX) -Y ($State.ActivePiece.Y + $DeltaY)
+    $candidate.Id = $State.ActivePiece.Id
     if (Test-PiecePosition -State $State -Piece $candidate) {
         $State.ActivePiece = $candidate
         return $true
@@ -394,6 +399,7 @@ function Try-RotatePiece {
     $to = ($from + $Step) % 4
     if ($to -lt 0) { $to += 4 }
     $candidate = New-ActivePiece -Type $State.ActivePiece.Type -Rotation $to -X $State.ActivePiece.X -Y $State.ActivePiece.Y
+    $candidate.Id = $State.ActivePiece.Id
 
     if (-not $UseKicks) {
         if (Test-PiecePosition -State $State -Piece $candidate) {
@@ -408,6 +414,7 @@ function Try-RotatePiece {
     $tests = if ($kickTable.ContainsKey($kickKey)) { $kickTable[$kickKey] } else { @($(New-KickOffset 0 0)) }
     foreach ($offset in $tests) {
         $testPiece = New-ActivePiece -Type $candidate.Type -Rotation $candidate.Rotation -X ($candidate.X + $offset.X) -Y ($candidate.Y - $offset.Y)
+        $testPiece.Id = $State.ActivePiece.Id
         if (Test-PiecePosition -State $State -Piece $testPiece) {
             $State.ActivePiece = $testPiece
             return $true
@@ -525,6 +532,17 @@ function Hard-DropPiece {
     Lock-ActivePiece -State $State
 }
 
+function Move-PieceToWall {
+    param(
+        $State,
+        [int]$DeltaX
+    )
+
+    if (-not $State.ActivePiece) { return }
+    while (Try-MovePiece -State $State -DeltaX $DeltaX -DeltaY 0) {
+    }
+}
+
 function Hold-CurrentPiece {
     param($State)
     if (-not $State.ActivePiece -or $State.HoldUsed -or $State.GameOver) { return $false }
@@ -579,6 +597,23 @@ function Update-GameClock {
     }
 }
 
+function Update-GameSettings {
+    param(
+        $State,
+        $Settings
+    )
+
+    if ($null -eq $Settings) { return }
+
+    if ($null -ne $Settings.gravityMs) {
+        $State.GravityMilliseconds = [Math]::Max(16, [int]$Settings.gravityMs)
+    }
+
+    if ($null -ne $Settings.countdownMs) {
+        $State.CountdownMilliseconds = [Math]::Max(0, [int]$Settings.countdownMs)
+    }
+}
+
 function Register-Input {
     param($State)
     $State.KeyInputs += 1
@@ -606,6 +641,8 @@ function Invoke-GameAction {
     switch ($Action) {
         'moveLeft' { [void](Try-MovePiece -State $State -DeltaX -1 -DeltaY 0) }
         'moveRight' { [void](Try-MovePiece -State $State -DeltaX 1 -DeltaY 0) }
+        'moveLeftMax' { Move-PieceToWall -State $State -DeltaX -1 }
+        'moveRightMax' { Move-PieceToWall -State $State -DeltaX 1 }
         'softDrop' { [void](Drop-OneRow -State $State -AwardSoftDrop:$true) }
         'hardDrop' { Hard-DropPiece -State $State }
         'rotateCcw' { [void](Try-RotatePiece -State $State -Step -1 -UseKicks) }
@@ -709,11 +746,16 @@ function Get-PublicGameState {
         piecesPlaced = $State.PiecesPlaced
         keyInputs = $State.KeyInputs
         currentPieceInputs = $State.CurrentPieceInputs
+        activePieceId = if ($State.ActivePiece) { $State.ActivePiece.Id } else { 0 }
         inputsPerPiece = Get-AverageKeysPerPiece -State $State
         sprintComplete = $State.SprintComplete
         gameOver = $State.GameOver
         gameClosed = $State.GameClosed
         finalMessage = $State.FinalMessage
+        timing = [pscustomobject]@{
+            gravityMs = $State.GravityMilliseconds
+            countdownMs = $State.CountdownMilliseconds
+        }
         sprintLeaderboard = @($State.SprintTimes)
         arcadeLeaderboard = @($State.HighScores)
         controls = [pscustomobject]@{

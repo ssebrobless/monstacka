@@ -7,6 +7,7 @@ PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the 
 - Primary mode is now a 40-line sprint inspired by the flow of modern clients such as TETR.IO.
 - PowerShell remains the source of truth for board state, 7-bag generation, hold logic, ghost projection, sprint timing, and persistent records.
 - Browser UI shows the sprint HUD, countdown, next queue, hold slot, quick retry flow, and local best times.
+- Browser UI now includes configurable timing settings inspired by modern handling menus.
 - SRS wall kicks are used for clockwise and counterclockwise rotation. `C` remains a non-standard 180 rotation without kicks.
 
 ## Sprint Features
@@ -19,6 +20,7 @@ PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the 
 - hold
 - pieces placed, total key inputs, keys per piece, and current-piece inputs
 - local top-10 sprint times stored separately from the older score-based leaderboard
+- customizable handling timings with DAS, ARR, DCD, SDF, gravity, and countdown values
 
 ## Controls
 
@@ -31,6 +33,17 @@ PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the 
 - `C`: rotate 180 degrees without kicks
 - `Shift`: hold
 - `Q`: quit the current session
+
+## Timing Settings
+
+- `DAS`: delay before left/right auto-repeat starts
+- `ARR`: repeat interval for left/right movement; `0` uses instant wall movement after DAS
+- `DCD`: pause before horizontal repeat resumes after a new piece spawns or after rotation
+- `SDF`: soft drop speed multiplier used while holding `Down Arrow`
+- `Gravity`: automatic fall interval for pieces
+- `Countdown`: pre-run countdown length before the sprint starts
+
+These settings are adjusted in the in-game handling panel and saved locally in the browser.
 
 ## How To Run
 
@@ -58,6 +71,6 @@ powershell -ExecutionPolicy Bypass -File .\main.ps1
 ## Known Limitations
 
 - Finesse faults and advanced finesse analysis are not implemented yet.
-- Handling tuning such as configurable DAS/ARR is not implemented yet.
+- Handling timings are configurable, but advanced handling features such as lock delay tuning and full TETR-style finesse analysis are not implemented yet.
 - The current build is sprint-focused and does not yet include a separate polished score-attack mode selector.
 - Quitting stops the PowerShell session, but because the browser is opened manually, you still need to close the browser tab yourself.
