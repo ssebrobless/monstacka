@@ -13,3 +13,4 @@
 - Replaced the placeholder launcher flow with the final two-choice launcher for `HTML` and `+E+RIS`.
 - Added a real backend-free `classic-html/` sprint edition that runs directly from local files and uses `localStorage` for nickname leaderboard persistence.
 - Added an `enhanced/` scaffold with TypeScript/Vite project structure and a launchable `+E+RIS` preview build.
+- Added the first `+E+RIS` control-feel pass with client-side DAS, ARR, and lock delay settings stored in localStorage.

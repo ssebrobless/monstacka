@@ -49,6 +49,7 @@ Launcher behavior:
   - [enhanced/src/engine.ts](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/src/engine.ts)
   - [enhanced/src/main.ts](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/src/main.ts)
 - The current dist build is a real launchable sprint preview and the base for the upgraded edition.
+- `+E+RIS` now also has a first improved-control pass with client-side DAS, ARR, and lock delay settings stored locally.
 
 ## Current State
 
@@ -134,5 +135,5 @@ powershell -ExecutionPolicy Bypass -File .\main.ps1
 
 - Finesse faults and advanced finesse analysis are not implemented yet.
 - The `HTML` edition is intentionally backend-free and simpler than the PowerShell reference build.
-- `+E+RIS` is a real preview build, but it has not yet received the later lock-delay, visual-upgrade, and audio passes from the roadmap.
+- `+E+RIS` has a first local handling pass, but it still needs the later visual, audio, and deeper polish passes from the roadmap.
 - The PowerShell build remains available mainly as a development/reference fallback rather than the standard user-facing startup path.

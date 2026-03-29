@@ -52,6 +52,18 @@
                     <button id="retryButton" type="button">Retry</button>
                 </div>
             </div>
+            <div class="panel">
+                <h2>Handling</h2>
+                <form id="settingsForm" class="settings-form">
+                    <label>DAS (ms)<input id="dasInput" type="number" min="0" max="300" step="1"></label>
+                    <label>ARR (ms)<input id="arrInput" type="number" min="0" max="120" step="1"></label>
+                    <label>Lock Delay (ms)<input id="lockDelayInput" type="number" min="0" max="1000" step="10"></label>
+                    <div class="button-row">
+                        <button id="applySettingsButton" type="submit">Apply</button>
+                        <button id="resetSettingsButton" type="button">Defaults</button>
+                    </div>
+                </form>
+            </div>
         </section>
     </main>
     <script src="./app.js"></script>
