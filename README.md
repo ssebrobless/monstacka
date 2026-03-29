@@ -2,6 +2,13 @@
 
 PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the gameplay engine runs in Windows PowerShell 5.1 and the UI runs in a page served from `http://localhost:8080/`.
 
+## Launchers
+
+- [Launcher.ps1](/C:/Users/grish/CODEX_Gen/Project_1/Launcher.ps1) is the new cross-phase launcher entry point.
+- [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) is the Windows launcher script.
+- [Start-Tetris.command](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.command) is a macOS placeholder for the future launcher flow.
+- In this phase, only `Current PowerShell Sprint` is implemented. `Classic HTML Edition` and `Enhanced Edition` are present in the menu as safe placeholders so the roadmap order is visible without breaking the current build.
+
 ## Current State
 
 - Primary mode is now a 40-line sprint inspired by the flow of modern clients such as TETR.IO.
@@ -47,6 +54,18 @@ These settings are adjusted in the in-game handling panel and saved locally in t
 
 ## How To Run
 
+### Windows Launcher
+
+1. Open [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd).
+2. Choose:
+   `1` Classic HTML Edition
+   `2` Current PowerShell Sprint
+   `3` Enhanced Edition
+   `4` Cancel
+3. In this phase, select `2` to launch the current PowerShell sprint build.
+
+### Direct PowerShell Fallback
+
 1. Open Windows PowerShell 5.1.
 2. Change into [Project_1](/C:/Users/grish/CODEX_Gen/Project_1).
 3. If needed, use a one-time bypass:
@@ -61,7 +80,7 @@ powershell -ExecutionPolicy Bypass -File .\main.ps1
 .\main.ps1
 ```
 
-5. Open the printed `http://localhost:8080/` URL in your browser.
+5. The browser should open automatically. If it does not, open the printed `http://localhost:8080/` URL manually.
 
 ## Records
 
