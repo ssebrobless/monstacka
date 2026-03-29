@@ -1,13 +1,24 @@
-# PowerShell Tetris
+# PowerShell Tetris Sprint
 
-PowerShell Tetris is a local browser-based Tetris game where the gameplay engine runs in Windows PowerShell 5.1 and the UI runs in a page served from `http://localhost:8080/`.
+PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the gameplay engine runs in Windows PowerShell 5.1 and the UI runs in a page served from `http://localhost:8080/`.
 
 ## Current State
 
-- Fully playable MVP with movement, soft drop, hard drop, hold, SRS wall kicks for clockwise and counterclockwise rotation, line clearing, scoring, and game over.
-- PowerShell is the source of truth for board state, scoring, hold logic, and persistent high scores.
-- Browser UI renders the board, HUD, controls, game-over flow, and top-10 leaderboard.
-- Arcade-style 3-character initials can be saved when a finished game earns a top-10 score.
+- Primary mode is now a 40-line sprint inspired by the flow of modern clients such as TETR.IO.
+- PowerShell remains the source of truth for board state, 7-bag generation, hold logic, ghost projection, sprint timing, and persistent records.
+- Browser UI shows the sprint HUD, countdown, next queue, hold slot, quick retry flow, and local best times.
+- SRS wall kicks are used for clockwise and counterclockwise rotation. `C` remains a non-standard 180 rotation without kicks.
+
+## Sprint Features
+
+- 40 lines remaining counter
+- stopwatch / elapsed time
+- 7-bag piece randomizer
+- visible next queue
+- ghost piece
+- hold
+- pieces placed, total key inputs, keys per piece, and current-piece inputs
+- local top-10 sprint times stored separately from the older score-based leaderboard
 
 ## Controls
 
@@ -25,22 +36,28 @@ PowerShell Tetris is a local browser-based Tetris game where the gameplay engine
 
 1. Open Windows PowerShell 5.1.
 2. Change into [Project_1](/C:/Users/grish/CODEX_Gen/Project_1).
-3. Run:
+3. If needed, use a one-time bypass:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\main.ps1
+```
+
+4. Or, after your execution policy is set appropriately, run:
 
 ```powershell
 .\main.ps1
 ```
 
-4. Open the printed `http://localhost:8080/` URL in your browser.
+5. Open the printed `http://localhost:8080/` URL in your browser.
 
-## Leaderboard
+## Records
 
-- High scores are stored in [highscores.json](/C:/Users/grish/CODEX_Gen/Project_1/data/highscores.json).
-- The game keeps the top 10 scores only.
-- Entries are saved as uppercase 3-character initials, score, lines, and timestamp.
+- Sprint times are stored in [sprint-times.json](/C:/Users/grish/CODEX_Gen/Project_1/data/sprint-times.json).
+- The project still keeps the older score leaderboard in [highscores.json](/C:/Users/grish/CODEX_Gen/Project_1/data/highscores.json), but sprint mode is now the main experience.
 
 ## Known Limitations
 
-- `C` rotation is a non-standard convenience move and does not use kicks.
-- There is no next-piece preview, ghost piece, pause system, or level progression yet.
+- Finesse faults and advanced finesse analysis are not implemented yet.
+- Handling tuning such as configurable DAS/ARR is not implemented yet.
+- The current build is sprint-focused and does not yet include a separate polished score-attack mode selector.
 - Quitting stops the PowerShell session, but because the browser is opened manually, you still need to close the browser tab yourself.

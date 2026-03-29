@@ -7,3 +7,4 @@
 - Added persistent top-10 high scores stored in JSON with arcade-style initials entry.
 - Added lightweight PowerShell checks for engine logic.
 - Added README and changelog documentation so project state stays current as the game evolves.
+- Refined the project into a 40-line sprint-focused build with a 7-bag queue, ghost piece, countdown start, quick retry flow, sprint counters, and separate sprint-time persistence.

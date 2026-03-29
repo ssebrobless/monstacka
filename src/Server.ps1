@@ -7,7 +7,9 @@ function Initialize-TetrisContext {
         WebRoot = Join-Path $RootPath 'web'
         BaseUrl = 'http://localhost:8080/'
         ShutdownRequested = $false
-        State = Initialize-GameState -HighScorePath (Join-Path $RootPath 'data\highscores.json')
+        State = Initialize-GameState `
+            -HighScorePath (Join-Path $RootPath 'data\highscores.json') `
+            -SprintTimePath (Join-Path $RootPath 'data\sprint-times.json')
     }
 }
 
@@ -97,15 +99,6 @@ function Process-TetrisRequest {
         }
         'POST /api/reset' {
             Reset-GameState -State $Context.State | Out-Null
-            Write-JsonResponse -Response $response -StatusCode 200 -Body (Get-PublicGameState -State $Context.State)
-            return
-        }
-        'POST /api/highscores' {
-            $payload = ConvertFrom-Json -InputObject (Get-RequestBody -Request $request)
-            if (-not (Submit-HighScore -State $Context.State -Initials ([string]$payload.initials))) {
-                Write-JsonResponse -Response $response -StatusCode 400 -Body @{ error = 'High score entry rejected.' }
-                return
-            }
             Write-JsonResponse -Response $response -StatusCode 200 -Body (Get-PublicGameState -State $Context.State)
             return
         }

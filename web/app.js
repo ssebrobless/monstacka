@@ -1,15 +1,19 @@
 const boardEl = document.getElementById('board');
-const scoreEl = document.getElementById('score');
+const overlayEl = document.getElementById('overlay');
+const timerEl = document.getElementById('timer');
+const linesRemainingEl = document.getElementById('linesRemaining');
 const linesEl = document.getElementById('lines');
 const holdEl = document.getElementById('hold');
+const nextQueueEl = document.getElementById('nextQueue');
+const piecesPlacedEl = document.getElementById('piecesPlaced');
+const keyInputsEl = document.getElementById('keyInputs');
+const inputsPerPieceEl = document.getElementById('inputsPerPiece');
+const currentPieceInputsEl = document.getElementById('currentPieceInputs');
 const controlsListEl = document.getElementById('controlsList');
-const leaderboardEl = document.getElementById('leaderboard');
+const sprintLeaderboardEl = document.getElementById('sprintLeaderboard');
 const statusCardEl = document.getElementById('statusCard');
 const statusTitleEl = document.getElementById('statusTitle');
 const statusMessageEl = document.getElementById('statusMessage');
-const initialsSectionEl = document.getElementById('initialsSection');
-const initialsInputEl = document.getElementById('initialsInput');
-const saveScoreButtonEl = document.getElementById('saveScoreButton');
 const retryButtonEl = document.getElementById('retryButton');
 const quitButtonEl = document.getElementById('quitButton');
 
@@ -28,24 +32,39 @@ const keyBindings = {
     KeyQ: 'quit'
 };
 
+function formatTime(ms) {
+    const totalMs = Math.max(0, ms || 0);
+    const minutes = Math.floor(totalMs / 60000);
+    const seconds = Math.floor((totalMs % 60000) / 1000);
+    const milliseconds = totalMs % 1000;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+}
+
 function renderBoard(rows) {
     if (!rows?.length) return;
     const rowCount = rows.length;
     const colCount = rows[0].length;
     const cellCount = rowCount * colCount;
+
     if (boardEl.children.length !== cellCount) {
         boardEl.innerHTML = '';
         boardEl.style.gridTemplateColumns = `repeat(${colCount}, 1fr)`;
-        for (let i = 0; i < cellCount; i += 1) {
+        for (let index = 0; index < cellCount; index += 1) {
             const cell = document.createElement('div');
             cell.className = 'cell';
             boardEl.appendChild(cell);
         }
     }
+
     rows.flat().forEach((value, index) => {
         const cell = boardEl.children[index];
         cell.className = 'cell';
-        if (value) cell.classList.add(`piece-${value.toLowerCase()}`);
+        if (!value) return;
+        if (value.startsWith('ghost-')) {
+            cell.classList.add('ghost', `piece-${value.replace('ghost-', '').toLowerCase()}`);
+            return;
+        }
+        cell.classList.add(`piece-${value.toLowerCase()}`);
     });
 }
 
@@ -69,46 +88,98 @@ function renderControls(controls) {
     });
 }
 
-function renderLeaderboard(entries) {
-    leaderboardEl.innerHTML = '';
-    if (!entries.length) {
+function renderQueue(queue) {
+    nextQueueEl.innerHTML = '';
+    queue.forEach((piece) => {
         const item = document.createElement('li');
-        item.textContent = 'No scores yet. Be the first to set one.';
-        leaderboardEl.appendChild(item);
-        return;
-    }
-    entries.forEach((entry, index) => {
-        const item = document.createElement('li');
-        item.textContent = `${index + 1}. ${entry.initials} - ${entry.score} pts - ${entry.lines} lines`;
-        leaderboardEl.appendChild(item);
+        item.className = `piece-chip piece-${piece.toLowerCase()}`;
+        item.textContent = piece;
+        nextQueueEl.appendChild(item);
     });
 }
 
+function renderSprintLeaderboard(entries) {
+    sprintLeaderboardEl.innerHTML = '';
+    if (!entries.length) {
+        const item = document.createElement('li');
+        item.textContent = 'No sprint records yet. Finish a run to set the first time.';
+        sprintLeaderboardEl.appendChild(item);
+        return;
+    }
+
+    entries.forEach((entry, index) => {
+        const item = document.createElement('li');
+        item.textContent = `${index + 1}. ${formatTime(entry.timeMs)} · ${entry.pieces} pieces · ${entry.keys} keys`;
+        sprintLeaderboardEl.appendChild(item);
+    });
+}
+
+function renderOverlay(current) {
+    let text = '';
+    if (!current.runStarted && !current.gameOver) {
+        const count = Math.ceil((current.countdownRemainingMs || 0) / 1000);
+        text = count > 0 ? String(count) : 'GO';
+    } else if (current.sprintComplete) {
+        text = '40 LINES CLEAR';
+    } else if (current.gameOver && !current.sprintComplete) {
+        text = 'TOP OUT';
+    }
+
+    overlayEl.textContent = text;
+    overlayEl.classList.toggle('hidden', !text);
+}
+
 function renderStatus(current) {
-    const visible = current.gameOver || current.gameClosed;
-    statusCardEl.classList.toggle('hidden', !visible);
-    if (!visible) return;
+    const showSummary = current.gameOver || current.gameClosed || !current.runStarted;
+    statusCardEl.classList.toggle('muted', !showSummary);
+
     if (current.gameClosed) {
         statusTitleEl.textContent = 'Session Closed';
-        statusMessageEl.textContent = current.finalMessage || 'This session has ended.';
-        initialsSectionEl.classList.add('hidden');
+        statusMessageEl.textContent = current.finalMessage || 'This game session has ended.';
         retryButtonEl.disabled = true;
         return;
     }
-    statusTitleEl.textContent = 'Game Over';
-    statusMessageEl.textContent = `Final score: ${current.score}. Retry, quit, or save initials if you made the top 10.`;
-    initialsSectionEl.classList.toggle('hidden', !current.canSubmitHighScore);
+
     retryButtonEl.disabled = false;
+
+    if (!current.runStarted && !current.gameOver) {
+        statusTitleEl.textContent = current.mode;
+        statusMessageEl.textContent = `Countdown running. The sprint starts in ${Math.ceil((current.countdownRemainingMs || 0) / 1000)} second(s).`;
+        return;
+    }
+
+    if (current.sprintComplete) {
+        statusTitleEl.textContent = 'Sprint Complete';
+        statusMessageEl.textContent = `Finished in ${formatTime(current.elapsedMs)} with ${current.piecesPlaced} pieces and ${current.keyInputs} inputs.`;
+        return;
+    }
+
+    if (current.gameOver) {
+        statusTitleEl.textContent = 'Run Over';
+        statusMessageEl.textContent = current.finalMessage || 'You topped out before 40 lines.';
+        return;
+    }
+
+    statusTitleEl.textContent = current.mode;
+    statusMessageEl.textContent = 'Clear 40 lines as fast as possible. Retry is tuned for quick restarts.';
 }
 
 function renderState(current) {
     state.latest = current;
     renderBoard(current.rows);
-    scoreEl.textContent = String(current.score);
+    timerEl.textContent = formatTime(current.elapsedMs);
+    linesRemainingEl.textContent = String(current.linesRemaining);
     linesEl.textContent = String(current.lines);
     holdEl.textContent = current.hold || '-';
+    holdEl.className = `piece-chip${current.hold ? ` piece-${current.hold.toLowerCase()}` : ''}`;
+    piecesPlacedEl.textContent = String(current.piecesPlaced);
+    keyInputsEl.textContent = String(current.keyInputs);
+    inputsPerPieceEl.textContent = Number(current.inputsPerPiece || 0).toFixed(2);
+    currentPieceInputsEl.textContent = String(current.currentPieceInputs);
     renderControls(current.controls);
-    renderLeaderboard(current.leaderboard || []);
+    renderQueue(current.nextQueue || []);
+    renderSprintLeaderboard(current.sprintLeaderboard || []);
+    renderOverlay(current);
     renderStatus(current);
 }
 
@@ -118,7 +189,9 @@ async function requestJson(url, options = {}) {
         ...options
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `Request failed with ${response.status}`);
+    if (!response.ok) {
+        throw new Error(data.error || `Request failed with ${response.status}`);
+    }
     return data;
 }
 
@@ -148,24 +221,29 @@ async function post(url, payload = {}) {
 }
 
 window.addEventListener('keydown', (event) => {
-    if (event.target === initialsInputEl) return;
     const action = keyBindings[event.code];
     if (!action || !state.latest || state.latest.gameClosed) return;
+
     event.preventDefault();
+
     if (state.latest.gameOver && action !== 'quit') return;
-    post(action === 'quit' ? '/api/quit' : '/api/action', action === 'quit' ? {} : { action });
+
+    if (action === 'quit') {
+        post('/api/quit');
+        return;
+    }
+
+    post('/api/action', { action });
 });
 
-saveScoreButtonEl.addEventListener('click', () => post('/api/highscores', { initials: initialsInputEl.value }));
 retryButtonEl.addEventListener('click', () => {
-    initialsInputEl.value = '';
     post('/api/reset');
-    if (!state.pollId) state.pollId = window.setInterval(pollState, 75);
+    if (!state.pollId) {
+        state.pollId = window.setInterval(pollState, 75);
+    }
 });
+
 quitButtonEl.addEventListener('click', () => post('/api/quit'));
-initialsInputEl.addEventListener('input', () => {
-    initialsInputEl.value = initialsInputEl.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
-});
 
 pollState();
 state.pollId = window.setInterval(pollState, 75);
