@@ -2,6 +2,10 @@
 
 PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the gameplay engine runs in Windows PowerShell 5.1 and the UI runs in a page served from `http://localhost:8080/`.
 
+## Implementation Plan
+
+- Full dual-version roadmap and execution guide: [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)
+
 ## Launchers
 
 - [Launcher.ps1](/C:/Users/grish/CODEX_Gen/Project_1/Launcher.ps1) is the new cross-phase launcher entry point.
