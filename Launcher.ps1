@@ -1,44 +1,72 @@
-$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
+$ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-function Show-LauncherMenu {
-    Write-Host ''
-    Write-Host 'PowerShell Tetris Launcher' -ForegroundColor Cyan
-    Write-Host '1. Classic HTML Edition'
-    Write-Host '2. Current PowerShell Sprint'
-    Write-Host '3. Enhanced Edition'
-    Write-Host '4. Cancel'
-    Write-Host ''
-}
-
-function Invoke-CurrentPowerShellSprint {
-    & (Join-Path $scriptRoot 'main.ps1')
-}
-
-function Show-Placeholder {
+function Open-Edition {
     param(
-        [string]$EditionName
+        [string]$Edition
     )
 
-    Write-Host ''
-    Write-Host ("{0} is not available yet in this phase." -f $EditionName) -ForegroundColor Yellow
-    Write-Host 'Current safe fallback: Current PowerShell Sprint' -ForegroundColor DarkGray
-    Write-Host ''
-    Read-Host 'Press Enter to return to the launcher'
-}
-
-while ($true) {
-    Show-LauncherMenu
-    $selection = Read-Host 'Choose an option'
-
-    switch ($selection) {
-        '1' { Show-Placeholder -EditionName 'Classic HTML Edition' }
-        '2' { Invoke-CurrentPowerShellSprint; break }
-        '3' { Show-Placeholder -EditionName 'Enhanced Edition' }
-        '4' { break }
+    switch ($Edition) {
+        'HTML' {
+            $target = Join-Path $scriptRoot 'classic-html\index.html'
+        }
+        '+E+RIS' {
+            $target = Join-Path $scriptRoot 'enhanced\dist\index.html'
+        }
         default {
-            Write-Host 'Please choose 1, 2, 3, or 4.' -ForegroundColor Yellow
+            return
         }
     }
+
+    if (-not (Test-Path -LiteralPath $target)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            ("The selected edition is not available yet:`n{0}" -f $target),
+            'Launch Tetris',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    Start-Process $target | Out-Null
 }
+
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'Launch Tetris'
+$form.StartPosition = 'CenterScreen'
+$form.FormBorderStyle = 'FixedDialog'
+$form.MaximizeBox = $false
+$form.MinimizeBox = $false
+$form.ClientSize = New-Object System.Drawing.Size(320, 160)
+$form.TopMost = $true
+
+$label = New-Object System.Windows.Forms.Label
+$label.Text = 'Version'
+$label.Location = New-Object System.Drawing.Point(20, 20)
+$label.AutoSize = $true
+
+$combo = New-Object System.Windows.Forms.ComboBox
+$combo.Location = New-Object System.Drawing.Point(20, 45)
+$combo.Size = New-Object System.Drawing.Size(280, 28)
+$combo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+[void]$combo.Items.Add('HTML')
+[void]$combo.Items.Add('+E+RIS')
+$combo.SelectedIndex = 0
+
+$runButton = New-Object System.Windows.Forms.Button
+$runButton.Text = 'Run'
+$runButton.Location = New-Object System.Drawing.Point(20, 88)
+$runButton.Size = New-Object System.Drawing.Size(280, 32)
+$runButton.Add_Click({
+    Open-Edition -Edition ([string]$combo.SelectedItem)
+    $form.Close()
+})
+
+$form.Controls.Add($label)
+$form.Controls.Add($combo)
+$form.Controls.Add($runButton)
+
+[void]$form.ShowDialog()

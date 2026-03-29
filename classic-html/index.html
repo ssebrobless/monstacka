@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tetris HTML Edition</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <main class="layout">
+        <section class="play-panel">
+            <header class="title-block">
+                <p class="eyebrow">HTML Edition</p>
+                <h1>Classic Sprint</h1>
+                <p class="subtitle">Backend-free Tetris sprint that runs directly from local files.</p>
+            </header>
+
+            <div class="play-surface">
+                <div class="board-wrap">
+                    <div id="overlay" class="overlay hidden"></div>
+                    <div id="board" class="board" aria-label="Tetris board"></div>
+                </div>
+
+                <aside class="sidebar">
+                    <div class="card">
+                        <h2>Time</h2>
+                        <p id="timer" class="metric">00:00.000</p>
+                    </div>
+                    <div class="card stats-two">
+                        <div>
+                            <h2>Remain</h2>
+                            <p id="remaining" class="metric">40</p>
+                        </div>
+                        <div>
+                            <h2>Lines</h2>
+                            <p id="lines" class="metric">0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h2>Hold</h2>
+                        <p id="hold" class="piece-chip">-</p>
+                    </div>
+                    <div class="card">
+                        <h2>Next</h2>
+                        <ul id="nextQueue" class="queue-list"></ul>
+                    </div>
+                </aside>
+            </div>
+        </section>
+
+        <section class="info-panel">
+            <div class="card">
+                <h2>Records</h2>
+                <ol id="leaderboard" class="leaderboard"></ol>
+            </div>
+
+            <div class="card">
+                <h2>Controls</h2>
+                <ul class="controls">
+                    <li>Left / Right: move</li>
+                    <li>Down: soft drop</li>
+                    <li>Space: hard drop</li>
+                    <li>Z / X / C: rotate</li>
+                    <li>Shift: hold</li>
+                    <li>R: retry</li>
+                </ul>
+            </div>
+
+            <div id="statusCard" class="card status-card">
+                <h2 id="statusTitle">Get Ready</h2>
+                <p id="statusMessage">Clear 40 lines as fast as possible.</p>
+                <div id="nicknamePanel" class="nickname-panel hidden">
+                    <label for="nicknameInput">Nickname</label>
+                    <div class="nickname-row">
+                        <input id="nicknameInput" type="text" maxlength="12" autocomplete="off">
+                        <button id="saveRecordButton" type="button">Save</button>
+                    </div>
+                </div>
+                <div class="button-row">
+                    <button id="retryButton" type="button">Retry</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="./app.js"></script>
+</body>
+</html>

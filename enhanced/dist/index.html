@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>+E+RIS</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <main class="layout">
+        <section class="hero">
+            <p class="eyebrow">+E+RIS</p>
+            <h1>Enhanced Edition</h1>
+            <p class="subtitle">Playable sprint scaffold with upgraded presentation and a clear path toward the TypeScript/Vite build.</p>
+        </section>
+
+        <section class="play-area">
+            <div class="board-wrap">
+                <div id="overlay" class="overlay hidden"></div>
+                <div id="board" class="board"></div>
+            </div>
+
+            <aside class="sidebar">
+                <div class="panel">
+                    <h2>Time</h2>
+                    <p id="timer" class="metric">00:00.000</p>
+                </div>
+                <div class="panel split">
+                    <div><h2>Remain</h2><p id="remaining" class="metric">40</p></div>
+                    <div><h2>Lines</h2><p id="lines" class="metric">0</p></div>
+                </div>
+                <div class="panel">
+                    <h2>Hold</h2>
+                    <p id="hold" class="piece-chip">-</p>
+                </div>
+                <div class="panel">
+                    <h2>Next</h2>
+                    <ul id="nextQueue" class="queue-list"></ul>
+                </div>
+            </aside>
+        </section>
+
+        <section class="info-grid">
+            <div class="panel">
+                <h2>Records</h2>
+                <ol id="leaderboard" class="leaderboard"></ol>
+            </div>
+            <div class="panel">
+                <h2>Status</h2>
+                <p id="statusText" class="status-text">Sprint preview is live. Clear 40 lines and retry instantly.</p>
+                <div class="button-row">
+                    <button id="retryButton" type="button">Retry</button>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script src="./app.js"></script>
+</body>
+</html>

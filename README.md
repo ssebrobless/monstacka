@@ -1,6 +1,11 @@
-# PowerShell Tetris Sprint
+# Tetris Dual-Version Repo
 
-PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the gameplay engine runs in Windows PowerShell 5.1 and the UI runs in a page served from `http://localhost:8080/`.
+This repository now supports two launcher-visible versions:
+
+- `HTML`
+- `+E+RIS`
+
+The PowerShell sprint build still remains in the repo as a development/reference fallback while the new versions continue to grow.
 
 ## Implementation Plan
 
@@ -8,18 +13,49 @@ PowerShell Tetris Sprint is a local browser-based 40-line sprint game where the 
 
 ## Launchers
 
-- [Launcher.ps1](/C:/Users/grish/CODEX_Gen/Project_1/Launcher.ps1) is the new cross-phase launcher entry point.
-- [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) is the Windows launcher script.
-- [Start-Tetris.command](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.command) is a macOS placeholder for the future launcher flow.
-- In this phase, only `Current PowerShell Sprint` is implemented. `Classic HTML Edition` and `Enhanced Edition` are present in the menu as safe placeholders so the roadmap order is visible without breaking the current build.
+- [Launcher.ps1](/C:/Users/grish/CODEX_Gen/Project_1/Launcher.ps1) is the Windows GUI launcher implementation.
+- [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) is the Windows double-click entry point.
+- [Start-Tetris.command](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.command) mirrors the same two-choice launcher flow on macOS as closely as practical.
+
+Launcher behavior:
+
+- On Windows, double-clicking [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) opens a small GUI launcher window.
+- The launcher shows exactly two visible choices:
+  - `HTML`
+  - `+E+RIS`
+- Clicking `Run` launches the selected version.
+- Closing the window cancels cleanly.
+
+## Repository Layout
+
+- [classic-html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html) is the backend-free HTML edition.
+- [enhanced](/C:/Users/grish/CODEX_Gen/Project_1/enhanced) contains the `+E+RIS` scaffold and launchable dist build.
+- [main.ps1](/C:/Users/grish/CODEX_Gen/Project_1/main.ps1), [src](/C:/Users/grish/CODEX_Gen/Project_1/src), and [web](/C:/Users/grish/CODEX_Gen/Project_1/web) remain the PowerShell reference build.
+
+## HTML Edition
+
+- Launch target: [classic-html/index.html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html/index.html)
+- Runs directly from local files under `file://`
+- No backend, no Node, no npm, no build step
+- Uses `localStorage` for sprint records, nickname persistence, and future-ready leaderboard structure
+- Supports sprint gameplay, hold, next queue, ghost piece, retry, and local nickname leaderboard behavior
+
+## +E+RIS Edition
+
+- Launch target: [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html)
+- Repo scaffold includes:
+  - [enhanced/package.json](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/package.json)
+  - [enhanced/tsconfig.json](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/tsconfig.json)
+  - [enhanced/src/engine.ts](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/src/engine.ts)
+  - [enhanced/src/main.ts](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/src/main.ts)
+- The current dist build is a real launchable sprint preview and the base for the upgraded edition.
 
 ## Current State
 
-- Primary mode is now a 40-line sprint inspired by the flow of modern clients such as TETR.IO.
-- PowerShell remains the source of truth for board state, 7-bag generation, hold logic, ghost projection, sprint timing, and persistent records.
-- Browser UI shows the sprint HUD, countdown, next queue, hold slot, quick retry flow, and local best times.
-- Browser UI now includes configurable timing settings inspired by modern handling menus.
-- SRS wall kicks are used for clockwise and counterclockwise rotation. `C` remains a non-standard 180 rotation without kicks.
+- `HTML` is now a real backend-free sprint build.
+- `+E+RIS` now has a real scaffold and launchable preview build.
+- The PowerShell build remains intact for rule-porting, comparison, and fallback testing.
+- The PowerShell/browser reference build still includes the deepest handling/timing implementation at this point.
 
 ## Sprint Features
 
@@ -58,15 +94,16 @@ These settings are adjusted in the in-game handling panel and saved locally in t
 
 ## How To Run
 
-### Windows Launcher
+### Standard Launcher Flow
 
-1. Open [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd).
-2. Choose:
-   `1` Classic HTML Edition
-   `2` Current PowerShell Sprint
-   `3` Enhanced Edition
-   `4` Cancel
-3. In this phase, select `2` to launch the current PowerShell sprint build.
+1. Double-click [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) on Windows.
+2. Choose `HTML` or `+E+RIS`.
+3. Click `Run`.
+
+### Direct File Launch
+
+- Open [classic-html/index.html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html/index.html) directly for the backend-free `HTML` edition.
+- Open [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html) directly for the current `+E+RIS` preview.
 
 ### Direct PowerShell Fallback
 
@@ -89,11 +126,13 @@ powershell -ExecutionPolicy Bypass -File .\main.ps1
 ## Records
 
 - Sprint times are stored in [sprint-times.json](/C:/Users/grish/CODEX_Gen/Project_1/data/sprint-times.json).
-- The project still keeps the older score leaderboard in [highscores.json](/C:/Users/grish/CODEX_Gen/Project_1/data/highscores.json), but sprint mode is now the main experience.
+- The PowerShell reference build still keeps the older score leaderboard in [highscores.json](/C:/Users/grish/CODEX_Gen/Project_1/data/highscores.json).
+- The `HTML` edition stores sprint leaderboard and nickname data in `localStorage`.
+- The `+E+RIS` preview currently stores its local records in `localStorage`.
 
 ## Known Limitations
 
 - Finesse faults and advanced finesse analysis are not implemented yet.
-- Handling timings are configurable, but advanced handling features such as lock delay tuning and full TETR-style finesse analysis are not implemented yet.
-- The current build is sprint-focused and does not yet include a separate polished score-attack mode selector.
-- Quitting stops the PowerShell session, but because the browser is opened manually, you still need to close the browser tab yourself.
+- The `HTML` edition is intentionally backend-free and simpler than the PowerShell reference build.
+- `+E+RIS` is a real preview build, but it has not yet received the later lock-delay, visual-upgrade, and audio passes from the roadmap.
+- The PowerShell build remains available mainly as a development/reference fallback rather than the standard user-facing startup path.

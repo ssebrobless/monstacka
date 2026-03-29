@@ -4,12 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "PowerShell Tetris launcher placeholder for macOS"
-echo "This phase only ships the Windows launcher and keeps the PowerShell sprint as the working reference build."
-echo "Planned menu entries:"
-echo "  1. Classic HTML Edition"
-echo "  2. Current PowerShell Sprint"
-echo "  3. Enhanced Edition"
-echo "  4. Cancel"
-echo
-echo "No macOS implementation is available yet."
+osascript <<EOF
+set selectedEdition to choose from list {"HTML", "+E+RIS"} with title "Launch Tetris" with prompt "Version" default items {"HTML"} OK button name "Run" cancel button name "Cancel"
+if selectedEdition is false then
+    return
+end if
+set editionName to item 1 of selectedEdition
+if editionName is "HTML" then
+    do shell script "open " & quoted form of POSIX path of "$SCRIPT_DIR/classic-html/index.html"
+else if editionName is "+E+RIS" then
+    do shell script "open " & quoted form of POSIX path of "$SCRIPT_DIR/enhanced/dist/index.html"
+end if
+EOF
