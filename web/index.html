@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PowerShell Tetris</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <main class="layout">
+        <section class="play-panel">
+            <header class="title-block">
+                <p class="eyebrow">Localhost Arcade</p>
+                <h1>PowerShell Tetris</h1>
+                <p class="subtitle">PowerShell runs the game logic. Your browser handles input, rendering, and the high-score screen.</p>
+            </header>
+            <div class="play-surface">
+                <div id="board" class="board" aria-label="Tetris playfield"></div>
+                <aside class="sidebar">
+                    <div class="card">
+                        <h2>Score</h2>
+                        <p id="score" class="metric">0</p>
+                    </div>
+                    <div class="card">
+                        <h2>Lines</h2>
+                        <p id="lines" class="metric">0</p>
+                    </div>
+                    <div class="card">
+                        <h2>Hold</h2>
+                        <p id="hold" class="metric hold-slot">-</p>
+                    </div>
+                    <div class="card">
+                        <h2>Controls</h2>
+                        <ul id="controlsList" class="controls"></ul>
+                    </div>
+                </aside>
+            </div>
+        </section>
+        <section class="leaderboard-panel">
+            <div class="card panel-card">
+                <h2>Top 10 High Scores</h2>
+                <ol id="leaderboard" class="leaderboard"></ol>
+            </div>
+            <div id="statusCard" class="card panel-card status-card hidden">
+                <h2 id="statusTitle">Game Over</h2>
+                <p id="statusMessage"></p>
+                <div id="initialsSection" class="hidden">
+                    <label for="initialsInput">Enter your initials</label>
+                    <div class="initials-row">
+                        <input id="initialsInput" type="text" maxlength="3" autocomplete="off" spellcheck="false">
+                        <button id="saveScoreButton" type="button">Save Score</button>
+                    </div>
+                    <p class="hint">Use 3 letters or numbers. They will be saved in uppercase.</p>
+                </div>
+                <div class="button-row">
+                    <button id="retryButton" type="button">Retry</button>
+                    <button id="quitButton" type="button" class="danger">Quit</button>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script src="/app.js"></script>
+</body>
+</html>

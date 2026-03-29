@@ -1,0 +1,9 @@
+# Changelog
+
+## 2026-03-29
+
+- Created the initial PowerShell Tetris MVP with a local `HttpListener` server and browser UI.
+- Added core gameplay for movement, dropping, hold, SRS wall kicks for `Z` and `X`, non-kicked `C` rotation, line clears, scoring, and game-over handling.
+- Added persistent top-10 high scores stored in JSON with arcade-style initials entry.
+- Added lightweight PowerShell checks for engine logic.
+- Added README and changelog documentation so project state stays current as the game evolves.
