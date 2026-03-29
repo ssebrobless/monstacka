@@ -16,6 +16,8 @@ The PowerShell sprint build still remains in the repo as a development/reference
 - [Launcher.ps1](/C:/Users/grish/CODEX_Gen/Project_1/Launcher.ps1) is the Windows GUI launcher implementation.
 - [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) is the Windows double-click entry point.
 - [Start-Tetris.command](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.command) mirrors the same two-choice launcher flow on macOS as closely as practical.
+- The target launch flow is: `HTML` opens the backend-free browser edition, while `+E+RIS` launches as a real desktop app window.
+- The current PowerShell sprint build remains the gameplay reference/fallback while those two launch targets continue to mature.
 
 Launcher behavior:
 
@@ -29,7 +31,7 @@ Launcher behavior:
 ## Repository Layout
 
 - [classic-html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html) is the backend-free HTML edition.
-- [enhanced](/C:/Users/grish/CODEX_Gen/Project_1/enhanced) contains the `+E+RIS` scaffold and launchable dist build.
+- [enhanced](/C:/Users/grish/CODEX_Gen/Project_1/enhanced) contains the `+E+RIS` scaffold and launchable preview build.
 - [main.ps1](/C:/Users/grish/CODEX_Gen/Project_1/main.ps1), [src](/C:/Users/grish/CODEX_Gen/Project_1/src), and [web](/C:/Users/grish/CODEX_Gen/Project_1/web) remain the PowerShell reference build.
 
 ## HTML Edition
@@ -42,7 +44,8 @@ Launcher behavior:
 
 ## +E+RIS Edition
 
-- Launch target: [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html)
+- Target launch mode: packaged desktop app window
+- Current repo preview: [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html)
 - Repo scaffold includes:
   - [enhanced/package.json](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/package.json)
   - [enhanced/tsconfig.json](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/tsconfig.json)
@@ -50,6 +53,7 @@ Launcher behavior:
   - [enhanced/src/main.ts](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/src/main.ts)
 - The current dist build is a real launchable sprint preview and the base for the upgraded edition.
 - `+E+RIS` now also has a first improved-control pass with client-side DAS, ARR, and lock delay settings stored locally.
+- The implementation target is to replace browser-style launching with a packaged app-window launch flow.
 
 ## Current State
 
@@ -104,7 +108,7 @@ These settings are adjusted in the in-game handling panel and saved locally in t
 ### Direct File Launch
 
 - Open [classic-html/index.html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html/index.html) directly for the backend-free `HTML` edition.
-- Open [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html) directly for the current `+E+RIS` preview.
+- Open [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html) directly only for the current `+E+RIS` preview during development; the target user-facing launch mode is a desktop app window.
 
 ### Direct PowerShell Fallback
 

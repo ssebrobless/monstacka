@@ -10,7 +10,7 @@ The project must support:
    A backend-free edition that can be launched directly in a browser from local files on restricted/work computers.
 
 2. `+E+RIS`
-   A newer improved edition with smoother controls, upgraded visuals, audio, and a more polished game flow.
+   A newer improved edition with smoother controls, upgraded visuals, audio, and a more polished game flow that launches as a real desktop app window.
 
 The existing PowerShell build must remain in the repository as a development/reference fallback while the new versions are being completed.
 
@@ -36,7 +36,7 @@ Required launcher behavior:
   - `+E+RIS`
 - A `Run` button must appear directly below the selector.
 - When `HTML` is selected and `Run` is clicked, the backend-free Classic HTML edition opens.
-- When `+E+RIS` is selected and `Run` is clicked, the improved edition opens.
+- When `+E+RIS` is selected and `Run` is clicked, the improved edition launches as a desktop app window, not in a browser tab.
 - Closing the window cancels without launching anything.
 
 Non-user-facing fallback behavior:
@@ -52,7 +52,7 @@ PowerShell engine --> local HTTP server --> browser
 
 Target product
 Launcher GUI --> HTML edition   --> browser (file-based, no backend)
-Launcher GUI --> +E+RIS edition --> browser or packaged app
+Launcher GUI --> +E+RIS edition --> packaged desktop app window
 
 Reference fallback
 PowerShell build remains available in repo for development use
@@ -106,12 +106,13 @@ Why:
 - `HTML5 Canvas`
 - `Web Audio API`
 - `Vite` for development/build
-- Optional later: `Tauri` packaging for Windows/macOS desktop builds
+- `Tauri` desktop shell for Windows/macOS app packaging
 
 Why:
 - Best path for smoother controls, rendering, and audio
 - Cross-platform friendly
 - Natural evolution from the existing browser game
+- Launches as an actual app window instead of a browser page
 
 ## Target Repository Shape
 
@@ -136,7 +137,8 @@ repo root
 |  |- package.json
 |  |- src/
 |  |- public/
-|  `- dist/
+|  |- dist/
+|  `- src-tauri/
 `- tests/
 ```
 
@@ -153,12 +155,16 @@ Required work:
   - `+E+RIS`
 - Put a `Run` button below the selector.
 - Make close/cancel exit cleanly.
+- Make `HTML` launch in the default browser.
+- Make `+E+RIS` launch the packaged desktop app window when available.
 - Update the macOS launcher script to mirror the same two choices as closely as practical.
 
 Acceptance criteria:
 - Double-click launcher opens a small GUI window on Windows.
 - The user can select `HTML` or `+E+RIS`.
 - Clicking `Run` launches the selected version.
+- `HTML` opens in the browser.
+- `+E+RIS` opens as an app window instead of a browser tab.
 
 ## Step 2: Build the `HTML` Edition
 
@@ -237,11 +243,12 @@ Required work:
 - Create `enhanced/`
 - Initialize the improved edition project structure
 - Set up the entry point and basic app shell
+- Add `Tauri` packaging structure so the edition can launch as a real desktop app window
 - Add the first real launch path for `+E+RIS`
-- Wire the launcher `+E+RIS` option to this edition
+- Wire the launcher `+E+RIS` option to this desktop app
 
 Acceptance criteria:
-- Selecting `+E+RIS` from the launcher opens a real scaffold, not a placeholder message
+- Selecting `+E+RIS` from the launcher opens a real desktop app window scaffold, not a placeholder message
 - The repo contains a clear foundation for ongoing improved-edition work
 
 ## Step 4: Port Core Gameplay Into `+E+RIS`
@@ -328,7 +335,7 @@ The first meaningful end-to-end delivery from this plan should produce:
 - a working small GUI launcher on Windows
 - the final visible launcher choices `HTML` and `+E+RIS`
 - a real backend-free `HTML` edition that launches from the GUI
-- a real `+E+RIS` scaffold that launches from the GUI
+- a real `+E+RIS` desktop app scaffold that launches from the GUI into an app window
 
 ## Definition Of Done
 
@@ -338,7 +345,7 @@ This plan is complete when:
 - the window presents `HTML` and `+E+RIS`
 - clicking `Run` launches the selected version
 - `HTML` runs directly from local files with no backend
-- `+E+RIS` becomes the improved playable version
+- `+E+RIS` launches as a packaged desktop app window and becomes the improved playable version
 - the PowerShell build remains available in the repo as a reference fallback
 - nickname leaderboard flow exists where appropriate
 - the README clearly explains how to run everything
