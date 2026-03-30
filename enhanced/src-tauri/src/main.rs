@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  eris_tetris_lib::run();
+  monstacka_lib::run();
 }

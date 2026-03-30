@@ -9,7 +9,7 @@ The project must support:
 1. `HTML`
    A backend-free edition that can be launched directly in a browser from local files on restricted/work computers.
 
-2. `+E+RIS`
+2. `MonStacka!`
    A newer improved edition with smoother controls, upgraded visuals, audio, and a more polished game flow that launches as a real desktop app window. Its target mode lineup is `Arcade`, `40 Lines`, and `Training`.
 
 The existing PowerShell build must remain in the repository as a development/reference fallback while the new versions are being completed.
@@ -33,10 +33,10 @@ Required launcher behavior:
 - Double-clicking the launcher opens a small GUI window, not a terminal prompt.
 - The selection control must offer exactly two visible choices:
   - `HTML`
-  - `+E+RIS`
+  - `MonStacka!`
 - A `Run` button must appear directly below the selector.
 - When `HTML` is selected and `Run` is clicked, the backend-free Classic HTML edition opens.
-- When `+E+RIS` is selected and `Run` is clicked, the improved edition launches as a desktop app window, not in a browser tab.
+- When `MonStacka!` is selected and `Run` is clicked, the improved edition launches as a desktop app window, not in a browser tab.
 - Closing the window cancels without launching anything.
 
 Non-user-facing fallback behavior:
@@ -52,7 +52,7 @@ PowerShell engine --> local HTTP server --> browser
 
 Target product
 Launcher GUI --> HTML edition   --> browser (file-based, no backend)
-Launcher GUI --> +E+RIS edition --> Tauri desktop app window
+Launcher GUI --> MonStacka! edition --> Tauri desktop app window
 
 Reference fallback
 PowerShell build remains available in repo for development use
@@ -89,9 +89,9 @@ Do not re-examine Steps 1, 2, 4, 5, or 8 — they are complete.
 
 ## Completed User Requests
 
-The following user-requested work was agreed after the numbered steps were drafted and is now implemented in `+E+RIS`:
+The following user-requested work was agreed after the numbered steps were drafted and is now implemented in `MonStacka!`:
 
-- Integrate the user-supplied tetromino sprite PNG into `+E+RIS` only.
+- Integrate the user-supplied tetromino sprite PNG into `MonStacka!` only.
 - Leave the `HTML` edition visually unchanged.
 - Treat the art as a tetromino sprite sheet / themed render pass rather than changing gameplay logic.
 - Add reactive eye/pupil motion where practical.
@@ -124,7 +124,7 @@ Why:
 - Can open directly from `file:///.../classic-html/index.html`
 - Lowest friction
 
-### `+E+RIS` edition
+### `MonStacka!` edition
 
 - `TypeScript`
 - `HTML5 Canvas`
@@ -186,7 +186,7 @@ repo root
 |  |- app.js
 |  |- assets/
 |  `- audio/
-|- enhanced/            +E+RIS source
+|- enhanced/            MonStacka! source
 |  |- package.json
 |  |- src/
 |  |- public/
@@ -207,19 +207,19 @@ Required work:
 - Keep `Start-Tetris.cmd` as the Windows double-click entry point.
 - Make the launcher show exactly:
   - `HTML`
-  - `+E+RIS`
+  - `MonStacka!`
 - Put a `Run` button below the selector.
 - Make close/cancel exit cleanly.
 - Make `HTML` launch in the default browser.
-- Make `+E+RIS` launch the packaged desktop app window when available.
+- Make `MonStacka!` launch the packaged desktop app window when available.
 - Update the macOS launcher script to mirror the same two choices as closely as practical.
 
 Acceptance criteria:
 - Double-click launcher opens a small GUI window on Windows.
-- The user can select `HTML` or `+E+RIS`.
+- The user can select `HTML` or `MonStacka!`.
 - Clicking `Run` launches the selected version.
 - `HTML` opens in the browser.
-- `+E+RIS` opens as an app window instead of a browser tab.
+- `MonStacka!` opens as an app window instead of a browser tab.
 
 ## Step 2: Build the `HTML` Edition
 
@@ -281,7 +281,7 @@ UI requirements:
 
 Launcher integration requirements:
 - The launcher `HTML` option must open `classic-html/index.html`
-- If `+E+RIS` is not ready yet, `HTML` must still be fully real and launchable
+- If `MonStacka!` is not ready yet, `HTML` must still be fully real and launchable
 
 Acceptance criteria:
 - `classic-html/index.html` is playable directly from disk
@@ -291,7 +291,7 @@ Acceptance criteria:
 - Nickname entry works
 - Existing PowerShell version remains intact
 
-## Step 3: Create the `+E+RIS` Foundation
+## Step 3: Create the `MonStacka!` Foundation
 
 Status: PARTIAL -- Vite/TypeScript scaffold exists and launches, but no Tauri packaging; currently opens in browser, not a desktop app window. Tauri packaging is split out to Step 10.
 
@@ -302,14 +302,14 @@ Required work:
 - Create `enhanced/`
 - Initialize the improved edition project structure
 - Set up the entry point and basic app shell
-- Wire the launcher `+E+RIS` option to open the built edition (browser fallback until Tauri is ready in Step 10)
+- Wire the launcher `MonStacka!` option to open the built edition (browser fallback until Tauri is ready in Step 10)
 
 Acceptance criteria:
-- Selecting `+E+RIS` from the launcher opens the real improved edition
+- Selecting `MonStacka!` from the launcher opens the real improved edition
 - The repo contains a clear foundation for ongoing improved-edition work
 - Vite build produces a self-contained dist/ that works over `file://`
 
-## Step 4: Port Core Gameplay Into `+E+RIS`
+## Step 4: Port Core Gameplay Into `MonStacka!`
 
 Status: COMPLETE
 
@@ -327,7 +327,7 @@ Required work:
   - sprint completion
 
 Acceptance criteria:
-- `+E+RIS` becomes a real playable sprint build
+- `MonStacka!` becomes a real playable sprint build
 - The PowerShell version is still available as the reference comparison
 
 ## Step 5: Improve Fluidity And Control Feel
@@ -343,14 +343,14 @@ Required work:
 - Reduce dependence on slow request/response loops by keeping gameplay local to the client
 
 Acceptance criteria:
-- `+E+RIS` clearly feels more responsive than the current PowerShell build
+- `MonStacka!` clearly feels more responsive than the current PowerShell build
 
 ## Step 6: Visual Polish Pass
 
 Status: COMPLETE
 
 Goal:
-- Make `+E+RIS` visually distinct and clearly upgraded from the `HTML` edition.
+- Make `MonStacka!` visually distinct and clearly upgraded from the `HTML` edition.
 
 Required work:
 - Add line-clear animation (brief flash or row-collapse effect via CSS transitions)
@@ -433,12 +433,12 @@ Acceptance criteria:
 Status: COMPLETE
 
 Goal:
-- Make `+E+RIS` launch as a real desktop app window instead of a browser tab.
+- Make `MonStacka!` launch as a real desktop app window instead of a browser tab.
 
 Required work:
 - Install Tauri CLI and prerequisites (Rust toolchain)
 - Create `enhanced/src-tauri/` with:
-  - `tauri.conf.json` (window title: "+E+RIS", default size 1200x800, no menu bar)
+  - `tauri.conf.json` (window title: "MonStacka!", default size 1200x800, no menu bar)
   - `Cargo.toml`
   - `src/main.rs` (standard Tauri bootstrap)
 - Configure `tauri.conf.json` to use Vite's `dist/` output as the frontend
@@ -452,7 +452,7 @@ Acceptance criteria:
 - The launcher detects and uses the Tauri binary when present
 - The game renders and plays identically inside the Tauri window
 
-## Step 11: Add `Training` Mode To `+E+RIS`
+## Step 11: Add `Training` Mode To `MonStacka!`
 
 Status: COMPLETE
 
@@ -501,13 +501,13 @@ Scope boundary:
 - Those are potential future extensions.
 
 Acceptance criteria:
-- `+E+RIS` supports three distinct modes: `Arcade`, `40 Lines`, `Training`
+- `MonStacka!` supports three distinct modes: `Arcade`, `40 Lines`, `Training`
 - `Training` is clearly a practice mode rather than a score-attack mode
 - Finesse fault detection works correctly for all 7 piece types
 - Show and Redo modes both function as specified
 - Unit tests verify finesse fault detection against the lookup table for all 7 piece types
 
-## Step 12: Audit, Stabilize, And Conditionally Rename
+## Step 12: Audit, Stabilize, Package, And Release
 
 Status: NOT STARTED
 
@@ -515,15 +515,16 @@ Required work:
 - Run an end-to-end audit after all requested feature work is complete
 - Verify launcher behavior
 - Verify `HTML` still launches in-browser correctly
-- Verify `+E+RIS` launches as a Tauri desktop window correctly and its implemented features behave properly
+- Verify `MonStacka!` launches as a Tauri desktop window correctly and its implemented features behave properly
 - Verify local leaderboards, nickname entry, and mode switching
 - Verify arcade gravity curve progression
 - Verify training mode finesse detection
 - Run the full Vitest test suite and confirm all tests pass
 - Fix any detected issues before final branding changes
-- Only if the audit passes cleanly with no blocking issues, rename `+E+RIS` to `MonStacka!`
+- Confirm the repo, launcher labels, packaged app title, and GitHub distribution path all use `MonStacka!`
+- Add GitHub desktop packaging workflow coverage for macOS and Windows so the standalone app can be downloaded without cloning the repo
 
-Rename scope when audit passes:
+Release scope:
 - launcher labels
 - in-app titles
 - visible branding text
@@ -535,32 +536,32 @@ Acceptance criteria:
 - The requested features are implemented and verified
 - No blocking issues remain from the audit
 - All Vitest tests pass
-- The improved edition is renamed from `+E+RIS` to `MonStacka!`
+- The improved edition is presented and packaged as `MonStacka!`
 
 ## First Real Delivery Target
 
 The first meaningful end-to-end delivery from this plan should produce:
 
 - a working small GUI launcher on Windows
-- the final visible launcher choices `HTML` and `+E+RIS`
+- the final visible launcher choices `HTML` and `MonStacka!`
 - a real backend-free `HTML` edition that launches from the GUI
-- a real `+E+RIS` desktop app scaffold that launches from the GUI into an app window
+- a real `MonStacka!` desktop app scaffold that launches from the GUI into an app window
 
 ## Definition Of Done
 
 This plan is complete when:
 
 - double-clicking the launcher opens the small selection window
-- the window presents `HTML` and `+E+RIS`
+- the window presents `HTML` and `MonStacka!`
 - clicking `Run` launches the selected version
 - `HTML` runs directly from local files with no backend
-- `+E+RIS` launches as a Tauri-packaged desktop app window and becomes the improved playable version
-- `+E+RIS` includes `Arcade`, `40 Lines`, and `Training`
+- `MonStacka!` launches as a Tauri-packaged desktop app window and becomes the improved playable version
+- `MonStacka!` includes `Arcade`, `40 Lines`, and `Training`
 - Arcade mode has a working gravity curve that increases speed with lines cleared
 - Training mode detects finesse faults and supports Show/Redo modes
 - the PowerShell build remains available in the repo as a reference fallback
 - nickname leaderboard flow exists where appropriate
 - Vitest engine tests pass
 - the final audit passes cleanly
-- the improved edition is renamed to `MonStacka!` once the audit passes
+- the improved edition is named and packaged as `MonStacka!`
 - the README clearly explains how to run everything

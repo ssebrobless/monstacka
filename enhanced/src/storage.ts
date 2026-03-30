@@ -1,14 +1,33 @@
 import type { Settings, SprintRecord, ScoreRecord, StorageData } from './types';
-import { STORAGE_KEY, SETTINGS_DEFAULTS, MAX_NICKNAME_LENGTH } from './constants';
+import { STORAGE_KEY, LEGACY_STORAGE_KEYS, SETTINGS_DEFAULTS, MAX_NICKNAME_LENGTH } from './constants';
+
+function parseStorage(raw: string | null): StorageData | null {
+  if (!raw) return null;
+
+  const parsed = JSON.parse(raw || '{}');
+  return {
+    sprint: Array.isArray(parsed.sprint) ? parsed.sprint : [],
+    score: Array.isArray(parsed.score) ? parsed.score : [],
+    settings: { ...SETTINGS_DEFAULTS, ...(parsed.settings || {}) },
+  };
+}
 
 export function loadStorage(): StorageData {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return {
-      sprint: Array.isArray(parsed.sprint) ? parsed.sprint : [],
-      score: Array.isArray(parsed.score) ? parsed.score : [],
-      settings: { ...SETTINGS_DEFAULTS, ...(parsed.settings || {}) },
-    };
+    const current = parseStorage(localStorage.getItem(STORAGE_KEY));
+    if (current) {
+      return current;
+    }
+
+    for (const legacyKey of LEGACY_STORAGE_KEYS) {
+      const legacy = parseStorage(localStorage.getItem(legacyKey));
+      if (legacy) {
+        saveStorage(legacy);
+        return legacy;
+      }
+    }
+
+    return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS } };
   } catch {
     return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS } };
   }
@@ -49,7 +68,7 @@ export function saveSprintRecord(
   pieces: number,
 ): void {
   const entry: SprintRecord = {
-    nickname: normalizeNickname(nickname) || 'ERIS',
+    nickname: normalizeNickname(nickname) || 'STACK',
     timeMs,
     lines,
     pieces,
@@ -69,7 +88,7 @@ export function saveScoreRecord(
   timeMs: number,
 ): void {
   const entry: ScoreRecord = {
-    nickname: normalizeNickname(nickname) || 'ERIS',
+    nickname: normalizeNickname(nickname) || 'STACK',
     score,
     lines,
     timeMs,

@@ -50,7 +50,7 @@ export interface MonsterTongue {
 }
 
 export interface MonsterTile {
-  imageUrl: string;
+  canvas: HTMLCanvasElement;
   eyes: MonsterEye[];
   tongue: MonsterTongue | null;
   blinkFamily: 'red' | 'pink' | 'orange' | 'none';
@@ -172,7 +172,7 @@ function rotatePoint(x: number, y: number, turns: number, boxSize: number): { x:
   return point;
 }
 
-function cropCellImage(canvas: HTMLCanvasElement, cellX: number, cellY: number): string {
+function cropCellCanvas(canvas: HTMLCanvasElement, cellX: number, cellY: number): HTMLCanvasElement {
   const tile = createCanvas(TILE_SIZE);
   const ctx = tile.getContext('2d')!;
   ctx.drawImage(
@@ -186,7 +186,7 @@ function cropCellImage(canvas: HTMLCanvasElement, cellX: number, cellY: number):
     TILE_SIZE,
     TILE_SIZE,
   );
-  return tile.toDataURL('image/png');
+  return tile;
 }
 
 function familyForPiece(pieceType: PieceType): 'red' | 'pink' | 'orange' | 'none' {
@@ -282,7 +282,7 @@ async function buildMonsterTiles(): Promise<void> {
       definition.forEach((cell, index) => {
         const key = `${pieceType}:${rotation}:${index}`;
         tiles.set(key, {
-          imageUrl: cropCellImage(rotatedCanvas, cell.x, cell.y),
+          canvas: cropCellCanvas(rotatedCanvas, cell.x, cell.y),
           eyes: rotatedEyes
             .filter((eye) => eye.targetIndex === index)
             .map(({ x, y, size, blink, seed }) => ({ x, y, size, blink, seed })),

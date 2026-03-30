@@ -184,6 +184,8 @@ body {
 }
 
 .preview-cell {
+    position: relative;
+    overflow: hidden;
     aspect-ratio: 1;
     border-radius: 6px;
     background: rgba(255,255,255,0.04);
@@ -294,14 +296,6 @@ button.secondary {
     border-radius: 6px;
 }
 
-.monster-cell,
-.monster-preview {
-    background-image: var(--monster-image);
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-}
-
 .monster-cell {
     transform:
         translate(
@@ -315,6 +309,15 @@ button.secondary {
     transform-origin: center;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.18));
     animation: monster-breathe 3.6s ease-in-out infinite;
+}
+
+.monster-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
 }
 
 .monster-eye {

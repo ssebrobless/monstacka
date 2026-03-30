@@ -835,18 +835,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eris_tetris"
-version = "0.1.0"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-log",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1990,6 +1978,18 @@ dependencies = [
  "libc",
  "wasi 0.11.1+wasi-snapshot-preview1",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "monstacka"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-log",
 ]
 
 [[package]]

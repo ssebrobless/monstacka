@@ -10,14 +10,14 @@ if [ -d "$SCRIPT_DIR/enhanced/src-tauri/target/release/bundle/macos" ]; then
 fi
 
 osascript <<EOF
-set selectedEdition to choose from list {"HTML", "+E+RIS"} with title "Launch Tetris" with prompt "Version" default items {"HTML"} OK button name "Run" cancel button name "Cancel"
+set selectedEdition to choose from list {"HTML", "MonStacka!"} with title "Launch Tetris" with prompt "Version" default items {"HTML"} OK button name "Run" cancel button name "Cancel"
 if selectedEdition is false then
     return
 end if
 set editionName to item 1 of selectedEdition
 if editionName is "HTML" then
     do shell script "open " & quoted form of POSIX path of "$SCRIPT_DIR/classic-html/index.html"
-else if editionName is "+E+RIS" then
+else if editionName is "MonStacka!" then
     if "$ENHANCED_APP" is not "" then
         do shell script "open " & quoted form of POSIX path of "$ENHANCED_APP"
     else

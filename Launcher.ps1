@@ -7,9 +7,11 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 function Get-EnhancedLaunchTarget {
     $releaseDir = Join-Path $scriptRoot 'enhanced\src-tauri\target\release'
     $preferredExecutables = @(
+        'monstacka.exe',
+        'MonStacka!.exe',
+        'MonStacka.exe',
         'eris_tetris.exe',
-        'ERIS Tetris.exe',
-        '+E+RIS.exe'
+        'ERIS Tetris.exe'
     )
 
     foreach ($name in $preferredExecutables) {
@@ -46,7 +48,7 @@ function Open-Edition {
         'HTML' {
             $target = Join-Path $scriptRoot 'classic-html\index.html'
         }
-        '+E+RIS' {
+        'MonStacka!' {
             $target = Get-EnhancedLaunchTarget
         }
         default {
@@ -91,7 +93,7 @@ $combo.Location = New-Object System.Drawing.Point(20, 45)
 $combo.Size = New-Object System.Drawing.Size(280, 28)
 $combo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
 [void]$combo.Items.Add('HTML')
-[void]$combo.Items.Add('+E+RIS')
+[void]$combo.Items.Add('MonStacka!')
 $combo.SelectedIndex = 0
 
 $runButton = New-Object System.Windows.Forms.Button

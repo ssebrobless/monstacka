@@ -74,6 +74,16 @@ function createEyeNode(x: number, y: number, size: number, blinkAmount: number, 
   return eye;
 }
 
+function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'monster-art';
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(source, 0, 0);
+  return canvas;
+}
+
 function createTongueNode(x: number, y: number, width: number, height: number, sway: number): HTMLElement {
   const tongue = document.createElement('span');
   tongue.className = 'monster-tongue';
@@ -106,7 +116,6 @@ function updateMonsterCell(
   const tile = getMonsterTile(skinKey);
   cell.replaceChildren();
   cell.className = 'cell';
-  cell.style.removeProperty('--monster-image');
   cell.style.removeProperty('--squish-scale-x');
   cell.style.removeProperty('--squish-scale-y');
   cell.style.removeProperty('--squish-shift-x');
@@ -125,11 +134,11 @@ function updateMonsterCell(
   const shiftY = occupiedNeighbors.up && !occupiedNeighbors.down ? 0.01 : occupiedNeighbors.down && !occupiedNeighbors.up ? -0.02 : 0;
 
   cell.classList.add('monster-cell', `piece-${pieceType.toLowerCase()}`);
-  cell.style.setProperty('--monster-image', `url("${tile.imageUrl}")`);
   cell.style.setProperty('--squish-scale-x', `${scaleX}`);
   cell.style.setProperty('--squish-scale-y', `${scaleY}`);
   cell.style.setProperty('--squish-shift-x', `${shiftX}`);
   cell.style.setProperty('--squish-shift-y', `${shiftY}`);
+  cell.appendChild(createMonsterArtNode(tile.canvas));
 
   for (const eye of tile.eyes) {
     const blink = eye.blink ? blinkAmount(now, eye.seed) : 0;
@@ -166,7 +175,7 @@ function renderPiecePreview(container: HTMLElement, piece: string | null): void 
         cell.classList.add('filled', 'monster-preview', `piece-${pieceType.toLowerCase()}`);
         const tile = getMonsterTile(`${pieceType}:0:${index}`);
         if (tile) {
-          cell.style.setProperty('--monster-image', `url("${tile.imageUrl}")`);
+          cell.appendChild(createMonsterArtNode(tile.canvas));
         }
       }
       container.appendChild(cell);
@@ -224,7 +233,6 @@ export function render(
     if (!value) {
       cell.className = 'cell';
       cell.replaceChildren();
-      cell.style.removeProperty('--monster-image');
       cell.style.removeProperty('--squish-scale-x');
       cell.style.removeProperty('--squish-scale-y');
       cell.style.removeProperty('--squish-shift-x');

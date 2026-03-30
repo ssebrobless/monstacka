@@ -32,11 +32,8 @@ function init() {
   const nicknameForm = document.getElementById('nicknameForm') as HTMLFormElement;
   const nicknameInput = document.getElementById('nicknameInput') as HTMLInputElement;
   const skipRecordButton = document.getElementById('skipRecordButton') as HTMLButtonElement;
-  const titleModal = document.getElementById('titleModal')!;
-  const startGameButton = document.getElementById('startGameButton') as HTMLButtonElement;
   let handledRunKey = '';
   let pendingRecord: PendingRecord | null = null;
-  let awaitingFirstStart = true;
   let lastLockSoundAt = 0;
   let lastLineClearSoundAt = 0;
   let gameOverSounded = false;
@@ -126,13 +123,6 @@ function init() {
     doReset(modeSelect.value as GameMode);
     doRender();
   });
-  startGameButton.addEventListener('click', () => {
-    audio.ensureReady(settings);
-    awaitingFirstStart = false;
-    titleModal.classList.add('hidden');
-    doReset(modeSelect.value as GameMode);
-    doRender();
-  });
 
   const settingsForm = document.getElementById('settingsForm')!;
   const resetSettingsButton = document.getElementById('resetSettingsButton')!;
@@ -186,12 +176,6 @@ function init() {
   });
 
   function tick(now: number) {
-    if (awaitingFirstStart) {
-      doRender();
-      requestAnimationFrame(tick);
-      return;
-    }
-
     if (!state.startTime && !state.gameOver) {
       const countdownMarker = Math.ceil(Math.max(0, state.countdownUntil - now) / 1000);
       if (countdownMarker !== lastCountdownMarker) {

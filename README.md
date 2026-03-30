@@ -9,8 +9,8 @@ This repository is being evolved into a dual-version Tetris project with one low
 ║ HTML           ║ classic-html/index.html║
 ║                ║ browser, file:// only  ║
 ╠════════════════╬════════════════════════╣
-║ +E+RIS         ║ enhanced/              ║
-║                ║ Vite + Tauri build     ║
+║ MonStacka!     ║ enhanced/              ║
+║                ║ standalone Tauri app   ║
 ╚════════════════╩════════════════════════╝
 ```
 
@@ -23,7 +23,7 @@ The original PowerShell build is still kept in the repo as a reference and fallb
 ## Repo Layout
 
 - [classic-html/](./classic-html/) is the backend-free browser edition.
-- [enhanced/](./enhanced/) is the `+E+RIS` edition source tree.
+- [enhanced/](./enhanced/) is the `MonStacka!` standalone desktop app source tree.
 - [src/](./src/), [web/](./web/), and [main.ps1](./main.ps1) are the original PowerShell reference build.
 - [Launcher.ps1](./Launcher.ps1), [Start-Tetris.cmd](./Start-Tetris.cmd), and [Start-Tetris.command](./Start-Tetris.command) provide the launcher flow.
 
@@ -37,7 +37,7 @@ The original PowerShell build is still kept in the repo as a reference and fallb
 - Uses `localStorage` for local records and settings
 - Intended for restricted/work computers
 
-### `+E+RIS`
+### `MonStacka!`
 
 - Source root: [enhanced/](./enhanced/)
 - Uses `TypeScript`, `Vite`, `Web Audio`, and a `Tauri` desktop shell
@@ -52,11 +52,13 @@ The original PowerShell build is still kept in the repo as a reference and fallb
   - configurable DAS / ARR / lock delay
   - Training feedback modes: `Show`, `Redo`, `Off`
   - finesse fault counter and perfect-streak tracking
-  - custom monster sprite-sheet rendering for `+E+RIS` only
+  - custom monster sprite-sheet rendering for `MonStacka!` only
   - reactive pupils, selective blinking, tongue motion, and soft squish-only visual effects
   - title screen, mini piece previews, lock flash, line-clear flash
   - audio controls for mute, SFX volume, and music volume
-- Launcher behavior:
+- Startup behavior:
+  - the packaged desktop app can be launched directly on its own
+  - the optional launcher offers `HTML` and `MonStacka!`
   - if a built Tauri executable exists, the launcher opens the native app window
   - otherwise it falls back to [enhanced/dist/index.html](./enhanced/dist/index.html) for development preview
 
@@ -77,14 +79,14 @@ The original PowerShell build is still kept in the repo as a reference and fallb
 ### Standard launcher flow
 
 1. On Windows, double-click [Start-Tetris.cmd](./Start-Tetris.cmd).
-2. Choose `HTML` or `+E+RIS`.
+2. Choose `HTML` or `MonStacka!`.
 3. Click `Run`.
 
 ### Run the `HTML` edition directly
 
 - Open [classic-html/index.html](./classic-html/index.html) directly in a browser.
 
-### Run the `+E+RIS` browser preview directly
+### Run the `MonStacka!` browser preview directly
 
 - Build once from [enhanced/](./enhanced/):
 
@@ -96,7 +98,7 @@ npm run build
 
 - Then open [enhanced/dist/index.html](./enhanced/dist/index.html) directly.
 
-### Run `+E+RIS` as a native desktop app window
+### Run `MonStacka!` as a native desktop app window
 
 From [enhanced/](./enhanced/):
 
@@ -111,7 +113,16 @@ To build a Windows executable:
 npm run tauri:build
 ```
 
-After a successful build, the launcher will prefer the native executable in `enhanced/src-tauri/target/release/` when `+E+RIS` is selected.
+After a successful build, the launcher will prefer the native executable in `enhanced/src-tauri/target/release/` when `MonStacka!` is selected.
+
+### Download `MonStacka!` from GitHub
+
+- GitHub Actions now builds desktop artifacts for:
+  - macOS Apple Silicon
+  - macOS Intel
+  - Windows
+- On branch pushes, download the build from the workflow artifacts on the Actions tab.
+- On `monstacka-v*` tags, the workflow publishes release assets so a MacBook can download just the standalone `MonStacka!` build without pulling the whole repo.
 
 ### Run the PowerShell fallback
 
@@ -128,10 +139,10 @@ The browser should open automatically. If it does not, open the printed `http://
   - score leaderboard: [data/highscores.json](./data/highscores.json)
 - `HTML` edition:
   - sprint/local leaderboard data in `localStorage`
-- `+E+RIS` edition:
+- `MonStacka!` edition:
   - Arcade and 40 Lines local records in `localStorage`
 
 ## Current Gaps
 
-- The final audit and conditional rename to `MonStacka!` have not happened yet.
+- A tagged GitHub release still needs to be cut for the first public Mac download.
 - The PowerShell build remains the deepest reference implementation for comparison while the port continues.
