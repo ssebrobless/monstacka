@@ -96,11 +96,17 @@ function createTongueNode(x: number, y: number, width: number, height: number, s
 }
 
 function blinkAmount(now: number, seed: number): number {
-  const period = 4200 + (seed % 5) * 680;
+  const period = 3200 + (seed % 4) * 540;
   const phase = (now + seed * 173) % period;
-  if (phase > period - 220) {
-    const t = (phase - (period - 220)) / 220;
-    return t < 0.5 ? t * 2 : (1 - t) * 2;
+  if (phase > period - 280) {
+    const t = (phase - (period - 280)) / 280;
+    if (t < 0.35) {
+      return t / 0.35;
+    }
+    if (t < 0.65) {
+      return 1;
+    }
+    return 1 - ((t - 0.65) / 0.35);
   }
   return 0;
 }

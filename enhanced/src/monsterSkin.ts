@@ -14,7 +14,6 @@ interface EyeSeed {
   x: number;
   y: number;
   size: number;
-  blink: boolean;
 }
 
 interface TongueSeed {
@@ -57,16 +56,19 @@ export interface MonsterTile {
 }
 
 const TILE_SIZE = 112;
+// The custom art sheet maps S=red, Z=green, J=pink, and L=orange.
+const BLINKING_PIECES = new Set<PieceType>(['S', 'J', 'L']);
+
 const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   I: {
     bounds: { x: 403, y: 182, width: 151, height: 571 },
     baseRotation: 1,
     boxSize: 4,
     eyes: [
-      { cellIndex: 0, x: 0.26, y: 0.18, size: 0.12, blink: false },
-      { cellIndex: 1, x: 0.52, y: 0.45, size: 0.15, blink: false },
-      { cellIndex: 2, x: 0.18, y: 0.54, size: 0.1, blink: false },
-      { cellIndex: 3, x: 0.5, y: 0.26, size: 0.13, blink: false },
+      { cellIndex: 0, x: 0.26, y: 0.18, size: 0.12 },
+      { cellIndex: 1, x: 0.52, y: 0.45, size: 0.15 },
+      { cellIndex: 2, x: 0.18, y: 0.54, size: 0.1 },
+      { cellIndex: 3, x: 0.5, y: 0.26, size: 0.13 },
     ],
   },
   O: {
@@ -79,9 +81,9 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
     baseRotation: 2,
     boxSize: 3,
     eyes: [
-      { cellIndex: 0, x: 0.26, y: 0.24, size: 0.08, blink: false },
-      { cellIndex: 1, x: 0.48, y: 0.18, size: 0.07, blink: false },
-      { cellIndex: 2, x: 0.72, y: 0.26, size: 0.09, blink: false },
+      { cellIndex: 0, x: 0.26, y: 0.24, size: 0.08 },
+      { cellIndex: 1, x: 0.48, y: 0.18, size: 0.07 },
+      { cellIndex: 2, x: 0.72, y: 0.26, size: 0.09 },
     ],
     tongue: { cellIndex: 3, x: 0.5, y: 0.52, width: 0.36, height: 0.54 },
   },
@@ -90,8 +92,8 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
     baseRotation: 0,
     boxSize: 3,
     eyes: [
-      { cellIndex: 1, x: 0.56, y: 0.22, size: 0.11, blink: true },
-      { cellIndex: 2, x: 0.22, y: 0.18, size: 0.11, blink: true },
+      { cellIndex: 1, x: 0.56, y: 0.22, size: 0.11 },
+      { cellIndex: 2, x: 0.22, y: 0.18, size: 0.11 },
     ],
   },
   Z: {
@@ -99,7 +101,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
     baseRotation: 0,
     boxSize: 3,
     eyes: [
-      { cellIndex: 1, x: 0.46, y: 0.22, size: 0.11, blink: false },
+      { cellIndex: 1, x: 0.46, y: 0.22, size: 0.11 },
     ],
   },
   J: {
@@ -107,8 +109,8 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
     baseRotation: 3,
     boxSize: 3,
     eyes: [
-      { cellIndex: 2, x: 0.24, y: 0.2, size: 0.11, blink: true },
-      { cellIndex: 2, x: 0.62, y: 0.2, size: 0.11, blink: true },
+      { cellIndex: 2, x: 0.24, y: 0.2, size: 0.11 },
+      { cellIndex: 2, x: 0.62, y: 0.2, size: 0.11 },
     ],
   },
   L: {
@@ -116,8 +118,8 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
     baseRotation: 1,
     boxSize: 3,
     eyes: [
-      { cellIndex: 0, x: 0.5, y: 0.18, size: 0.09, blink: true },
-      { cellIndex: 1, x: 0.64, y: 0.28, size: 0.14, blink: true },
+      { cellIndex: 0, x: 0.5, y: 0.18, size: 0.09 },
+      { cellIndex: 1, x: 0.64, y: 0.28, size: 0.14 },
     ],
   },
 };
@@ -196,6 +198,10 @@ function familyForPiece(pieceType: PieceType): 'red' | 'pink' | 'orange' | 'none
   return 'none';
 }
 
+function shouldBlinkPiece(pieceType: PieceType): boolean {
+  return BLINKING_PIECES.has(pieceType);
+}
+
 async function buildMonsterTiles(): Promise<void> {
   const image = await loadImage(monsterSheetUrl);
 
@@ -244,7 +250,7 @@ async function buildMonsterTiles(): Promise<void> {
               x: localX,
               y: localY,
               size: eye.size,
-              blink: eye.blink,
+              blink: shouldBlinkPiece(pieceType),
               seed: (rotation + 1) * 100 + eyeIndex * 37 + eye.cellIndex * 11,
             };
         })
