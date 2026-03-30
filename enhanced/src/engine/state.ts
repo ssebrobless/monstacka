@@ -1,0 +1,287 @@
+import type { GameState, Piece, PieceType, GameMode, TrainingSnapshot } from '../types';
+import { COUNTDOWN_MS, DEFAULT_MODE, SCORE_TABLE, SETTINGS_DEFAULTS, TARGET_LINES } from '../constants';
+import { clearLines, createBoard } from './board';
+import { ensureQueue } from './bag';
+import { isGrounded, isValid, getCells, rotate as rotatePiece } from './pieces';
+import { evaluateTrainingPlacement } from './training';
+
+function newPiece(type: PieceType): Piece {
+  return { type, rotation: 0, x: 3, y: 0 };
+}
+
+function captureTrainingSnapshot(state: GameState): void {
+  if (state.mode !== 'training' || !state.active) {
+    state.trainingSnapshot = null;
+    state.currentPieceInputs = 0;
+    return;
+  }
+
+  const snapshot: TrainingSnapshot = {
+    active: { ...state.active },
+    queue: [...state.queue],
+  };
+
+  state.trainingSnapshot = snapshot;
+  state.currentPieceInputs = 0;
+}
+
+function restoreTrainingSnapshot(state: GameState): void {
+  if (!state.trainingSnapshot) return;
+
+  state.board = createBoard();
+  state.active = { ...state.trainingSnapshot.active };
+  state.queue = [...state.trainingSnapshot.queue];
+  state.hold = '';
+  state.holdUsed = false;
+  state.lines = 0;
+  state.score = 0;
+  state.lockDeadline = 0;
+  state.lastLockAt = 0;
+  state.lastLineClearAt = 0;
+  state.sprintComplete = false;
+  state.gameOver = false;
+  state.currentPieceInputs = 0;
+}
+
+export function createGameState(mode: GameMode = DEFAULT_MODE): GameState {
+  const state: GameState = {
+    board: createBoard(),
+    active: null,
+    hold: '',
+    holdUsed: false,
+    queue: [],
+    hasSpawned: false,
+    mode,
+    lines: 0,
+    score: 0,
+    pieces: 0,
+    startTime: 0,
+    completedTime: 0,
+    countdownUntil: performance.now() + COUNTDOWN_MS,
+    lastGravity: 0,
+    lockDeadline: 0,
+    lastLockAt: 0,
+    lastLineClearAt: 0,
+    trainingFeedback: SETTINGS_DEFAULTS.trainingFeedback,
+    currentPieceInputs: 0,
+    trainingFaults: 0,
+    trainingPerfectStreak: 0,
+    lastTrainingFaultAt: 0,
+    lastTrainingFaultMessage: '',
+    trainingSnapshot: null,
+    sprintComplete: false,
+    gameOver: false,
+  };
+  spawn(state);
+  return state;
+}
+
+export function spawn(state: GameState, forceType?: PieceType): boolean {
+  ensureQueue(state.queue, state.hasSpawned);
+  const piece = newPiece(forceType || state.queue.shift()!);
+  if (!isValid(state.board, piece)) {
+    state.active = null;
+    state.gameOver = true;
+    state.completedTime = performance.now();
+    return false;
+  }
+
+  state.active = piece;
+  state.holdUsed = false;
+  state.hasSpawned = true;
+  state.lockDeadline = 0;
+  ensureQueue(state.queue, state.hasSpawned);
+  captureTrainingSnapshot(state);
+  return true;
+}
+
+export function reset(state: GameState, mode: GameMode = state.mode): void {
+  state.board = createBoard();
+  state.active = null;
+  state.hold = '';
+  state.holdUsed = false;
+  state.queue = [];
+  state.hasSpawned = false;
+  state.mode = mode;
+  state.lines = 0;
+  state.score = 0;
+  state.pieces = 0;
+  state.startTime = 0;
+  state.completedTime = 0;
+  state.countdownUntil = performance.now() + COUNTDOWN_MS;
+  state.lastGravity = 0;
+  state.lockDeadline = 0;
+  state.lastLockAt = 0;
+  state.lastLineClearAt = 0;
+  state.currentPieceInputs = 0;
+  state.trainingFaults = 0;
+  state.trainingPerfectStreak = 0;
+  state.lastTrainingFaultAt = 0;
+  state.lastTrainingFaultMessage = '';
+  state.trainingSnapshot = null;
+  state.sprintComplete = false;
+  state.gameOver = false;
+  spawn(state);
+}
+
+export function move(state: GameState, dx: number, dy: number, lockDelayMs: number): boolean {
+  if (!state.active || state.gameOver) return false;
+
+  const next = { ...state.active, x: state.active.x + dx, y: state.active.y + dy };
+  if (!isValid(state.board, next)) return false;
+
+  state.active = next;
+  state.lockDeadline = isGrounded(state.board, state.active)
+    ? performance.now() + lockDelayMs
+    : 0;
+  return true;
+}
+
+export function rotate(state: GameState, step: number, useKicks: boolean, lockDelayMs: number): boolean {
+  if (!state.active || state.gameOver) return false;
+
+  const result = rotatePiece(state.board, state.active, step, useKicks);
+  if (!result) return false;
+
+  state.active = result;
+  state.lockDeadline = isGrounded(state.board, state.active)
+    ? performance.now() + lockDelayMs
+    : 0;
+  return true;
+}
+
+export function lockPiece(state: GameState): void {
+  if (!state.active) return;
+
+  const lockedPiece = { ...state.active };
+
+  if (state.mode === 'training') {
+    const evaluation = evaluateTrainingPlacement(lockedPiece, state.currentPieceInputs);
+    state.pieces += 1;
+    state.lastLockAt = performance.now();
+
+    if (evaluation.isFault) {
+      state.trainingFaults += 1;
+      state.trainingPerfectStreak = 0;
+      state.lastTrainingFaultAt = performance.now();
+      state.lastTrainingFaultMessage = evaluation.message;
+    } else {
+      state.trainingPerfectStreak += 1;
+      state.lastTrainingFaultMessage = '';
+    }
+
+    if (evaluation.isFault && state.trainingFeedback === 'redo') {
+      restoreTrainingSnapshot(state);
+      return;
+    }
+
+    state.board = createBoard();
+    state.active = null;
+    state.hold = '';
+    state.holdUsed = false;
+    state.lines = 0;
+    state.score = 0;
+    state.lockDeadline = 0;
+    spawn(state);
+    return;
+  }
+
+  state.lastLockAt = performance.now();
+  for (const cell of getCells(state.active)) {
+    if (cell.y >= 0) {
+      state.board[cell.y][cell.x] = state.active.type;
+    }
+  }
+
+  state.active = null;
+  state.pieces += 1;
+
+  const { newBoard, clearedCount } = clearLines(state.board);
+  state.board = newBoard;
+  state.lines += clearedCount;
+  state.score += SCORE_TABLE[clearedCount] ?? 0;
+
+  if (clearedCount > 0) {
+    state.lastLineClearAt = performance.now();
+  }
+
+  if (state.mode === 'sprint40' && state.lines >= TARGET_LINES) {
+    state.sprintComplete = true;
+    state.gameOver = true;
+    state.completedTime = performance.now();
+  }
+
+  state.lockDeadline = 0;
+  if (!state.sprintComplete) {
+    spawn(state);
+  }
+}
+
+export function dropOnce(state: GameState, lockDelayMs: number, awardSoftDrop = false): boolean {
+  if (move(state, 0, 1, lockDelayMs)) {
+    if (awardSoftDrop && state.mode !== 'training') {
+      state.score += 1;
+    }
+    return true;
+  }
+
+  if (!state.lockDeadline) {
+    state.lockDeadline = performance.now() + lockDelayMs;
+  }
+  return false;
+}
+
+export function hardDrop(state: GameState, lockDelayMs: number): void {
+  let distance = 0;
+  while (move(state, 0, 1, lockDelayMs)) {
+    distance += 1;
+  }
+
+  if (state.mode !== 'training') {
+    state.score += distance * 2;
+  }
+
+  lockPiece(state);
+}
+
+export function hold(state: GameState, lockDelayMs: number): boolean {
+  if (!state.active || state.holdUsed || state.gameOver) return false;
+
+  const current = state.active.type;
+  if (state.hold) {
+    const swap = state.hold as PieceType;
+    state.hold = current;
+    const piece = newPiece(swap);
+    if (!isValid(state.board, piece)) {
+      state.gameOver = true;
+      state.completedTime = performance.now();
+      return false;
+    }
+    state.active = piece;
+  } else {
+    state.hold = current;
+    state.active = null;
+    spawn(state);
+  }
+
+  state.holdUsed = true;
+  if (state.active) {
+    state.lockDeadline = isGrounded(state.board, state.active)
+      ? performance.now() + lockDelayMs
+      : 0;
+  }
+  captureTrainingSnapshot(state);
+  return true;
+}
+
+export function elapsed(state: GameState): number {
+  if (!state.startTime) return 0;
+  return Math.floor((state.completedTime || performance.now()) - state.startTime);
+}
+
+export function formatTime(ms: number): string {
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  const millis = Math.floor(ms % 1000);
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}

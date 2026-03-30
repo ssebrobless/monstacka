@@ -1,78 +1,62 @@
 # Tetris Dual-Version Repo
 
-This repository now supports two launcher-visible versions:
+This repository is being evolved into a dual-version Tetris project with one low-friction browser build and one improved desktop-focused build.
 
-- `HTML`
-- `+E+RIS`
+```text
+╔══════════════ Launch Flow ══════════════╗
+║ Start-Tetris.cmd / Launcher.ps1         ║
+╠════════════════╦════════════════════════╣
+║ HTML           ║ classic-html/index.html║
+║                ║ browser, file:// only  ║
+╠════════════════╬════════════════════════╣
+║ +E+RIS         ║ enhanced/              ║
+║                ║ Vite + Tauri build     ║
+╚════════════════╩════════════════════════╝
+```
 
-The PowerShell sprint build still remains in the repo as a development/reference fallback while the new versions continue to grow.
+The original PowerShell build is still kept in the repo as a reference and fallback while the new versions continue to grow.
 
 ## Implementation Plan
 
-- Full dual-version roadmap and execution guide: [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)
+- Source of truth for the roadmap: [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)
 
-## Launchers
+## Repo Layout
 
-- [Launcher.ps1](/C:/Users/grish/CODEX_Gen/Project_1/Launcher.ps1) is the Windows GUI launcher implementation.
-- [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) is the Windows double-click entry point.
-- [Start-Tetris.command](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.command) mirrors the same two-choice launcher flow on macOS as closely as practical.
-- The target launch flow is: `HTML` opens the backend-free browser edition, while `+E+RIS` launches as a real desktop app window.
-- The current PowerShell sprint build remains the gameplay reference/fallback while those two launch targets continue to mature.
+- [classic-html/](./classic-html/) is the backend-free browser edition.
+- [enhanced/](./enhanced/) is the `+E+RIS` edition source tree.
+- [src/](./src/), [web/](./web/), and [main.ps1](./main.ps1) are the original PowerShell reference build.
+- [Launcher.ps1](./Launcher.ps1), [Start-Tetris.cmd](./Start-Tetris.cmd), and [Start-Tetris.command](./Start-Tetris.command) provide the launcher flow.
 
-Launcher behavior:
+## Versions
 
-- On Windows, double-clicking [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) opens a small GUI launcher window.
-- The launcher shows exactly two visible choices:
-  - `HTML`
-  - `+E+RIS`
-- Clicking `Run` launches the selected version.
-- Closing the window cancels cleanly.
+### `HTML`
 
-## Repository Layout
-
-- [classic-html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html) is the backend-free HTML edition.
-- [enhanced](/C:/Users/grish/CODEX_Gen/Project_1/enhanced) contains the `+E+RIS` scaffold and launchable preview build.
-- [main.ps1](/C:/Users/grish/CODEX_Gen/Project_1/main.ps1), [src](/C:/Users/grish/CODEX_Gen/Project_1/src), and [web](/C:/Users/grish/CODEX_Gen/Project_1/web) remain the PowerShell reference build.
-
-## HTML Edition
-
-- Launch target: [classic-html/index.html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html/index.html)
+- Launch target: [classic-html/index.html](./classic-html/index.html)
 - Runs directly from local files under `file://`
 - No backend, no Node, no npm, no build step
-- Uses `localStorage` for sprint records, nickname persistence, and future-ready leaderboard structure
-- Supports sprint gameplay, hold, next queue, ghost piece, retry, and local nickname leaderboard behavior
+- Uses `localStorage` for local records and settings
+- Intended for restricted/work computers
 
-## +E+RIS Edition
+### `+E+RIS`
 
-- Target launch mode: packaged desktop app window
-- Current repo preview: [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html)
-- Repo scaffold includes:
-  - [enhanced/package.json](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/package.json)
-  - [enhanced/tsconfig.json](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/tsconfig.json)
-  - [enhanced/src/engine.ts](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/src/engine.ts)
-  - [enhanced/src/main.ts](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/src/main.ts)
-- The current dist build is a real launchable sprint preview and the base for the upgraded edition.
-- `+E+RIS` now also has a first improved-control pass with client-side DAS, ARR, and lock delay settings stored locally.
-- The implementation target is to replace browser-style launching with a packaged app-window launch flow.
-
-## Current State
-
-- `HTML` is now a real backend-free sprint build.
-- `+E+RIS` now has a real scaffold and launchable preview build.
-- The PowerShell build remains intact for rule-porting, comparison, and fallback testing.
-- The PowerShell/browser reference build still includes the deepest handling/timing implementation at this point.
-
-## Sprint Features
-
-- 40 lines remaining counter
-- stopwatch / elapsed time
-- 7-bag piece randomizer
-- visible next queue
-- ghost piece
-- hold
-- pieces placed, total key inputs, keys per piece, and current-piece inputs
-- local top-10 sprint times stored separately from the older score-based leaderboard
-- customizable handling timings with DAS, ARR, DCD, SDF, gravity, and countdown values
+- Source root: [enhanced/](./enhanced/)
+- Uses `TypeScript`, `Vite`, `Web Audio`, and a `Tauri` desktop shell
+- Current playable modes:
+  - `Arcade`
+  - `40 Lines`
+  - `Training`
+- Local features already present:
+  - top-10 Arcade leaderboard
+  - top-10 40 Lines leaderboard
+  - 5-character nickname entry
+  - configurable DAS / ARR / lock delay
+  - Training feedback modes: `Show`, `Redo`, `Off`
+  - finesse fault counter and perfect-streak tracking
+  - title screen, mini piece previews, lock flash, line-clear flash
+  - audio controls for mute, SFX volume, and music volume
+- Launcher behavior:
+  - if a built Tauri executable exists, the launcher opens the native app window
+  - otherwise it falls back to [enhanced/dist/index.html](./enhanced/dist/index.html) for development preview
 
 ## Controls
 
@@ -80,64 +64,73 @@ Launcher behavior:
 - `Right Arrow`: move right
 - `Down Arrow`: soft drop
 - `Space`: hard drop
-- `Z`: rotate counterclockwise with SRS kicks
-- `X`: rotate clockwise with SRS kicks
-- `C`: rotate 180 degrees without kicks
+- `Z`: rotate counterclockwise
+- `X`: rotate clockwise
+- `C`: rotate 180 degrees
 - `Shift`: hold
-- `Q`: quit the current session
-
-## Timing Settings
-
-- `DAS`: delay before left/right auto-repeat starts
-- `ARR`: repeat interval for left/right movement; `0` uses instant wall movement after DAS
-- `DCD`: pause before horizontal repeat resumes after a new piece spawns or after rotation
-- `SDF`: soft drop speed multiplier used while holding `Down Arrow`
-- `Gravity`: automatic fall interval for pieces
-- `Countdown`: pre-run countdown length before the sprint starts
-
-These settings are adjusted in the in-game handling panel and saved locally in the browser.
+- `R`: retry
 
 ## How To Run
 
-### Standard Launcher Flow
+### Standard launcher flow
 
-1. Double-click [Start-Tetris.cmd](/C:/Users/grish/CODEX_Gen/Project_1/Start-Tetris.cmd) on Windows.
+1. On Windows, double-click [Start-Tetris.cmd](./Start-Tetris.cmd).
 2. Choose `HTML` or `+E+RIS`.
 3. Click `Run`.
 
-### Direct File Launch
+### Run the `HTML` edition directly
 
-- Open [classic-html/index.html](/C:/Users/grish/CODEX_Gen/Project_1/classic-html/index.html) directly for the backend-free `HTML` edition.
-- Open [enhanced/dist/index.html](/C:/Users/grish/CODEX_Gen/Project_1/enhanced/dist/index.html) directly only for the current `+E+RIS` preview during development; the target user-facing launch mode is a desktop app window.
+- Open [classic-html/index.html](./classic-html/index.html) directly in a browser.
 
-### Direct PowerShell Fallback
+### Run the `+E+RIS` browser preview directly
 
-1. Open Windows PowerShell 5.1.
-2. Change into [Project_1](/C:/Users/grish/CODEX_Gen/Project_1).
-3. If needed, use a one-time bypass:
+- Build once from [enhanced/](./enhanced/):
+
+```powershell
+cd .\enhanced
+npm install
+npm run build
+```
+
+- Then open [enhanced/dist/index.html](./enhanced/dist/index.html) directly.
+
+### Run `+E+RIS` as a native desktop app window
+
+From [enhanced/](./enhanced/):
+
+```powershell
+npm install
+npm run tauri:dev
+```
+
+To build a Windows executable:
+
+```powershell
+npm run tauri:build
+```
+
+After a successful build, the launcher will prefer the native executable in `enhanced/src-tauri/target/release/` when `+E+RIS` is selected.
+
+### Run the PowerShell fallback
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\main.ps1
 ```
 
-4. Or, after your execution policy is set appropriately, run:
-
-```powershell
-.\main.ps1
-```
-
-5. The browser should open automatically. If it does not, open the printed `http://localhost:8080/` URL manually.
+The browser should open automatically. If it does not, open the printed `http://localhost:8080/` URL manually.
 
 ## Records
 
-- Sprint times are stored in [sprint-times.json](/C:/Users/grish/CODEX_Gen/Project_1/data/sprint-times.json).
-- The PowerShell reference build still keeps the older score leaderboard in [highscores.json](/C:/Users/grish/CODEX_Gen/Project_1/data/highscores.json).
-- The `HTML` edition stores sprint leaderboard and nickname data in `localStorage`.
-- The `+E+RIS` preview currently stores its local records in `localStorage`.
+- PowerShell reference build:
+  - sprint records: [data/sprint-times.json](./data/sprint-times.json)
+  - score leaderboard: [data/highscores.json](./data/highscores.json)
+- `HTML` edition:
+  - sprint/local leaderboard data in `localStorage`
+- `+E+RIS` edition:
+  - Arcade and 40 Lines local records in `localStorage`
 
-## Known Limitations
+## Current Gaps
 
-- Finesse faults and advanced finesse analysis are not implemented yet.
-- The `HTML` edition is intentionally backend-free and simpler than the PowerShell reference build.
-- `+E+RIS` has a first local handling pass, but it still needs the later visual, audio, and deeper polish passes from the roadmap.
-- The PowerShell build remains available mainly as a development/reference fallback rather than the standard user-facing startup path.
+- The monster-art integration pass for `+E+RIS` is still outstanding.
+- The final audit and conditional rename to `MonStacka!` have not happened yet.
+- The PowerShell build remains the deepest reference implementation for comparison while the port continues.

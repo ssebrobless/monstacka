@@ -52,7 +52,7 @@ PowerShell engine --> local HTTP server --> browser
 
 Target product
 Launcher GUI --> HTML edition   --> browser (file-based, no backend)
-Launcher GUI --> +E+RIS edition --> packaged desktop app window
+Launcher GUI --> +E+RIS edition --> Tauri desktop app window
 
 Reference fallback
 PowerShell build remains available in repo for development use
@@ -63,7 +63,7 @@ PowerShell build remains available in repo for development use
 Any Codex agent working from this file must follow these rules:
 
 1. Read this file first and treat it as the source of truth.
-2. Determine the highest completed step by inspecting the actual repository state.
+2. Read the Status marker on each step and the Remaining Work Priority section to determine what to work on next.
 3. Continue with the next unfinished step automatically.
 4. Do not stop after a single step just because a milestone is reached.
 5. Do not ask for permission between steps unless there is a real blocker or a risky architectural fork.
@@ -75,6 +75,31 @@ Any Codex agent working from this file must follow these rules:
    - what is complete
    - what remains
    - what the next unfinished step is
+11. Update the Status marker on each step as work is completed.
+
+## Remaining Work Priority
+
+The following items are incomplete and should be executed in this order:
+
+1. Monster art and animation pass for `+E+RIS` only (see Outstanding User Requests section)
+2. Final audit and rename (Step 12)
+
+Codex agents: start from item 1 in this list and work downward.
+Superseding note: Steps 6, 7, 9, 10, and 11 are also complete, so the remaining work list above takes precedence over any stale step references below.
+Do not re-examine Steps 1, 2, 4, 5, or 8 — they are complete.
+
+## Outstanding User Requests
+
+The following user-requested work was agreed after the numbered steps were drafted and must be completed before the final audit/rename step:
+
+- Integrate the user-supplied tetromino sprite PNG into `+E+RIS` only.
+- Leave the `HTML` edition visually unchanged.
+- Treat the art as a tetromino sprite sheet / themed render pass rather than changing gameplay logic.
+- Add reactive eye/pupil motion where practical.
+- Add occasional blinking for the red, pink, and orange pieces.
+- Add subtle tongue motion for the purple `T` piece without breaking the block silhouette.
+- Add soft "squish together" rendering so stacked monster pieces feel organic without changing collision or rules.
+- Keep all of the above visual-only; no gameplay hitboxes or logic should change.
 
 ## Non-Negotiable Requirements
 
@@ -114,6 +139,35 @@ Why:
 - Natural evolution from the existing browser game
 - Launches as an actual app window instead of a browser page
 
+## Testing Strategy
+
+### Unit tests for game engine (enhanced/src/engine/)
+
+- Framework: Vitest (compatible with the Vite build)
+- Test files: `enhanced/src/engine/__tests__/*.test.ts`
+- Coverage targets:
+  - `board.ts`: createBoard, clearLines (empty board, single line, multiple lines, Tetris)
+  - `bag.ts`: ensureQueue (7-bag completeness, no repeats within bag)
+  - `pieces.ts`: getCells, isValid, isGrounded, rotate with kicks
+  - `state.ts`: spawn, move, rotate, lockPiece, hardDrop, hold, reset
+  - `storage.ts`: normalizeNickname, qualifiesSprintRecord, qualifiesScoreRecord
+
+### Integration tests
+
+- Verify a full 40-line sprint completion flow (programmatic)
+- Verify arcade mode game-over triggers leaderboard qualification check
+
+### How to run
+
+- Add `"test": "vitest run"` to `enhanced/package.json`
+- Add `"test:watch": "vitest"` to `enhanced/package.json`
+
+### When to add tests
+
+- Add retroactively for existing engine logic before starting new feature work
+- All new engine logic (gravity curves, finesse detection) must include tests
+- UI/rendering code does not require automated tests
+
 ## Target Repository Shape
 
 ```text
@@ -144,6 +198,8 @@ repo root
 
 ## Step 1: Complete Launcher Foundation
 
+Status: COMPLETE
+
 Status intent:
 - This step is only complete when the launcher matches the final two-choice GUI UX.
 
@@ -167,6 +223,8 @@ Acceptance criteria:
 - `+E+RIS` opens as an app window instead of a browser tab.
 
 ## Step 2: Build the `HTML` Edition
+
+Status: COMPLETE
 
 Goal:
 - Create the first real dual-version split by implementing the `HTML` version as a fully backend-free local-file build.
@@ -236,6 +294,8 @@ Acceptance criteria:
 
 ## Step 3: Create the `+E+RIS` Foundation
 
+Status: PARTIAL -- Vite/TypeScript scaffold exists and launches, but no Tauri packaging; currently opens in browser, not a desktop app window. Tauri packaging is split out to Step 10.
+
 Goal:
 - Replace placeholder behavior with a real improved-edition scaffold.
 
@@ -243,15 +303,16 @@ Required work:
 - Create `enhanced/`
 - Initialize the improved edition project structure
 - Set up the entry point and basic app shell
-- Add `Tauri` packaging structure so the edition can launch as a real desktop app window
-- Add the first real launch path for `+E+RIS`
-- Wire the launcher `+E+RIS` option to this desktop app
+- Wire the launcher `+E+RIS` option to open the built edition (browser fallback until Tauri is ready in Step 10)
 
 Acceptance criteria:
-- Selecting `+E+RIS` from the launcher opens a real desktop app window scaffold, not a placeholder message
+- Selecting `+E+RIS` from the launcher opens the real improved edition
 - The repo contains a clear foundation for ongoing improved-edition work
+- Vite build produces a self-contained dist/ that works over `file://`
 
 ## Step 4: Port Core Gameplay Into `+E+RIS`
+
+Status: COMPLETE
 
 Required work:
 - Port sprint gameplay rules into TypeScript modules
@@ -272,6 +333,8 @@ Acceptance criteria:
 
 ## Step 5: Improve Fluidity And Control Feel
 
+Status: COMPLETE
+
 Required work:
 - Add configurable DAS
 - Add configurable ARR
@@ -283,21 +346,34 @@ Required work:
 Acceptance criteria:
 - `+E+RIS` clearly feels more responsive than the current PowerShell build
 
-## Step 6: Visual Upgrade Pass
+## Step 6: Visual Polish Pass
+
+Status: COMPLETE
+
+Goal:
+- Make `+E+RIS` visually distinct and clearly upgraded from the `HTML` edition.
 
 Required work:
-- Canvas-based board rendering
-- Better piece styling
-- Better ghost styling
-- line-clear and lock feedback
-- stronger hold/next presentation
-- title/menu screen
-- more cohesive HUD
+- Add line-clear animation (brief flash or row-collapse effect via CSS transitions)
+- Add lock feedback (brief highlight on piece lock)
+- Improve hold and next-queue presentation (render mini piece grids instead of letter labels)
+- Add a title/menu screen shown before first game start
+- Polish the HUD layout for clearer visual hierarchy
+- Ensure responsive layout works at common window sizes
+
+Optional stretch (not required for acceptance):
+- Migrate board rendering to Canvas for smoother animation
+- If Canvas is adopted, keep all non-board UI (sidebar, modals, settings) as DOM
 
 Acceptance criteria:
-- `+E+RIS` is visually distinct and clearly upgraded
+- Line clears have visible feedback animation
+- Hold and next queue show piece shapes, not just letters
+- A title screen exists
+- The edition looks visually distinct from the HTML edition
 
 ## Step 7: Audio Pass
+
+Status: COMPLETE
 
 Required work:
 - Sound effects for move, rotate, hold, hard drop, lock, line clear, top-out, countdown
@@ -309,6 +385,8 @@ Acceptance criteria:
 
 ## Step 8: Leaderboards And Nicknames Across Versions
 
+Status: COMPLETE
+
 Required work:
 - Keep the `HTML` edition leaderboard local and simple
 - Add the improved-edition leaderboard flow
@@ -318,45 +396,131 @@ Required work:
 Acceptance criteria:
 - Both visible versions support leaderboard entry in a clean way
 
-## Step 9: Score-Focused Mode
+## Step 9: Score-Focused Mode With Gravity Curve
+
+Status: COMPLETE
+
+Goal:
+- Add a second major mode (`Arcade`) with scoring progression and increasing speed.
 
 Required work:
-- Add a second major mode such as `Marathon` or `Arcade`
-- Add scoring progression and speed curve
+- Add a `getGravityMs(linesCleared: number): number` function to the engine
+- Replace constant `GRAVITY_MS` usage in the game loop with a call to this function using `state.lines`
+- Sprint mode (`40 Lines`) continues to use flat 650ms gravity
+- Implement the following gravity progression for Arcade mode:
+
+  | Lines cleared | Gravity (ms) |
+  |---------------|-------------|
+  | 0-9           | 650         |
+  | 10-19         | 500         |
+  | 20-29         | 400         |
+  | 30-39         | 300         |
+  | 40-59         | 220         |
+  | 60-79         | 150         |
+  | 80-99         | 100         |
+  | 100-119       | 70          |
+  | 120-139       | 50          |
+  | 140+          | 33          |
+
 - Make score-based leaderboards meaningful
 
 Acceptance criteria:
 - The project supports both sprint and a score-focused mode
+- Arcade gravity increases noticeably as lines are cleared
+- Unit tests verify gravity returns correct values at each threshold
 
-## Step 10: Add `Training` Mode To `+E+RIS`
+## Step 10: Tauri Desktop Packaging
+
+Status: COMPLETE
+
+Goal:
+- Make `+E+RIS` launch as a real desktop app window instead of a browser tab.
 
 Required work:
-- Add a third major mode named `Training`
-- Model the mode after Tetresse-style practice behavior as closely as practical
-- Focus the first implementation on technique training, especially finesse
-- Add training settings such as:
-  - mistake highlighting / `show`
-  - forced retry / `redo`
-  - handling-aware practice flow
-- Keep the mode local to `+E+RIS`
-- Keep gameplay logic separate from visual-only polish features
+- Install Tauri CLI and prerequisites (Rust toolchain)
+- Create `enhanced/src-tauri/` with:
+  - `tauri.conf.json` (window title: "+E+RIS", default size 1200x800, no menu bar)
+  - `Cargo.toml`
+  - `src/main.rs` (standard Tauri bootstrap)
+- Configure `tauri.conf.json` to use Vite's `dist/` output as the frontend
+- Add npm scripts: `"tauri dev"` and `"tauri build"`
+- Update `Launcher.ps1` to detect and launch the Tauri executable when available, falling back to browser launch if the binary is not built
+- Test that the built `.exe` opens a native window with the game running inside
 
 Acceptance criteria:
-- `+E+RIS` supports three distinct modes:
-  - `Arcade`
-  - `40 Lines`
-  - `Training`
-- `Training` is clearly a practice mode rather than a score-attack mode
-- The mode can detect and react to inefficient play in a useful way
+- Running `npm run tauri dev` from `enhanced/` opens a native window with the game
+- Running `npm run tauri build` produces a distributable `.exe`
+- The launcher detects and uses the Tauri binary when present
+- The game renders and plays identically inside the Tauri window
 
-## Step 11: Audit, Stabilize, And Conditionally Rename
+## Step 11: Add `Training` Mode To `+E+RIS`
+
+Status: COMPLETE
+
+Goal:
+- Add a third major mode named `Training` focused on teaching optimal piece placement (finesse).
+
+Concept:
+- Training mode teaches the player to place each piece using the minimum number of keystrokes. A piece placed with more inputs than necessary is a "finesse fault."
+
+Required work:
+
+Finesse fault detection:
+- Maintain a lookup table mapping `(piece type, target column, target rotation)` to the optimal key sequence length.
+- For standard SRS with DAS/ARR-0 movement, optimal placements use at most 2-3 inputs (one direction move + one rotation, or hard drop alone).
+- After each piece lock, compare actual input count for that piece against the optimal count from the lookup table.
+- If actual > optimal, flag a finesse fault.
+
+Reference data:
+- Use the commonly published SRS finesse charts.
+- Each of the 7 pieces has up to 10 columns x 4 rotations = up to 40 placements.
+- Many are unreachable; only valid final positions need entries.
+- The optimal input count for each valid `(column, rotation)` pair is 0-3.
+
+UI requirements for Training mode:
+- Display a `Faults` counter in the HUD showing cumulative finesse faults.
+- **"Show" mode** (mistake highlighting): when a fault occurs, briefly flash the locked piece red and display the optimal input count vs. actual count as a small overlay (e.g., "3 inputs used / 2 optimal").
+- **"Redo" mode** (forced retry): when a fault occurs, undo the placement, restore the piece to spawn position, and force the player to retry the same piece. The player cannot advance until the piece is placed with optimal finesse.
+- Add a toggle in Training settings: `Show` / `Redo` / `Off`.
+
+Piece sequence:
+- Use standard 7-bag randomizer (same as other modes).
+- No fixed/scripted sequences for the initial implementation.
+
+Tracking:
+- Training mode does not track score or speed.
+- Track and display: pieces placed, finesse faults, fault rate (faults / pieces).
+- Show a "perfect streak" counter (consecutive pieces with 0 faults).
+
+Training settings panel:
+- Mode toggle: Show / Redo / Off
+- Optional: limit training to specific piece types (e.g., practice only T-piece placements)
+
+Scope boundary:
+- Do NOT implement T-spin detection or combo training in this step.
+- Do NOT implement opener/pattern drilling in this step.
+- Those are potential future extensions.
+
+Acceptance criteria:
+- `+E+RIS` supports three distinct modes: `Arcade`, `40 Lines`, `Training`
+- `Training` is clearly a practice mode rather than a score-attack mode
+- Finesse fault detection works correctly for all 7 piece types
+- Show and Redo modes both function as specified
+- Unit tests verify finesse fault detection against the lookup table for all 7 piece types
+
+## Step 12: Audit, Stabilize, And Conditionally Rename
+
+Status: NOT STARTED
 
 Required work:
 - Run an end-to-end audit after all requested feature work is complete
 - Verify launcher behavior
 - Verify `HTML` still launches in-browser correctly
-- Verify `+E+RIS` launches correctly and its implemented features behave properly
+- Verify `+E+RIS` launches as a Tauri desktop window correctly and its implemented features behave properly
 - Verify local leaderboards, nickname entry, and mode switching
+- Verify arcade gravity curve progression
+- Verify training mode finesse detection
+- Run the full Vitest test suite and confirm all tests pass
 - Fix any detected issues before final branding changes
 - Only if the audit passes cleanly with no blocking issues, rename `+E+RIS` to `MonStacka!`
 
@@ -365,11 +529,13 @@ Rename scope when audit passes:
 - in-app titles
 - visible branding text
 - README / docs references where appropriate
+- Tauri window title and packaging name
 - packaging/app window name where appropriate
 
 Acceptance criteria:
 - The requested features are implemented and verified
 - No blocking issues remain from the audit
+- All Vitest tests pass
 - The improved edition is renamed from `+E+RIS` to `MonStacka!`
 
 ## First Real Delivery Target
@@ -389,10 +555,13 @@ This plan is complete when:
 - the window presents `HTML` and `+E+RIS`
 - clicking `Run` launches the selected version
 - `HTML` runs directly from local files with no backend
-- `+E+RIS` launches as a packaged desktop app window and becomes the improved playable version
+- `+E+RIS` launches as a Tauri-packaged desktop app window and becomes the improved playable version
 - `+E+RIS` includes `Arcade`, `40 Lines`, and `Training`
+- Arcade mode has a working gravity curve that increases speed with lines cleared
+- Training mode detects finesse faults and supports Show/Redo modes
 - the PowerShell build remains available in the repo as a reference fallback
 - nickname leaderboard flow exists where appropriate
+- Vitest engine tests pass
 - the final audit passes cleanly
 - the improved edition is renamed to `MonStacka!` once the audit passes
 - the README clearly explains how to run everything
