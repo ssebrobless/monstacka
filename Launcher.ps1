@@ -4,6 +4,39 @@ Add-Type -AssemblyName System.Drawing
 $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+function Get-EnhancedLaunchTarget {
+    $releaseDir = Join-Path $scriptRoot 'enhanced\src-tauri\target\release'
+    $preferredExecutables = @(
+        'eris_tetris.exe',
+        'ERIS Tetris.exe',
+        '+E+RIS.exe'
+    )
+
+    foreach ($name in $preferredExecutables) {
+        $candidate = Join-Path $releaseDir $name
+        if (Test-Path -LiteralPath $candidate) {
+            return $candidate
+        }
+    }
+
+    if (Test-Path -LiteralPath $releaseDir) {
+        $fallbackExe = Get-ChildItem -LiteralPath $releaseDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'build-script|crash_reporter' } |
+            Select-Object -First 1
+
+        if ($fallbackExe) {
+            return $fallbackExe.FullName
+        }
+    }
+
+    $browserFallback = Join-Path $scriptRoot 'enhanced\dist\index.html'
+    if (Test-Path -LiteralPath $browserFallback) {
+        return $browserFallback
+    }
+
+    return $null
+}
+
 function Open-Edition {
     param(
         [string]$Edition
@@ -14,7 +47,7 @@ function Open-Edition {
             $target = Join-Path $scriptRoot 'classic-html\index.html'
         }
         '+E+RIS' {
-            $target = Join-Path $scriptRoot 'enhanced\dist\index.html'
+            $target = Get-EnhancedLaunchTarget
         }
         default {
             return
@@ -31,7 +64,12 @@ function Open-Edition {
         return
     }
 
-    Start-Process $target | Out-Null
+    if ([IO.Path]::GetExtension($target) -ieq '.exe') {
+        Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target) | Out-Null
+        return
+    }
+
+    Start-Process -FilePath $target | Out-Null
 }
 
 $form = New-Object System.Windows.Forms.Form
