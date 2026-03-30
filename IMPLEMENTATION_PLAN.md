@@ -81,16 +81,15 @@ Any Codex agent working from this file must follow these rules:
 
 The following items are incomplete and should be executed in this order:
 
-1. Monster art and animation pass for `+E+RIS` only (see Outstanding User Requests section)
-2. Final audit and rename (Step 12)
+1. Final audit and rename (Step 12)
 
 Codex agents: start from item 1 in this list and work downward.
-Superseding note: Steps 6, 7, 9, 10, and 11 are also complete, so the remaining work list above takes precedence over any stale step references below.
+Superseding note: The monster-art pass and Steps 6, 7, 9, 10, and 11 are complete, so the remaining work list above takes precedence over any stale step references below.
 Do not re-examine Steps 1, 2, 4, 5, or 8 — they are complete.
 
-## Outstanding User Requests
+## Completed User Requests
 
-The following user-requested work was agreed after the numbered steps were drafted and must be completed before the final audit/rename step:
+The following user-requested work was agreed after the numbered steps were drafted and is now implemented in `+E+RIS`:
 
 - Integrate the user-supplied tetromino sprite PNG into `+E+RIS` only.
 - Leave the `HTML` edition visually unchanged.

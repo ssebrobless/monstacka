@@ -21,6 +21,7 @@ export interface TrainingSnapshot {
 
 export interface GameState {
   board: string[][];
+  boardSkin: string[][];
   active: Piece | null;
   hold: PieceType | '';
   holdUsed: boolean;

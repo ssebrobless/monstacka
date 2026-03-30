@@ -1,6 +1,6 @@
 import type { GameState, Piece, PieceType, GameMode, TrainingSnapshot } from '../types';
 import { COUNTDOWN_MS, DEFAULT_MODE, SCORE_TABLE, SETTINGS_DEFAULTS, TARGET_LINES } from '../constants';
-import { clearLines, createBoard } from './board';
+import { clearLines, collapseRows, createBoard } from './board';
 import { ensureQueue } from './bag';
 import { isGrounded, isValid, getCells, rotate as rotatePiece } from './pieces';
 import { evaluateTrainingPlacement } from './training';
@@ -29,6 +29,7 @@ function restoreTrainingSnapshot(state: GameState): void {
   if (!state.trainingSnapshot) return;
 
   state.board = createBoard();
+  state.boardSkin = createBoard();
   state.active = { ...state.trainingSnapshot.active };
   state.queue = [...state.trainingSnapshot.queue];
   state.hold = '';
@@ -46,6 +47,7 @@ function restoreTrainingSnapshot(state: GameState): void {
 export function createGameState(mode: GameMode = DEFAULT_MODE): GameState {
   const state: GameState = {
     board: createBoard(),
+    boardSkin: createBoard(),
     active: null,
     hold: '',
     holdUsed: false,
@@ -97,6 +99,7 @@ export function spawn(state: GameState, forceType?: PieceType): boolean {
 
 export function reset(state: GameState, mode: GameMode = state.mode): void {
   state.board = createBoard();
+  state.boardSkin = createBoard();
   state.active = null;
   state.hold = '';
   state.holdUsed = false;
@@ -176,6 +179,7 @@ export function lockPiece(state: GameState): void {
     }
 
     state.board = createBoard();
+    state.boardSkin = createBoard();
     state.active = null;
     state.hold = '';
     state.holdUsed = false;
@@ -187,17 +191,19 @@ export function lockPiece(state: GameState): void {
   }
 
   state.lastLockAt = performance.now();
-  for (const cell of getCells(state.active)) {
+  for (const [index, cell] of getCells(state.active).entries()) {
     if (cell.y >= 0) {
       state.board[cell.y][cell.x] = state.active.type;
+      state.boardSkin[cell.y][cell.x] = `${state.active.type}:${state.active.rotation}:${index}`;
     }
   }
 
   state.active = null;
   state.pieces += 1;
 
-  const { newBoard, clearedCount } = clearLines(state.board);
+  const { newBoard, clearedCount, clearedRows } = clearLines(state.board);
   state.board = newBoard;
+  state.boardSkin = collapseRows(state.boardSkin, clearedRows, () => Array(state.board[0].length).fill(''));
   state.lines += clearedCount;
   state.score += SCORE_TABLE[clearedCount] ?? 0;
 

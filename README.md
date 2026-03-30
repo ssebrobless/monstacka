@@ -52,6 +52,8 @@ The original PowerShell build is still kept in the repo as a reference and fallb
   - configurable DAS / ARR / lock delay
   - Training feedback modes: `Show`, `Redo`, `Off`
   - finesse fault counter and perfect-streak tracking
+  - custom monster sprite-sheet rendering for `+E+RIS` only
+  - reactive pupils, selective blinking, tongue motion, and soft squish-only visual effects
   - title screen, mini piece previews, lock flash, line-clear flash
   - audio controls for mute, SFX volume, and music volume
 - Launcher behavior:
@@ -131,6 +133,5 @@ The browser should open automatically. If it does not, open the printed `http://
 
 ## Current Gaps
 
-- The monster-art integration pass for `+E+RIS` is still outstanding.
 - The final audit and conditional rename to `MonStacka!` have not happened yet.
 - The PowerShell build remains the deepest reference implementation for comparison while the port continues.

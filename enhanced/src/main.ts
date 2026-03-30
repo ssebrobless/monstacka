@@ -6,6 +6,7 @@ import { createGameState, reset, dropOnce, lockPiece, elapsed } from './engine/s
 import { getGravityMs } from './engine/gravity';
 import { setupKeyboard, createInputState, clearHorizontalRepeat } from './input/keyboard';
 import { getDomRefs, render } from './ui/render';
+import { prepareMonsterSkin } from './monsterSkin';
 import type { GameMode } from './types';
 
 interface PendingRecord {
@@ -59,6 +60,8 @@ function init() {
   function doRender() {
     render(refs, state, settings, storage);
   }
+
+  void prepareMonsterSkin(doRender);
 
   function doRecordCheck() {
     if (!state.gameOver || !state.startTime) return;
