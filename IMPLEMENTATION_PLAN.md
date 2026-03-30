@@ -10,7 +10,7 @@ The project must support:
    A backend-free edition that can be launched directly in a browser from local files on restricted/work computers.
 
 2. `+E+RIS`
-   A newer improved edition with smoother controls, upgraded visuals, audio, and a more polished game flow that launches as a real desktop app window.
+   A newer improved edition with smoother controls, upgraded visuals, audio, and a more polished game flow that launches as a real desktop app window. Its target mode lineup is `Arcade`, `40 Lines`, and `Training`.
 
 The existing PowerShell build must remain in the repository as a development/reference fallback while the new versions are being completed.
 
@@ -328,6 +328,50 @@ Required work:
 Acceptance criteria:
 - The project supports both sprint and a score-focused mode
 
+## Step 10: Add `Training` Mode To `+E+RIS`
+
+Required work:
+- Add a third major mode named `Training`
+- Model the mode after Tetresse-style practice behavior as closely as practical
+- Focus the first implementation on technique training, especially finesse
+- Add training settings such as:
+  - mistake highlighting / `show`
+  - forced retry / `redo`
+  - handling-aware practice flow
+- Keep the mode local to `+E+RIS`
+- Keep gameplay logic separate from visual-only polish features
+
+Acceptance criteria:
+- `+E+RIS` supports three distinct modes:
+  - `Arcade`
+  - `40 Lines`
+  - `Training`
+- `Training` is clearly a practice mode rather than a score-attack mode
+- The mode can detect and react to inefficient play in a useful way
+
+## Step 11: Audit, Stabilize, And Conditionally Rename
+
+Required work:
+- Run an end-to-end audit after all requested feature work is complete
+- Verify launcher behavior
+- Verify `HTML` still launches in-browser correctly
+- Verify `+E+RIS` launches correctly and its implemented features behave properly
+- Verify local leaderboards, nickname entry, and mode switching
+- Fix any detected issues before final branding changes
+- Only if the audit passes cleanly with no blocking issues, rename `+E+RIS` to `MonStacka!`
+
+Rename scope when audit passes:
+- launcher labels
+- in-app titles
+- visible branding text
+- README / docs references where appropriate
+- packaging/app window name where appropriate
+
+Acceptance criteria:
+- The requested features are implemented and verified
+- No blocking issues remain from the audit
+- The improved edition is renamed from `+E+RIS` to `MonStacka!`
+
 ## First Real Delivery Target
 
 The first meaningful end-to-end delivery from this plan should produce:
@@ -346,6 +390,9 @@ This plan is complete when:
 - clicking `Run` launches the selected version
 - `HTML` runs directly from local files with no backend
 - `+E+RIS` launches as a packaged desktop app window and becomes the improved playable version
+- `+E+RIS` includes `Arcade`, `40 Lines`, and `Training`
 - the PowerShell build remains available in the repo as a reference fallback
 - nickname leaderboard flow exists where appropriate
+- the final audit passes cleanly
+- the improved edition is renamed to `MonStacka!` once the audit passes
 - the README clearly explains how to run everything
