@@ -1,4 +1,4 @@
-import type { Settings } from './types';
+import type { PieceType, Settings } from './types';
 
 export type SoundCue =
   | 'move'
@@ -94,6 +94,51 @@ export class AudioManager {
         break;
       default:
         break;
+    }
+  }
+
+  playMonstosPreview(pieceType: PieceType, settings: Settings): void {
+    this.ensureReady(settings);
+    if (!this.context || !this.sfxGain || settings.muted) return;
+
+    const now = this.context.currentTime;
+    const patterns: Record<PieceType, Array<{ type: OscillatorType; frequency: number; delay: number; duration: number; amplitude: number }>> = {
+      I: [
+        { type: 'sine', frequency: 260, delay: 0, duration: 0.08, amplitude: 0.05 },
+        { type: 'triangle', frequency: 340, delay: 0.06, duration: 0.08, amplitude: 0.045 },
+        { type: 'sine', frequency: 220, delay: 0.12, duration: 0.12, amplitude: 0.04 },
+      ],
+      O: [
+        { type: 'triangle', frequency: 280, delay: 0, duration: 0.06, amplitude: 0.05 },
+        { type: 'triangle', frequency: 280, delay: 0.05, duration: 0.06, amplitude: 0.05 },
+      ],
+      T: [
+        { type: 'sawtooth', frequency: 210, delay: 0, duration: 0.12, amplitude: 0.045 },
+        { type: 'sine', frequency: 160, delay: 0.08, duration: 0.18, amplitude: 0.038 },
+      ],
+      S: [
+        { type: 'square', frequency: 200, delay: 0, duration: 0.07, amplitude: 0.04 },
+        { type: 'square', frequency: 250, delay: 0.04, duration: 0.07, amplitude: 0.04 },
+        { type: 'sawtooth', frequency: 180, delay: 0.1, duration: 0.1, amplitude: 0.03 },
+      ],
+      Z: [
+        { type: 'triangle', frequency: 180, delay: 0, duration: 0.08, amplitude: 0.04 },
+        { type: 'triangle', frequency: 150, delay: 0.05, duration: 0.08, amplitude: 0.04 },
+      ],
+      J: [
+        { type: 'sine', frequency: 300, delay: 0, duration: 0.05, amplitude: 0.04 },
+        { type: 'sine', frequency: 360, delay: 0.045, duration: 0.05, amplitude: 0.04 },
+        { type: 'triangle', frequency: 220, delay: 0.1, duration: 0.08, amplitude: 0.035 },
+      ],
+      L: [
+        { type: 'sawtooth', frequency: 230, delay: 0, duration: 0.06, amplitude: 0.04 },
+        { type: 'triangle', frequency: 190, delay: 0.06, duration: 0.08, amplitude: 0.038 },
+        { type: 'sawtooth', frequency: 260, delay: 0.12, duration: 0.07, amplitude: 0.04 },
+      ],
+    };
+
+    for (const note of patterns[pieceType]) {
+      this.playTone(note.type, note.frequency, note.duration, note.amplitude, now + note.delay);
     }
   }
 

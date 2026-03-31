@@ -56,7 +56,6 @@ export function setupKeyboard(
   settings: Settings,
   onRender: () => void,
   onReset: () => void,
-  onRecordCheck: () => void,
   onSound: (cue: SoundCue) => void,
 ): () => void {
   function countTrainingInput(): void {
@@ -92,7 +91,6 @@ export function setupKeyboard(
     } else if (action === 'hard') {
       hardDrop(state, settings.lockDelayMs);
       onSound('hardDrop');
-      onRecordCheck();
     } else if (action === 'ccw') {
       if (rotate(state, -1, true, settings.lockDelayMs)) {
         countTrainingInput();

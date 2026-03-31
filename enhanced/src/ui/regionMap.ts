@@ -1,0 +1,53 @@
+const ARTBOARD_WIDTH = 1920;
+const ARTBOARD_HEIGHT = 1080;
+
+export interface HitRegion {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function toPercent(value: number, total: number): string {
+  return `${(value / total) * 100}%`;
+}
+
+export function applyRegionMap(root: ParentNode, regions: readonly HitRegion[]): void {
+  for (const region of regions) {
+    const el = root.querySelector<HTMLElement>(`[data-region="${region.id}"]`);
+    if (!el) continue;
+
+    el.style.left = toPercent(region.x, ARTBOARD_WIDTH);
+    el.style.top = toPercent(region.y, ARTBOARD_HEIGHT);
+    el.style.width = toPercent(region.width, ARTBOARD_WIDTH);
+    el.style.height = toPercent(region.height, ARTBOARD_HEIGHT);
+  }
+}
+
+export const HOME_REGIONS: readonly HitRegion[] = [
+  { id: 'home-settings', x: 1747, y: 18, width: 123, height: 97 },
+  { id: 'home-quit', x: 1747, y: 127, width: 123, height: 99 },
+  { id: 'home-name-fill', x: 152, y: 427, width: 328, height: 73 },
+  { id: 'home-voice', x: 468, y: 421, width: 111, height: 98 },
+  { id: 'home-lore', x: 520, y: 451, width: 139, height: 129 },
+  { id: 'home-lore-fill', x: 715, y: 356, width: 518, height: 140 },
+  { id: 'home-preview-left', x: 42, y: 752, width: 315, height: 257 },
+  { id: 'home-preview-center', x: 230, y: 531, width: 522, height: 445 },
+  { id: 'home-preview-right', x: 609, y: 782, width: 353, height: 266 },
+  { id: 'home-prev', x: 123, y: 683, width: 261, height: 164 },
+  { id: 'home-next', x: 588, y: 684, width: 276, height: 164 },
+  { id: 'home-score-sprint', x: 970, y: 706, width: 128, height: 58 },
+  { id: 'home-score-arcade', x: 1117, y: 706, width: 136, height: 58 },
+  { id: 'home-score-grid', x: 983, y: 802, width: 256, height: 228 },
+  { id: 'home-play-arcade', x: 1386, y: 617, width: 407, height: 121 },
+  { id: 'home-play-sprint', x: 1386, y: 763, width: 407, height: 121 },
+  { id: 'home-play-training', x: 1386, y: 907, width: 407, height: 121 },
+] as const;
+
+export const GAME_REGIONS: readonly HitRegion[] = [
+  { id: 'game-settings', x: 1780, y: 11, width: 100, height: 89 },
+  { id: 'game-quit', x: 1780, y: 95, width: 102, height: 93 },
+  { id: 'game-home', x: 1784, y: 180, width: 96, height: 93 },
+  { id: 'game-ui', x: 154, y: 173, width: 1613, height: 799 },
+] as const;

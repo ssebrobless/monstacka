@@ -1,6 +1,7 @@
 export type PieceType = 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L';
 export type GameMode = 'arcade' | 'sprint40' | 'training';
 export type TrainingFeedbackMode = 'off' | 'show' | 'redo';
+export type AppPhase = 'menu' | 'countdown' | 'playing' | 'game-over' | 'sprint-clear';
 
 export interface Cell {
   x: number;

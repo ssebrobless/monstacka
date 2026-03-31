@@ -1,15 +1,14 @@
-import type { GameState, Settings, StorageData } from '../types';
+import type { AppPhase, GameState, Settings, StorageData } from '../types';
 import { HIDDEN_ROWS, COLS, TARGET_LINES, MODE_LABELS, MODE_DESCRIPTIONS, DEFINITIONS } from '../constants';
 import { getCells, getGhostCells } from '../engine/pieces';
 import { elapsed, formatTime } from '../engine/state';
-import { getMonsterTile } from '../monsterSkin';
+import { populateMonsterCell, populateMonsterFigure } from './monsterDom';
 
 export interface DomRefs {
   boardWrap: HTMLElement;
   board: HTMLElement;
   overlay: HTMLElement;
   faultToast: HTMLElement;
-  modeSelect: HTMLSelectElement;
   modeDescription: HTMLElement;
   timer: HTMLElement;
   scoreLabel: HTMLElement;
@@ -38,7 +37,6 @@ export function getDomRefs(): DomRefs {
     board: document.getElementById('board')!,
     overlay: document.getElementById('overlay')!,
     faultToast: document.getElementById('faultToast')!,
-    modeSelect: document.getElementById('modeSelect') as HTMLSelectElement,
     modeDescription: document.getElementById('modeDescription')!,
     timer: document.getElementById('timer')!,
     scoreLabel: document.getElementById('scoreLabel')!,
@@ -62,103 +60,6 @@ export function getDomRefs(): DomRefs {
   };
 }
 
-function createEyeNode(x: number, y: number, size: number, blinkAmount: number, lookX: number, lookY: number): HTMLElement {
-  const eye = document.createElement('span');
-  eye.className = 'monster-eye';
-  eye.style.setProperty('--eye-x', `${Math.round(x * 100)}%`);
-  eye.style.setProperty('--eye-y', `${Math.round(y * 100)}%`);
-  eye.style.setProperty('--eye-size', `${size}`);
-  eye.style.setProperty('--blink', `${blinkAmount}`);
-  eye.style.setProperty('--look-x', `${lookX.toFixed(3)}`);
-  eye.style.setProperty('--look-y', `${lookY.toFixed(3)}`);
-  return eye;
-}
-
-function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.className = 'monster-art';
-  canvas.width = source.width;
-  canvas.height = source.height;
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(source, 0, 0);
-  return canvas;
-}
-
-function createTongueNode(x: number, y: number, width: number, height: number, sway: number): HTMLElement {
-  const tongue = document.createElement('span');
-  tongue.className = 'monster-tongue';
-  tongue.style.setProperty('--tongue-x', `${Math.round(x * 100)}%`);
-  tongue.style.setProperty('--tongue-y', `${Math.round(y * 100)}%`);
-  tongue.style.setProperty('--tongue-width', `${width}`);
-  tongue.style.setProperty('--tongue-height', `${height}`);
-  tongue.style.setProperty('--tongue-sway', `${sway.toFixed(3)}`);
-  return tongue;
-}
-
-function blinkAmount(now: number, seed: number): number {
-  const period = 3200 + (seed % 4) * 540;
-  const phase = (now + seed * 173) % period;
-  if (phase > period - 280) {
-    const t = (phase - (period - 280)) / 280;
-    if (t < 0.35) {
-      return t / 0.35;
-    }
-    if (t < 0.65) {
-      return 1;
-    }
-    return 1 - ((t - 0.65) / 0.35);
-  }
-  return 0;
-}
-
-function updateMonsterCell(
-  cell: HTMLElement,
-  skinKey: string,
-  occupiedNeighbors: { left: boolean; right: boolean; up: boolean; down: boolean },
-  now: number,
-  lookX: number,
-  lookY: number,
-): void {
-  const tile = getMonsterTile(skinKey);
-  cell.replaceChildren();
-  cell.className = 'cell';
-  cell.style.removeProperty('--squish-scale-x');
-  cell.style.removeProperty('--squish-scale-y');
-  cell.style.removeProperty('--squish-shift-x');
-  cell.style.removeProperty('--squish-shift-y');
-
-  if (!tile) {
-    const [pieceType] = skinKey.split(':');
-    cell.classList.add(`piece-${pieceType.toLowerCase()}`);
-    return;
-  }
-
-  const [pieceType] = skinKey.split(':');
-  const scaleX = occupiedNeighbors.left || occupiedNeighbors.right ? 0.05 : 0;
-  const scaleY = occupiedNeighbors.up || occupiedNeighbors.down ? 0.03 : 0;
-  const shiftX = occupiedNeighbors.left && !occupiedNeighbors.right ? 0.02 : occupiedNeighbors.right && !occupiedNeighbors.left ? -0.02 : 0;
-  const shiftY = occupiedNeighbors.up && !occupiedNeighbors.down ? 0.01 : occupiedNeighbors.down && !occupiedNeighbors.up ? -0.02 : 0;
-
-  cell.classList.add('monster-cell', `piece-${pieceType.toLowerCase()}`);
-  cell.style.setProperty('--squish-scale-x', `${scaleX}`);
-  cell.style.setProperty('--squish-scale-y', `${scaleY}`);
-  cell.style.setProperty('--squish-shift-x', `${shiftX}`);
-  cell.style.setProperty('--squish-shift-y', `${shiftY}`);
-  cell.appendChild(createMonsterArtNode(tile.canvas));
-
-  for (const eye of tile.eyes) {
-    const blink = eye.blink ? blinkAmount(now, eye.seed) : 0;
-    const reactiveX = lookX + Math.sin((now + eye.seed * 41) / 1100) * 0.08;
-    const reactiveY = lookY + Math.cos((now + eye.seed * 61) / 1400) * 0.05;
-    cell.appendChild(createEyeNode(eye.x, eye.y, eye.size, blink, reactiveX, reactiveY));
-  }
-
-  if (tile.tongue) {
-    const sway = Math.sin((now + tile.tongue.seed * 97) / 520) * 0.16;
-    cell.appendChild(createTongueNode(tile.tongue.x, tile.tongue.y, tile.tongue.width, tile.tongue.height, sway));
-  }
-}
-
 function renderPiecePreview(container: HTMLElement, piece: string | null): void {
   container.innerHTML = '';
   container.className = 'piece-preview';
@@ -171,22 +72,13 @@ function renderPiecePreview(container: HTMLElement, piece: string | null): void 
 
   const pieceType = piece as keyof typeof DEFINITIONS;
   container.classList.add(`piece-${pieceType.toLowerCase()}`);
-
-  for (let row = 0; row < 4; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
-      const cell = document.createElement('div');
-      cell.className = 'preview-cell';
-      const index = DEFINITIONS[pieceType][0].findIndex(({ x, y }) => x === col && y === row);
-      if (index !== -1) {
-        cell.classList.add('filled', 'monster-preview', `piece-${pieceType.toLowerCase()}`);
-        const tile = getMonsterTile(`${pieceType}:0:${index}`);
-        if (tile) {
-          cell.appendChild(createMonsterArtNode(tile.canvas));
-        }
-      }
-      container.appendChild(cell);
-    }
-  }
+  populateMonsterFigure(container, pieceType, {
+    rotation: 0,
+    now: performance.now(),
+    animate: false,
+    cellClassName: 'preview-cell',
+    filledClassName: 'filled monster-preview',
+  });
 }
 
 export function render(
@@ -194,9 +86,10 @@ export function render(
   state: GameState,
   settings: Settings,
   storage: StorageData,
+  appPhase: AppPhase,
+  now: number,
 ): void {
   const isTraining = state.mode === 'training';
-  const now = performance.now();
   const lookX = Math.max(-0.18, Math.min(0.18, Math.sin(now / 680) * 0.08 + (state.active ? (state.active.x - 4.5) / 18 : 0)));
   const lookY = Math.max(-0.12, Math.min(0.12, Math.cos(now / 920) * 0.04 + (state.active ? (state.active.y - 8) / 70 : 0.02)));
 
@@ -261,7 +154,14 @@ export function render(
     };
 
     if (occupied) {
-      updateMonsterCell(cell, skinKey, occupiedNeighbors, now, lookX, lookY);
+      populateMonsterCell(cell, skinKey, occupiedNeighbors, {
+        now,
+        lookX,
+        lookY,
+        animate: true,
+        allowSquish: true,
+        baseClassName: 'cell',
+      });
     } else {
       cell.className = 'cell';
       cell.replaceChildren();
@@ -273,7 +173,6 @@ export function render(
   refs.boardWrap.classList.toggle('line-clear-flash', now - state.lastLineClearAt < 180);
   refs.boardWrap.classList.toggle('training-fault-flash', isTraining && now - state.lastTrainingFaultAt < 320);
 
-  refs.modeSelect.value = state.mode;
   refs.modeDescription.textContent = MODE_DESCRIPTIONS[state.mode];
   refs.timer.textContent = formatTime(elapsed(state));
   refs.scoreLabel.textContent = isTraining ? 'Faults' : 'Score';
@@ -350,30 +249,41 @@ export function render(
     refs.faultToast.classList.add('hidden');
   }
 
-  if (!state.startTime && !state.gameOver) {
-    const count = Math.ceil(Math.max(0, state.countdownUntil - now) / 1000);
-    refs.overlay.textContent = count > 0 ? String(count) : 'GO';
-    refs.overlay.classList.remove('hidden');
-    refs.statusText.textContent = isTraining
-      ? 'Training ready. Place each piece with the fewest movement and rotation inputs you can.'
-      : `${MODE_LABELS[state.mode]} ready. ${MODE_DESCRIPTIONS[state.mode]}`;
-  } else if (state.sprintComplete) {
-    refs.overlay.textContent = '40 CLEAR';
-    refs.overlay.classList.remove('hidden');
-    refs.statusText.textContent = `Sprint complete in ${formatTime(elapsed(state))}.`;
-  } else if (state.gameOver) {
-    refs.overlay.textContent = 'TOP OUT';
-    refs.overlay.classList.remove('hidden');
-    refs.statusText.textContent = state.mode === 'arcade'
-      ? `Arcade run ended with ${state.score} points after ${state.lines} cleared lines.`
-      : 'Run ended by top out before clearing 40 lines.';
-  } else {
-    refs.overlay.classList.add('hidden');
-    if (isTraining) {
-      const faultRate = state.pieces ? Math.round((state.trainingFaults / state.pieces) * 1000) / 10 : 0;
-      refs.statusText.textContent = `Training active. ${state.trainingFaults} faults, ${faultRate}% fault rate, ${state.trainingPerfectStreak} perfect streak, feedback ${settings.trainingFeedback.toUpperCase()}.`;
-    } else {
-      refs.statusText.textContent = `${MODE_LABELS[state.mode]} active. DAS ${settings.dasMs}ms, ARR ${settings.arrMs}ms, lock delay ${settings.lockDelayMs}ms.`;
+  switch (appPhase) {
+    case 'countdown': {
+      const count = Math.ceil(Math.max(0, state.countdownUntil - now) / 1000);
+      refs.overlay.textContent = count > 0 ? String(count) : 'GO';
+      refs.overlay.classList.remove('hidden');
+      refs.statusText.textContent = isTraining
+        ? 'Training ready. Place each piece with the fewest movement and rotation inputs you can.'
+        : `${MODE_LABELS[state.mode]} ready. ${MODE_DESCRIPTIONS[state.mode]}`;
+      break;
     }
+    case 'playing':
+      refs.overlay.classList.add('hidden');
+      if (isTraining) {
+        const faultRate = state.pieces ? Math.round((state.trainingFaults / state.pieces) * 1000) / 10 : 0;
+        refs.statusText.textContent = `Training active. ${state.trainingFaults} faults, ${faultRate}% fault rate, ${state.trainingPerfectStreak} perfect streak, feedback ${settings.trainingFeedback.toUpperCase()}.`;
+      } else {
+        refs.statusText.textContent = `${MODE_LABELS[state.mode]} active. DAS ${settings.dasMs}ms, ARR ${settings.arrMs}ms, lock delay ${settings.lockDelayMs}ms.`;
+      }
+      break;
+    case 'sprint-clear':
+      refs.overlay.textContent = '40 CLEAR';
+      refs.overlay.classList.remove('hidden');
+      refs.statusText.textContent = `Sprint complete in ${formatTime(elapsed(state))}.`;
+      break;
+    case 'game-over':
+      refs.overlay.textContent = 'TOP OUT';
+      refs.overlay.classList.remove('hidden');
+      refs.statusText.textContent = state.mode === 'arcade'
+        ? `Arcade run ended with ${state.score} points after ${state.lines} cleared lines.`
+        : 'Run ended by top out before clearing 40 lines.';
+      break;
+    case 'menu':
+    default:
+      refs.overlay.classList.add('hidden');
+      refs.statusText.textContent = 'Choose a mode from the home menu and drop into the run.';
+      break;
   }
 }

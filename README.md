@@ -97,6 +97,7 @@ npm run build
 ```
 
 - Then open [enhanced/dist/index.html](./enhanced/dist/index.html) directly.
+- For layout and animation verification, append `?debug=1` to the preview URL.
 
 ### Run `MonStacka!` as a native desktop app window
 

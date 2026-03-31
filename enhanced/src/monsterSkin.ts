@@ -125,6 +125,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
 };
 
 const tiles = new Map<string, MonsterTile>();
+const figures = new Map<string, HTMLCanvasElement>();
 let loadPromise: Promise<void> | null = null;
 let loadCallbacks: Array<() => void> = [];
 
@@ -232,6 +233,7 @@ async function buildMonsterTiles(): Promise<void> {
     for (let rotation = 0; rotation < 4; rotation += 1) {
       const turns = ((rotation - spec.baseRotation) % 4 + 4) % 4;
       const rotatedCanvas = rotateCanvas(baseCanvas, turns);
+      figures.set(`${pieceType}:${rotation}`, rotatedCanvas);
       const definition = DEFINITIONS[pieceType][rotation];
       const rotatedEyes = (spec.eyes || [])
         .map((eye, eyeIndex) => {
@@ -330,4 +332,8 @@ export function prepareMonsterSkin(onReady?: () => void): Promise<void> {
 
 export function getMonsterTile(skinKey: string): MonsterTile | null {
   return tiles.get(skinKey) ?? null;
+}
+
+export function getMonsterFigureCanvas(pieceType: PieceType, rotation = 0): HTMLCanvasElement | null {
+  return figures.get(`${pieceType}:${rotation}`) ?? null;
 }

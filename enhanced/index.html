@@ -7,89 +7,140 @@
     <link rel="stylesheet" href="./src/styles.css">
 </head>
 <body>
-    <main class="layout">
-        <section class="hero">
-            <p class="eyebrow">MonStacka!</p>
-            <h1>Standalone Desktop Edition</h1>
-            <p class="subtitle">Monster-stack survival with Arcade, 40 Lines, and Training in one packaged app.</p>
-        </section>
+    <main class="app-shell">
+        <section id="homeScreen" class="screen-stage">
+            <div id="homeArtboard" class="artboard home-artboard">
+                <button id="openSettingsButtonHome" type="button" class="art-hit hit-home-settings" data-region="home-settings" aria-label="Open settings"></button>
+                <button id="quitGameButtonHome" type="button" class="art-hit hit-home-quit" data-region="home-quit" aria-label="Quit MonStacka!"></button>
 
-        <section class="play-area">
-            <div id="boardWrap" class="board-wrap">
-                <div id="overlay" class="overlay hidden"></div>
-                <div id="faultToast" class="fault-toast hidden"></div>
-                <div id="board" class="board"></div>
-            </div>
+                <div class="home-name-fill" data-region="home-name-fill">
+                    <span id="monstosName" class="home-name-text">BLYNDOOLIE</span>
+                </div>
 
-            <aside class="sidebar">
-                <div class="panel">
-                    <h2>Mode</h2>
-                    <label class="mode-label">
-                        <span>Select</span>
-                        <select id="modeSelect">
-                            <option value="arcade">Arcade</option>
-                            <option value="sprint40">40 Lines</option>
-                            <option value="training">Training</option>
-                        </select>
-                    </label>
-                    <p id="modeDescription" class="status-text">Play until you top out. Chase the highest score you can post.</p>
-                </div>
-                <div class="panel">
-                    <h2>Time</h2>
-                    <p id="timer" class="metric">00:00.000</p>
-                </div>
-                <div class="panel triple">
-                    <div><h2 id="scoreLabel">Score</h2><p id="score" class="metric">0</p></div>
-                    <div><h2 id="goalLabel">Goal</h2><p id="goalValue" class="metric">ENDLESS</p></div>
-                    <div><h2 id="linesLabel">Lines</h2><p id="lines" class="metric">0</p></div>
-                </div>
-                <div class="panel">
-                    <h2>Hold</h2>
-                    <div id="hold" class="piece-preview empty">-</div>
-                </div>
-                <div class="panel">
-                    <h2>Next</h2>
-                    <ul id="nextQueue" class="queue-list"></ul>
-                </div>
-            </aside>
-        </section>
-
-        <section class="info-grid">
-            <div class="panel">
-                <h2 id="leaderboardTitle">Top 10 Scores</h2>
-                <ol id="leaderboard" class="leaderboard"></ol>
-            </div>
-            <div class="panel">
-                <h2>Status</h2>
-                <p id="statusText" class="status-text">MonStacka! opens straight into the run. Switch modes or retry at any time.</p>
-                <div class="button-row">
-                    <button id="retryButton" type="button">Retry</button>
-                </div>
-            </div>
-            <div class="panel">
-                <h2>Handling</h2>
-                <form id="settingsForm" class="settings-form">
-                    <label>DAS (ms)<input id="dasInput" type="number" min="0" max="300" step="1"></label>
-                    <label>ARR (ms)<input id="arrInput" type="number" min="0" max="120" step="1"></label>
-                    <label>Lock Delay (ms)<input id="lockDelayInput" type="number" min="0" max="1000" step="10"></label>
-                    <label>Training Feedback
-                        <select id="trainingFeedbackInput">
-                            <option value="show">Show</option>
-                            <option value="redo">Redo</option>
-                            <option value="off">Off</option>
-                        </select>
-                    </label>
-                    <label class="toggle-row"><input id="mutedInput" type="checkbox">Mute Audio</label>
-                    <label>SFX Volume<input id="sfxVolumeInput" type="range" min="0" max="100" step="1"></label>
-                    <label>Music Volume<input id="musicVolumeInput" type="range" min="0" max="100" step="1"></label>
-                    <div class="button-row">
-                        <button id="applySettingsButton" type="submit">Apply</button>
-                        <button id="resetSettingsButton" type="button">Defaults</button>
+                <div id="monstosLoreBubble" class="home-lore-fill" data-region="home-lore-fill">
+                    <div id="monstosLoreText" class="home-lore-text">
+                        it sees all! good luck sneaking up... wait...it doesn't even blink... is it drooling on it's own eyes?
                     </div>
-                </form>
+                </div>
+
+                <button id="monstosVoiceButton" type="button" class="art-hit hit-home-voice" data-region="home-voice" aria-label="Play Monstos sound preview"></button>
+                <button id="monstosLoreButton" type="button" class="art-hit hit-home-lore" data-region="home-lore" aria-label="Toggle Monstos lore"></button>
+
+                <div class="preview-slot preview-slot-left" data-region="home-preview-left">
+                    <div id="monstosLeft" class="preview-stage"></div>
+                </div>
+                <div class="preview-slot preview-slot-center" data-region="home-preview-center">
+                    <div id="monstosCenter" class="preview-stage preview-stage-active"></div>
+                </div>
+                <div class="preview-slot preview-slot-right" data-region="home-preview-right">
+                    <div id="monstosRight" class="preview-stage"></div>
+                </div>
+
+                <button id="monstosPrevButton" type="button" class="art-hit hit-home-prev" data-region="home-prev" aria-label="Previous Monstos"></button>
+                <button id="monstosNextButton" type="button" class="art-hit hit-home-next" data-region="home-next" aria-label="Next Monstos"></button>
+
+                <button id="leaderboardSprintButton" type="button" class="art-hit hit-home-score-sprint" data-region="home-score-sprint" aria-label="Show X(4)-LINES leaderboard"></button>
+                <button id="leaderboardArcadeButton" type="button" class="art-hit hit-home-score-arcade" data-region="home-score-arcade" aria-label="Show OGBM leaderboard"></button>
+                <ol id="homeLeaderboard" class="home-score-grid" data-region="home-score-grid"></ol>
+
+                <button id="startArcadeButton" type="button" class="art-hit hit-home-play-arcade" data-region="home-play-arcade" aria-label="Start OG Bubba Mode"></button>
+                <button id="startSprintButton" type="button" class="art-hit hit-home-play-sprint" data-region="home-play-sprint" aria-label="Start X(4)-LINES mode"></button>
+                <button id="startTrainingButton" type="button" class="art-hit hit-home-play-training" data-region="home-play-training" aria-label="Start Training mode"></button>
+            </div>
+        </section>
+
+        <section id="gameShell" class="screen-stage hidden">
+            <div id="gameArtboard" class="artboard game-artboard">
+                <button id="openSettingsButtonGame" type="button" class="art-hit hit-game-settings" data-region="game-settings" aria-label="Open settings"></button>
+                <button id="quitGameButtonGame" type="button" class="art-hit hit-game-quit" data-region="game-quit" aria-label="Quit MonStacka!"></button>
+                <button id="homeButtonGame" type="button" class="art-hit hit-game-home" data-region="game-home" aria-label="Return to home menu"></button>
+
+                <div class="game-ui" data-region="game-ui">
+                    <div class="board-column">
+                        <div id="boardWrap" class="board-wrap">
+                            <div id="overlay" class="overlay hidden"></div>
+                            <div id="faultToast" class="fault-toast hidden"></div>
+                            <div id="board" class="board"></div>
+                        </div>
+                    </div>
+
+                    <aside class="game-sidebar">
+                        <div class="panel">
+                            <h2>Mode</h2>
+                            <p id="modeDescription" class="status-text">Play until you top out. Chase the highest score you can post.</p>
+                        </div>
+
+                        <div class="panel triple">
+                            <div><h2 id="scoreLabel">Score</h2><p id="score" class="metric">0</p></div>
+                            <div><h2 id="goalLabel">Goal</h2><p id="goalValue" class="metric">ENDLESS</p></div>
+                            <div><h2 id="linesLabel">Lines</h2><p id="lines" class="metric">0</p></div>
+                        </div>
+
+                        <div class="panel split">
+                            <div><h2>Time</h2><p id="timer" class="metric">00:00.000</p></div>
+                            <div class="run-actions">
+                                <button id="retryButton" type="button">Retry</button>
+                            </div>
+                        </div>
+
+                        <div class="panel split preview-panels">
+                            <div>
+                                <h2>Hold</h2>
+                                <div id="hold" class="piece-preview empty">-</div>
+                            </div>
+                            <div>
+                                <h2>Next</h2>
+                                <ul id="nextQueue" class="queue-list"></ul>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <section class="game-sidebar game-sidebar-secondary">
+                        <div class="panel">
+                            <h2 id="leaderboardTitle">Top 10 Scores</h2>
+                            <ol id="leaderboard" class="leaderboard"></ol>
+                        </div>
+                        <div class="panel">
+                            <h2>Status</h2>
+                            <p id="statusText" class="status-text">Choose a mode from the home menu and drop into the run.</p>
+                        </div>
+                    </section>
+                </div>
             </div>
         </section>
     </main>
+
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-card">
+            <div class="modal-title-row">
+                <div>
+                    <p class="eyebrow">Settings</p>
+                    <h2>Handling And Audio</h2>
+                </div>
+                <button id="closeSettingsButton" type="button" class="modal-close secondary" aria-label="Close settings">Close</button>
+            </div>
+            <form id="settingsForm" class="settings-form">
+                <label>DAS (ms)<input id="dasInput" type="number" min="0" max="300" step="1"></label>
+                <label>ARR (ms)<input id="arrInput" type="number" min="0" max="120" step="1"></label>
+                <label>Lock Delay (ms)<input id="lockDelayInput" type="number" min="0" max="1000" step="10"></label>
+                <label>Training Feedback
+                    <select id="trainingFeedbackInput">
+                        <option value="show">Show</option>
+                        <option value="redo">Redo</option>
+                        <option value="off">Off</option>
+                    </select>
+                </label>
+                <label class="toggle-row"><input id="mutedInput" type="checkbox">Mute Audio</label>
+                <label>SFX Volume<input id="sfxVolumeInput" type="range" min="0" max="100" step="1"></label>
+                <label>Music Volume<input id="musicVolumeInput" type="range" min="0" max="100" step="1"></label>
+                <div class="button-row">
+                    <button id="applySettingsButton" type="submit">Apply</button>
+                    <button id="resetSettingsButton" type="button" class="secondary">Defaults</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="recordModal" class="modal hidden">
         <div class="modal-card">
             <p class="eyebrow">New Record</p>
@@ -106,6 +157,7 @@
             </form>
         </div>
     </div>
+
     <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
