@@ -10,7 +10,8 @@ export type SoundCue =
   | 'lineClear'
   | 'topOut'
   | 'countdown'
-  | 'go';
+  | 'go'
+  | 'previewBeep';
 
 export class AudioManager {
   private context: AudioContext | null = null;
@@ -91,6 +92,9 @@ export class AudioManager {
       case 'go':
         this.playTone('triangle', 660, 0.08, 0.05, now);
         this.playTone('triangle', 880, 0.08, 0.05, now + 0.05);
+        break;
+      case 'previewBeep':
+        this.playTone('sine', 640, 0.07, 0.035, now);
         break;
       default:
         break;

@@ -1,5 +1,8 @@
-import type { GameState, Piece, PieceType, GameMode, TrainingSnapshot } from '../types';
+import type {
+  GameState, Piece, PieceType, GameMode, ResumableAppPhase, SavedRun, SavedRunState, TrainingSnapshot,
+} from '../types';
 import { COUNTDOWN_MS, DEFAULT_MODE, SCORE_TABLE, SETTINGS_DEFAULTS, TARGET_LINES } from '../constants';
+import { getGravityMs } from './gravity';
 import { clearLines, collapseRows, createBoard } from './board';
 import { ensureQueue } from './bag';
 import { isGrounded, isValid, getCells, rotate as rotatePiece } from './pieces';
@@ -42,6 +45,44 @@ function restoreTrainingSnapshot(state: GameState): void {
   state.sprintComplete = false;
   state.gameOver = false;
   state.currentPieceInputs = 0;
+}
+
+function cloneBoard(board: string[][]): string[][] {
+  return board.map((row) => [...row]);
+}
+
+function clonePiece(piece: Piece | null): Piece | null {
+  return piece ? { ...piece } : null;
+}
+
+function cloneTrainingSnapshot(snapshot: TrainingSnapshot | null): TrainingSnapshot | null {
+  if (!snapshot) return null;
+  return {
+    active: { ...snapshot.active },
+    queue: [...snapshot.queue],
+  };
+}
+
+function createSavedRunState(state: GameState): SavedRunState {
+  return {
+    board: cloneBoard(state.board),
+    boardSkin: cloneBoard(state.boardSkin),
+    active: clonePiece(state.active),
+    hold: state.hold,
+    holdUsed: state.holdUsed,
+    queue: [...state.queue],
+    hasSpawned: state.hasSpawned,
+    mode: state.mode,
+    lines: state.lines,
+    score: state.score,
+    pieces: state.pieces,
+    trainingFeedback: state.trainingFeedback,
+    currentPieceInputs: state.currentPieceInputs,
+    trainingFaults: state.trainingFaults,
+    trainingPerfectStreak: state.trainingPerfectStreak,
+    lastTrainingFaultMessage: state.lastTrainingFaultMessage,
+    trainingSnapshot: cloneTrainingSnapshot(state.trainingSnapshot),
+  };
 }
 
 export function createGameState(mode: GameMode = DEFAULT_MODE): GameState {
@@ -125,6 +166,62 @@ export function reset(state: GameState, mode: GameMode = state.mode): void {
   state.sprintComplete = false;
   state.gameOver = false;
   spawn(state);
+}
+
+export function captureSavedRun(state: GameState, phase: ResumableAppPhase, now: number): SavedRun {
+  return {
+    mode: state.mode,
+    phase,
+    savedAt: new Date().toISOString(),
+    elapsedMs: (phase === 'playing' || phase === 'paused') && state.startTime ? Math.max(0, Math.floor(now - state.startTime)) : 0,
+    remainingCountdownMs: phase === 'countdown' ? Math.max(0, Math.ceil(state.countdownUntil - now)) : 0,
+    gravityElapsedMs: (phase === 'playing' || phase === 'paused') ? Math.max(0, Math.floor(now - state.lastGravity)) : 0,
+    lockRemainingMs: state.lockDeadline ? Math.max(0, Math.ceil(state.lockDeadline - now)) : 0,
+    state: createSavedRunState(state),
+  };
+}
+
+export function restoreSavedRun(state: GameState, savedRun: SavedRun, now: number): ResumableAppPhase {
+  const saved = savedRun.state;
+  state.board = cloneBoard(saved.board);
+  state.boardSkin = cloneBoard(saved.boardSkin);
+  state.active = clonePiece(saved.active);
+  state.hold = saved.hold;
+  state.holdUsed = saved.holdUsed;
+  state.queue = [...saved.queue];
+  state.hasSpawned = saved.hasSpawned;
+  state.mode = saved.mode;
+  state.lines = saved.lines;
+  state.score = saved.score;
+  state.pieces = saved.pieces;
+  state.trainingFeedback = saved.trainingFeedback;
+  state.currentPieceInputs = saved.currentPieceInputs;
+  state.trainingFaults = saved.trainingFaults;
+  state.trainingPerfectStreak = saved.trainingPerfectStreak;
+  state.lastTrainingFaultMessage = saved.lastTrainingFaultMessage;
+  state.trainingSnapshot = cloneTrainingSnapshot(saved.trainingSnapshot);
+  state.completedTime = 0;
+  state.lastLockAt = 0;
+  state.lastLineClearAt = 0;
+  state.lastTrainingFaultAt = 0;
+  state.sprintComplete = false;
+  state.gameOver = false;
+
+  if (savedRun.phase === 'countdown' && savedRun.remainingCountdownMs > 0) {
+    state.startTime = 0;
+    state.countdownUntil = now + savedRun.remainingCountdownMs;
+    state.lastGravity = 0;
+    state.lockDeadline = savedRun.lockRemainingMs ? now + savedRun.lockRemainingMs : 0;
+    return 'countdown';
+  }
+
+  const gravityMs = getGravityMs(saved.mode, saved.lines);
+  const safeGravityElapsed = Math.min(savedRun.gravityElapsedMs, Math.max(0, gravityMs - 1));
+  state.startTime = now - savedRun.elapsedMs;
+  state.countdownUntil = 0;
+  state.lastGravity = now - safeGravityElapsed;
+  state.lockDeadline = savedRun.lockRemainingMs ? now + savedRun.lockRemainingMs : 0;
+  return savedRun.phase === 'paused' ? 'paused' : 'playing';
 }
 
 export function move(state: GameState, dx: number, dy: number, lockDelayMs: number): boolean {

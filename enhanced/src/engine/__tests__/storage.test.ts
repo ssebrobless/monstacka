@@ -1,13 +1,58 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SETTINGS_DEFAULTS } from '../../constants';
-import { normalizeNickname, qualifiesScoreRecord, qualifiesSprintRecord, saveScoreRecord, saveSprintRecord } from '../../storage';
-import type { StorageData } from '../../types';
+import {
+  clearSavedRun,
+  getSavedRun,
+  normalizeNickname,
+  qualifiesScoreRecord,
+  qualifiesSprintRecord,
+  saveScoreRecord,
+  saveSprintRecord,
+  setSavedRun,
+} from '../../storage';
+import type { SavedRun, StorageData } from '../../types';
 
 function createStorage(): StorageData {
   return {
     sprint: [],
     score: [],
     settings: { ...SETTINGS_DEFAULTS },
+    savedRuns: {
+      arcade: null,
+      sprint40: null,
+      training: null,
+    },
+  };
+}
+
+function createSavedRun(mode: SavedRun['mode']): SavedRun {
+  return {
+    mode,
+    phase: 'playing',
+    savedAt: '2026-03-31T00:00:00.000Z',
+    elapsedMs: 5000,
+    remainingCountdownMs: 0,
+    gravityElapsedMs: 120,
+    lockRemainingMs: 200,
+    state: {
+      board: Array.from({ length: 24 }, () => Array(10).fill('')),
+      boardSkin: Array.from({ length: 24 }, () => Array(10).fill('')),
+      active: { type: 'T', rotation: 0, x: 3, y: 0 },
+      hold: '',
+      holdUsed: false,
+      queue: ['I', 'O', 'L'],
+      hasSpawned: true,
+      mode,
+      lines: 8,
+      score: 1200,
+      pieces: 15,
+      trainingFeedback: 'show',
+      currentPieceInputs: 0,
+      trainingFaults: 1,
+      trainingPerfectStreak: 2,
+      lastTrainingFaultMessage: '',
+      trainingSnapshot: null,
+    },
   };
 }
 
@@ -71,5 +116,17 @@ describe('storage helpers', () => {
     expect(data.score[0].nickname).toBe('P11');
     expect(data.score[0].score).toBe(1200);
     expect(data.score[9].score).toBe(300);
+  });
+
+  it('stores and clears saved runs per mode', () => {
+    const data = createStorage();
+    const sprintSave = createSavedRun('sprint40');
+
+    setSavedRun(data, sprintSave);
+    expect(getSavedRun(data, 'sprint40')?.state.lines).toBe(8);
+    expect(getSavedRun(data, 'arcade')).toBeNull();
+
+    clearSavedRun(data, 'sprint40');
+    expect(getSavedRun(data, 'sprint40')).toBeNull();
   });
 });

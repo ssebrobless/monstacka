@@ -5,12 +5,17 @@ import {
   loadStorage,
   saveStorage,
   normalizeNickname,
+  clearSavedRun,
+  getSavedRun,
   qualifiesScoreRecord,
   qualifiesSprintRecord,
   saveScoreRecord,
   saveSprintRecord,
+  setSavedRun,
 } from './storage';
-import { createGameState, reset, dropOnce, lockPiece, elapsed } from './engine/state';
+import {
+  captureSavedRun, createGameState, reset, restoreSavedRun, dropOnce, lockPiece, elapsed,
+} from './engine/state';
 import { getGravityMs } from './engine/gravity';
 import { setupKeyboard, createInputState, clearHorizontalRepeat } from './input/keyboard';
 import { getDomRefs, render } from './ui/render';
@@ -39,6 +44,7 @@ function init() {
   const settings = storage.settings;
   const state = createGameState(DEFAULT_MODE);
   const debugMode = new URLSearchParams(window.location.search).has('debug');
+  const isTauriApp = '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
   state.trainingFeedback = settings.trainingFeedback;
   const input = createInputState();
   const refs = getDomRefs();
@@ -50,9 +56,16 @@ function init() {
   const gameShell = document.getElementById('gameShell')!;
   const homeArtboard = document.getElementById('homeArtboard')!;
   const gameArtboard = document.getElementById('gameArtboard')!;
+  const gameBoardZone = document.getElementById('gameBoardZone')!;
   const recordModal = document.getElementById('recordModal')!;
   const recordSummary = document.getElementById('recordSummary')!;
   const recordTitle = recordModal.querySelector('h2')!;
+  const resumeModal = document.getElementById('resumeModal')!;
+  const resumeSummary = document.getElementById('resumeSummary')!;
+  const resumeTitle = document.getElementById('resumeTitle')!;
+  const continueSavedButton = document.getElementById('continueSavedButton') as HTMLButtonElement;
+  const startFreshButton = document.getElementById('startFreshButton') as HTMLButtonElement;
+  const cancelResumeButton = document.getElementById('cancelResumeButton') as HTMLButtonElement;
   const nicknameForm = document.getElementById('nicknameForm') as HTMLFormElement;
   const nicknameInput = document.getElementById('nicknameInput') as HTMLInputElement;
   const skipRecordButton = document.getElementById('skipRecordButton') as HTMLButtonElement;
@@ -79,11 +92,24 @@ function init() {
   let appPhase: AppPhase = 'menu';
   let handledRunKey = '';
   let pendingRecord: PendingRecord | null = null;
+  let pendingResumeMode: GameMode | null = null;
   let lastLockSoundAt = 0;
   let lastLineClearSoundAt = 0;
   let gameOverSounded = false;
   let lastCountdownMarker = -1;
   let monsterSkinReady = false;
+  let lastMenuPreviewFrameAt = 0;
+  let pausedAt = 0;
+
+  function showHomeScreen() {
+    gameShell.classList.add('hidden');
+    homeScreen.classList.remove('hidden');
+  }
+
+  function showGameScreen() {
+    gameShell.classList.remove('hidden');
+    homeScreen.classList.add('hidden');
+  }
 
   function renderCurrentView(now = performance.now()) {
     if (appPhase === 'menu') {
@@ -98,9 +124,29 @@ function init() {
     render(refs, state, settings, storage, appPhase, now);
   }
 
+  function fitBoardToZone() {
+    const zoneWidth = gameBoardZone.clientWidth;
+    const zoneHeight = gameBoardZone.clientHeight;
+    if (!zoneWidth || !zoneHeight) {
+      return;
+    }
+
+    const boardWidth = Math.min(zoneWidth, zoneHeight / 2);
+    const boardHeight = boardWidth * 2;
+    refs.boardWrap.style.width = `${boardWidth.toFixed(2)}px`;
+    refs.boardWrap.style.height = `${boardHeight.toFixed(2)}px`;
+  }
+
+  function scheduleBoardFit() {
+    window.requestAnimationFrame(() => {
+      fitBoardToZone();
+    });
+  }
+
   function applyArtboardRegions() {
     applyRegionMap(homeArtboard, HOME_REGIONS);
     applyRegionMap(gameArtboard, GAME_REGIONS);
+    fitBoardToZone();
   }
 
   function closeSettingsModal() {
@@ -115,6 +161,36 @@ function init() {
     pendingRecord = null;
     recordModal.classList.add('hidden');
     nicknameForm.reset();
+  }
+
+  function closeResumeModal() {
+    pendingResumeMode = null;
+    resumeModal.classList.add('hidden');
+  }
+
+  function formatSavedRunSummary(mode: GameMode): string {
+    const savedRun = getSavedRun(storage, mode);
+    if (!savedRun) {
+      return '';
+    }
+
+    const savedAt = new Date(savedRun.savedAt).toLocaleString();
+    switch (mode) {
+      case 'sprint40':
+        return `Continue your ${MODE_LABELS[mode]} run from ${savedRun.state.lines} cleared lines. Saved ${savedAt}.`;
+      case 'training':
+        return `Continue your ${MODE_LABELS[mode]} run from ${savedRun.state.pieces} pieces with ${savedRun.state.trainingFaults} faults. Saved ${savedAt}.`;
+      case 'arcade':
+      default:
+        return `Continue your ${MODE_LABELS[mode]} run from ${savedRun.state.score} points and ${savedRun.state.lines} cleared lines. Saved ${savedAt}.`;
+    }
+  }
+
+  function openResumeModal(mode: GameMode) {
+    pendingResumeMode = mode;
+    resumeTitle.textContent = `${MODE_LABELS[mode]} Save Found`;
+    resumeSummary.textContent = formatSavedRunSummary(mode);
+    resumeModal.classList.remove('hidden');
   }
 
   function openRecordModal(record: PendingRecord) {
@@ -175,6 +251,7 @@ function init() {
     clearHorizontalRepeat(input);
     handledRunKey = '';
     closeRecordModal();
+    closeResumeModal();
     reset(state, nextMode);
     lastLockSoundAt = 0;
     lastLineClearSoundAt = 0;
@@ -187,25 +264,34 @@ function init() {
       case 'menu':
         clearHorizontalRepeat(input);
         closeRecordModal();
+        closeResumeModal();
         closeSettingsModal();
         doReset(state.mode);
-        gameShell.classList.add('hidden');
-        homeScreen.classList.remove('hidden');
+        showHomeScreen();
+        lastMenuPreviewFrameAt = 0;
+        pausedAt = 0;
         break;
       case 'countdown':
         closeSettingsModal();
         closeRecordModal();
-        gameShell.classList.remove('hidden');
-        homeScreen.classList.add('hidden');
+        closeResumeModal();
+        showGameScreen();
         doReset(nextMode ?? state.mode);
+        scheduleBoardFit();
+        pausedAt = 0;
         break;
       case 'playing':
         state.startTime = state.countdownUntil;
         state.lastGravity = state.startTime;
+        pausedAt = 0;
+        break;
+      case 'paused':
         break;
       case 'game-over':
       case 'sprint-clear':
+        clearSavedRun(storage, state.mode);
         doRecordCheck();
+        pausedAt = 0;
         break;
       default:
         break;
@@ -214,15 +300,123 @@ function init() {
     appPhase = nextPhase;
   }
 
-  function returnToMenu() {
-    transitionTo('menu');
-    renderCurrentView();
+  function saveCurrentRunIfResumable() {
+    if (appPhase !== 'countdown' && appPhase !== 'playing' && appPhase !== 'paused') {
+      return;
+    }
+
+    const captureTime = appPhase === 'paused' && pausedAt ? pausedAt : performance.now();
+    const savedPhase = appPhase === 'paused' ? 'paused' : appPhase;
+    const savedRun = captureSavedRun(state, savedPhase, captureTime);
+    setSavedRun(storage, savedRun);
+  }
+
+  function returnToMenu(preserveRun = false) {
+    try {
+      if (preserveRun) {
+        saveCurrentRunIfResumable();
+      }
+      transitionTo('menu');
+      renderCurrentView();
+    } catch (error) {
+      console.error('MonStacka menu recovery failed', error);
+      try {
+        clearHorizontalRepeat(input);
+        closeRecordModal();
+        closeResumeModal();
+        closeSettingsModal();
+        doReset(state.mode);
+      } catch (recoveryError) {
+        console.error('MonStacka hard reset failed', recoveryError);
+      }
+
+      appPhase = 'menu';
+      showHomeScreen();
+
+      try {
+        renderCurrentView();
+      } catch (renderError) {
+        console.error('MonStacka menu fallback render failed', renderError);
+      }
+    }
   }
 
   function startMode(mode: GameMode) {
     audio.ensureReady(settings);
+    clearSavedRun(storage, mode);
     transitionTo('countdown', mode);
     renderCurrentView();
+  }
+
+  function continueSavedMode(mode: GameMode) {
+    const savedRun = getSavedRun(storage, mode);
+    if (!savedRun) {
+      startMode(mode);
+      return;
+    }
+
+    audio.ensureReady(settings);
+    closeResumeModal();
+    closeRecordModal();
+    closeSettingsModal();
+    showGameScreen();
+    const resumePhase = restoreSavedRun(state, savedRun, performance.now());
+    lastLockSoundAt = 0;
+    lastLineClearSoundAt = 0;
+    gameOverSounded = false;
+    lastCountdownMarker = -1;
+    handledRunKey = '';
+    appPhase = resumePhase;
+    pausedAt = resumePhase === 'paused' ? performance.now() : 0;
+    scheduleBoardFit();
+    renderCurrentView();
+  }
+
+  function restartCurrentRun() {
+    audio.ensureReady(settings);
+    clearSavedRun(storage, state.mode);
+    transitionTo('countdown', state.mode);
+    renderCurrentView();
+  }
+
+  function pauseRun(now = performance.now()) {
+    if (appPhase !== 'playing') {
+      return;
+    }
+
+    pausedAt = now;
+    appPhase = 'paused';
+    renderCurrentView(now);
+  }
+
+  function resumeRun(now = performance.now()) {
+    if (appPhase !== 'paused') {
+      return;
+    }
+
+    const pausedDuration = pausedAt ? Math.max(0, now - pausedAt) : 0;
+    if (state.startTime) {
+      state.startTime += pausedDuration;
+    }
+    if (state.lastGravity) {
+      state.lastGravity += pausedDuration;
+    }
+    if (state.lockDeadline) {
+      state.lockDeadline += pausedDuration;
+    }
+    pausedAt = 0;
+    appPhase = 'playing';
+    renderCurrentView(now);
+  }
+
+  function requestModeStart(mode: GameMode) {
+    const savedRun = getSavedRun(storage, mode);
+    if (savedRun) {
+      openResumeModal(mode);
+      return;
+    }
+
+    startMode(mode);
   }
 
   applyArtboardRegions();
@@ -232,17 +426,19 @@ function init() {
     renderCurrentView();
   });
 
-  setupKeyboard(state, input, settings, renderCurrentView, () => transitionTo('countdown'), (cue) => {
+  setupKeyboard(state, input, settings, renderCurrentView, () => {
+    clearSavedRun(storage, state.mode);
+    transitionTo('countdown');
+    renderCurrentView();
+  }, (cue) => {
     audio.play(cue, settings);
   });
 
   document.getElementById('retryButton')!.addEventListener('click', () => {
-    audio.ensureReady(settings);
-    transitionTo('countdown');
-    renderCurrentView();
+    restartCurrentRun();
   });
 
-  homeButtonGame.addEventListener('click', returnToMenu);
+  homeButtonGame.addEventListener('click', () => returnToMenu(true));
 
   openSettingsButtonHome.addEventListener('click', openSettingsModal);
   openSettingsButtonGame.addEventListener('click', openSettingsModal);
@@ -252,13 +448,33 @@ function init() {
       closeSettingsModal();
     }
   });
+  resumeModal.addEventListener('click', (event) => {
+    if (event.target === resumeModal) {
+      closeResumeModal();
+    }
+  });
 
-  const quitGame = () => {
+  const quitGame = async () => {
+    closeSettingsModal();
+    closeRecordModal();
+    closeResumeModal();
+
+    if (isTauriApp) {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().close();
+        return;
+      } catch (error) {
+        console.error('Native MonStacka close failed, falling back to menu.', error);
+      }
+    }
+
     try {
       window.close();
     } catch {
       // Browser contexts can block window.close(); fall back to menu.
     }
+
     window.setTimeout(() => {
       if (!document.hidden) {
         returnToMenu();
@@ -271,23 +487,32 @@ function init() {
 
   monstosPrevButton.addEventListener('click', () => {
     cycleHomeMonstos(homeState, -1);
+    homeState.loreTypingPiece = null;
+    homeState.loreBubbleOpenedAt = performance.now();
     renderCurrentView();
   });
 
   monstosNextButton.addEventListener('click', () => {
     cycleHomeMonstos(homeState, 1);
+    homeState.loreTypingPiece = null;
+    homeState.loreBubbleOpenedAt = performance.now();
     renderCurrentView();
   });
 
-  homeRefs.monstosLoreButton.addEventListener('click', () => {
+  homeRefs.monstosLoreButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     homeState.loreOpen = !homeState.loreOpen;
+    homeState.loreBubbleOpenedAt = performance.now();
+    homeState.loreTypingPiece = homeState.loreOpen ? null : getActiveMonstos(homeState).pieceType;
+    homeState.loreVisibleText = '';
     renderCurrentView();
   });
 
-  homeRefs.monstosVoiceButton.addEventListener('click', () => {
-    const active = getActiveMonstos(homeState);
-    audio.playMonstosPreview(active.pieceType, settings);
-    renderCurrentView();
+  homeRefs.monstosVoiceButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    audio.play('previewBeep', settings);
   });
 
   homeRefs.leaderboardArcadeButton.addEventListener('click', () => {
@@ -300,9 +525,23 @@ function init() {
     renderCurrentView();
   });
 
-  startArcadeButton.addEventListener('click', () => startMode('arcade'));
-  startSprintButton.addEventListener('click', () => startMode('sprint40'));
-  startTrainingButton.addEventListener('click', () => startMode('training'));
+  startArcadeButton.addEventListener('click', () => requestModeStart('arcade'));
+  startSprintButton.addEventListener('click', () => requestModeStart('sprint40'));
+  startTrainingButton.addEventListener('click', () => requestModeStart('training'));
+
+  continueSavedButton.addEventListener('click', () => {
+    if (!pendingResumeMode) return;
+    continueSavedMode(pendingResumeMode);
+  });
+
+  startFreshButton.addEventListener('click', () => {
+    if (!pendingResumeMode) return;
+    const mode = pendingResumeMode;
+    closeResumeModal();
+    startMode(mode);
+  });
+
+  cancelResumeButton.addEventListener('click', closeResumeModal);
 
   const settingsForm = document.getElementById('settingsForm')!;
   const resetSettingsButton = document.getElementById('resetSettingsButton')!;
@@ -356,6 +595,28 @@ function init() {
     renderCurrentView();
   });
 
+  document.addEventListener('keydown', (event) => {
+    if (event.repeat) {
+      return;
+    }
+
+    if (event.code === 'KeyP') {
+      if (appPhase === 'playing') {
+        event.preventDefault();
+        pauseRun();
+      } else if (appPhase === 'paused') {
+        event.preventDefault();
+        resumeRun();
+      }
+      return;
+    }
+
+    if (event.code === 'KeyO' && appPhase === 'paused') {
+      event.preventDefault();
+      restartCurrentRun();
+    }
+  });
+
   function tick(now: number) {
     if (debugLabel) {
       debugLabel.textContent = `phase: ${appPhase}${state.active ? ` | active: ${state.active.type}` : ''}`;
@@ -363,6 +624,10 @@ function init() {
 
     switch (appPhase) {
       case 'menu':
+        if (monsterSkinReady && now - lastMenuPreviewFrameAt >= 33) {
+          renderCurrentView(now);
+          lastMenuPreviewFrameAt = now;
+        }
         break;
       case 'countdown': {
         const countdownMarker = Math.ceil(Math.max(0, state.countdownUntil - now) / 1000);
@@ -409,6 +674,9 @@ function init() {
         renderCurrentView(now);
         break;
       }
+      case 'paused':
+        renderCurrentView(now);
+        break;
       case 'game-over':
       case 'sprint-clear':
         if (appPhase === 'game-over' && !state.sprintComplete && !gameOverSounded) {

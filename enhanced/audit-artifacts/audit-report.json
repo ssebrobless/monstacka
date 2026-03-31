@@ -1,0 +1,369 @@
+{
+  "generatedAt": "2026-03-31T22:08:58.248Z",
+  "screenshots": {
+    "home": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-initial.png",
+    "homeLoreCollapsed": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-lore-collapsed.png",
+    "homeAfterNext": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-after-next.png",
+    "arcadeStart": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\arcade-start.png",
+    "arcadeAfterInput": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\arcade-after-input.png",
+    "arcadeAfterHome": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\arcade-after-home.png",
+    "arcadeResume": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\arcade-resume.png",
+    "sprint40Start": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\sprint40-start.png",
+    "sprint40AfterInput": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\sprint40-after-input.png",
+    "sprint40AfterHome": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\sprint40-after-home.png",
+    "sprint40Resume": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\sprint40-resume.png",
+    "trainingStart": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\training-start.png",
+    "trainingAfterInput": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\training-after-input.png",
+    "trainingAfterHome": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\training-after-home.png",
+    "trainingResume": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\training-resume.png"
+  },
+  "preview": {
+    "initial": {
+      "name": "BLYNDOOLIE",
+      "lore": "it sees all! good luck sneakin",
+      "loreBubbleClass": "home-lore-fill is-long is-huge",
+      "left": {
+        "childCount": 1,
+        "htmlLength": 891,
+        "text": ""
+      },
+      "center": {
+        "childCount": 1,
+        "htmlLength": 1350,
+        "text": ""
+      },
+      "right": {
+        "childCount": 1,
+        "htmlLength": 657,
+        "text": ""
+      }
+    },
+    "afterLoreToggle": {
+      "name": "BLYNDOOLIE",
+      "lore": "",
+      "loreBubbleClass": "home-lore-fill is-collapsed",
+      "left": {
+        "childCount": 1,
+        "htmlLength": 891,
+        "text": ""
+      },
+      "center": {
+        "childCount": 1,
+        "htmlLength": 1353,
+        "text": ""
+      },
+      "right": {
+        "childCount": 1,
+        "htmlLength": 657,
+        "text": ""
+      }
+    },
+    "afterVoiceButton": {
+      "name": "BLYNDOOLIE",
+      "lore": "",
+      "loreBubbleClass": "home-lore-fill is-collapsed",
+      "left": {
+        "childCount": 1,
+        "htmlLength": 891,
+        "text": ""
+      },
+      "center": {
+        "childCount": 1,
+        "htmlLength": 1353,
+        "text": ""
+      },
+      "right": {
+        "childCount": 1,
+        "htmlLength": 657,
+        "text": ""
+      }
+    },
+    "afterNext": {
+      "name": "AGGRASO",
+      "lore": "",
+      "loreBubbleClass": "home-lore-fill is-collapsed",
+      "left": {
+        "childCount": 1,
+        "htmlLength": 1337,
+        "text": ""
+      },
+      "center": {
+        "childCount": 1,
+        "htmlLength": 670,
+        "text": ""
+      },
+      "right": {
+        "childCount": 1,
+        "htmlLength": 421,
+        "text": ""
+      }
+    }
+  },
+  "leaderboards": {
+    "sprint": [
+      "00:52.890",
+      "00:55.620",
+      "01:00.110",
+      "01:03.240",
+      "01:06.510",
+      "01:10.300",
+      "01:14.220",
+      "01:18.110",
+      "01:22.630",
+      "01:27.450"
+    ],
+    "sprintTags": [
+      "FASTY",
+      "GLINT",
+      "CHOMP",
+      "SLICK",
+      "GNAWS",
+      "BLINK",
+      "RINSE",
+      "SPINE",
+      "FLESH",
+      "DRONE"
+    ],
+    "arcade": [
+      "12800 pts",
+      "11100 pts",
+      "9700 pts",
+      "9100 pts",
+      "8600 pts",
+      "8000 pts",
+      "7600 pts",
+      "7100 pts",
+      "6900 pts",
+      "6400 pts"
+    ],
+    "arcadeTags": [
+      "GLOOP",
+      "BLOBB",
+      "MAWZ1",
+      "SPLOT",
+      "OOZER",
+      "FANG5",
+      "CREEP",
+      "STARE",
+      "SLURP",
+      "DRIPY"
+    ]
+  },
+  "gameModes": {
+    "arcade": {
+      "start": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.312",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterInput": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:00.704",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "paused": {
+        "overlayHidden": false,
+        "overlayText": "PAUSED",
+        "status": "Paused. Press P to continue or O to restart this run fresh.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:00.983",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "resumed": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:00.973",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterPausedRestart": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "Arcade ready. Play until you top out. Chase the highest score you can post.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.000",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterHome": {
+        "homeVisible": true,
+        "resumeVisible": false
+      },
+      "resumePrompt": {
+        "visible": true,
+        "title": "Arcade Save Found",
+        "summary": "Continue your Arcade run from 0 points and 0 cleared lines. Saved 3/31/2026, 6:09:03 PM."
+      }
+    },
+    "sprint40": {
+      "start": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.330",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterInput": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:00.735",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "paused": {
+        "overlayHidden": false,
+        "overlayText": "PAUSED",
+        "status": "Paused. Press P to continue or O to restart this run fresh.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:01.035",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "resumed": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:01.031",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterPausedRestart": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "40 Lines ready. Clear 40 lines as fast as possible in a TETR.IO-style sprint mode.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.000",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterHome": {
+        "homeVisible": true,
+        "resumeVisible": false
+      },
+      "resumePrompt": {
+        "visible": true,
+        "title": "40 Lines Save Found",
+        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 3/31/2026, 6:09:07 PM."
+      }
+    },
+    "training": {
+      "start": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Training active. 0 faults, 0% fault rate, 0 perfect streak, feedback SHOW.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.328",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterInput": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Training active. 0 faults, 0% fault rate, 1 perfect streak, feedback SHOW.",
+        "score": "0",
+        "lines": "1",
+        "timer": "00:00.692",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "paused": {
+        "overlayHidden": false,
+        "overlayText": "PAUSED",
+        "status": "Paused. Press P to continue or O to restart this run fresh.",
+        "score": "0",
+        "lines": "1",
+        "timer": "00:00.946",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "resumed": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "Training active. 0 faults, 0% fault rate, 1 perfect streak, feedback SHOW.",
+        "score": "0",
+        "lines": "1",
+        "timer": "00:00.930",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterPausedRestart": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "Training ready. Place each piece with the fewest movement and rotation inputs you can.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.000",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false
+      },
+      "afterHome": {
+        "homeVisible": true,
+        "resumeVisible": false
+      },
+      "resumePrompt": {
+        "visible": true,
+        "title": "Training Save Found",
+        "summary": "Continue your Training run from 0 pieces with 0 faults. Saved 3/31/2026, 6:09:12 PM."
+      }
+    }
+  },
+  "consoleMessages": [],
+  "pageErrors": []
+}

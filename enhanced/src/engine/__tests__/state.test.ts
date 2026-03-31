@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBoard } from '../board';
-import { createGameState, hardDrop, hold, lockPiece, spawn } from '../state';
+import { captureSavedRun, createGameState, hardDrop, hold, lockPiece, restoreSavedRun, spawn } from '../state';
 
 describe('game state helpers', () => {
   it('tops out when a spawn position is blocked', () => {
@@ -141,5 +141,53 @@ describe('game state helpers', () => {
     expect(state.pieces).toBe(1);
     expect(state.active?.type).toBe('O');
     expect(state.board.flat().every((cell) => cell === '')).toBe(true);
+  });
+
+  it('captures and restores a playing run without changing the gameplay footprint', () => {
+    const state = createGameState('arcade');
+    state.board = createBoard();
+    state.boardSkin = createBoard();
+    state.active = { type: 'L', rotation: 1, x: 4, y: 5 };
+    state.hold = 'T';
+    state.holdUsed = true;
+    state.queue = ['I', 'O', 'S', 'Z'];
+    state.hasSpawned = true;
+    state.lines = 12;
+    state.score = 3400;
+    state.pieces = 18;
+    state.startTime = 2000;
+    state.lastGravity = 6880;
+    state.lockDeadline = 7240;
+    state.board[23][0] = 'X';
+    state.boardSkin[23][0] = 'L:1:0';
+
+    const savedRun = captureSavedRun(state, 'playing', 7000);
+    const restored = createGameState('arcade');
+    const restoredPhase = restoreSavedRun(restored, savedRun, 9000);
+
+    expect(restoredPhase).toBe('playing');
+    expect(restored.active).toEqual(state.active);
+    expect(restored.hold).toBe('T');
+    expect(restored.holdUsed).toBe(true);
+    expect(restored.queue).toEqual(['I', 'O', 'S', 'Z']);
+    expect(restored.board[23][0]).toBe('X');
+    expect(restored.boardSkin[23][0]).toBe('L:1:0');
+    expect(restored.startTime).toBe(4000);
+    expect(restored.lastGravity).toBe(8880);
+    expect(restored.lockDeadline).toBe(9240);
+  });
+
+  it('captures and restores a countdown run with remaining countdown time', () => {
+    const state = createGameState('sprint40');
+    state.countdownUntil = 5200;
+
+    const savedRun = captureSavedRun(state, 'countdown', 4300);
+    const restored = createGameState('sprint40');
+    const restoredPhase = restoreSavedRun(restored, savedRun, 10000);
+
+    expect(restoredPhase).toBe('countdown');
+    expect(restored.startTime).toBe(0);
+    expect(restored.countdownUntil).toBe(10900);
+    expect(restored.mode).toBe('sprint40');
   });
 });

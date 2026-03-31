@@ -15,13 +15,15 @@ function toPercent(value: number, total: number): string {
 
 export function applyRegionMap(root: ParentNode, regions: readonly HitRegion[]): void {
   for (const region of regions) {
-    const el = root.querySelector<HTMLElement>(`[data-region="${region.id}"]`);
-    if (!el) continue;
+    const elements = root.querySelectorAll<HTMLElement>(`[data-region="${region.id}"]`);
+    if (!elements.length) continue;
 
-    el.style.left = toPercent(region.x, ARTBOARD_WIDTH);
-    el.style.top = toPercent(region.y, ARTBOARD_HEIGHT);
-    el.style.width = toPercent(region.width, ARTBOARD_WIDTH);
-    el.style.height = toPercent(region.height, ARTBOARD_HEIGHT);
+    for (const el of elements) {
+      el.style.left = toPercent(region.x, ARTBOARD_WIDTH);
+      el.style.top = toPercent(region.y, ARTBOARD_HEIGHT);
+      el.style.width = toPercent(region.width, ARTBOARD_WIDTH);
+      el.style.height = toPercent(region.height, ARTBOARD_HEIGHT);
+    }
   }
 }
 
@@ -29,9 +31,9 @@ export const HOME_REGIONS: readonly HitRegion[] = [
   { id: 'home-settings', x: 1747, y: 18, width: 123, height: 97 },
   { id: 'home-quit', x: 1747, y: 127, width: 123, height: 99 },
   { id: 'home-name-fill', x: 152, y: 427, width: 328, height: 73 },
-  { id: 'home-voice', x: 468, y: 421, width: 111, height: 98 },
-  { id: 'home-lore', x: 520, y: 451, width: 139, height: 129 },
-  { id: 'home-lore-fill', x: 715, y: 356, width: 518, height: 140 },
+  { id: 'home-voice', x: 500, y: 454, width: 72, height: 72 },
+  { id: 'home-lore', x: 590, y: 484, width: 82, height: 82 },
+  { id: 'home-lore-fill', x: 690, y: 334, width: 594, height: 184 },
   { id: 'home-preview-left', x: 42, y: 752, width: 315, height: 257 },
   { id: 'home-preview-center', x: 230, y: 531, width: 522, height: 445 },
   { id: 'home-preview-right', x: 609, y: 782, width: 353, height: 266 },
@@ -49,5 +51,7 @@ export const GAME_REGIONS: readonly HitRegion[] = [
   { id: 'game-settings', x: 1780, y: 11, width: 100, height: 89 },
   { id: 'game-quit', x: 1780, y: 95, width: 102, height: 93 },
   { id: 'game-home', x: 1784, y: 180, width: 96, height: 93 },
-  { id: 'game-ui', x: 154, y: 173, width: 1613, height: 799 },
+  { id: 'game-board-zone', x: 660, y: 70, width: 600, height: 960 },
+  { id: 'game-primary-zone', x: 110, y: 170, width: 470, height: 730 },
+  { id: 'game-secondary-zone', x: 1300, y: 170, width: 500, height: 730 },
 ] as const;

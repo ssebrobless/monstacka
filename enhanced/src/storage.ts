@@ -1,5 +1,47 @@
-import type { Settings, SprintRecord, ScoreRecord, StorageData } from './types';
+import type { GameMode, SavedRun, SavedRunsByMode, Settings, SprintRecord, ScoreRecord, StorageData } from './types';
 import { STORAGE_KEY, LEGACY_STORAGE_KEYS, SETTINGS_DEFAULTS, MAX_NICKNAME_LENGTH } from './constants';
+
+function createEmptySavedRuns(): SavedRunsByMode {
+  return {
+    arcade: null,
+    sprint40: null,
+    training: null,
+  };
+}
+
+function parseSavedRun(value: unknown, mode: GameMode): SavedRun | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const parsed = value as Partial<SavedRun>;
+  if (parsed.mode !== mode) {
+    return null;
+  }
+
+  if (parsed.phase !== 'countdown' && parsed.phase !== 'playing' && parsed.phase !== 'paused') {
+    return null;
+  }
+
+  if (!parsed.state || typeof parsed.state !== 'object') {
+    return null;
+  }
+
+  return parsed as SavedRun;
+}
+
+function parseSavedRuns(value: unknown): SavedRunsByMode {
+  if (!value || typeof value !== 'object') {
+    return createEmptySavedRuns();
+  }
+
+  const parsed = value as Partial<Record<GameMode, unknown>>;
+  return {
+    arcade: parseSavedRun(parsed.arcade, 'arcade'),
+    sprint40: parseSavedRun(parsed.sprint40, 'sprint40'),
+    training: parseSavedRun(parsed.training, 'training'),
+  };
+}
 
 function parseStorage(raw: string | null): StorageData | null {
   if (!raw) return null;
@@ -9,6 +51,7 @@ function parseStorage(raw: string | null): StorageData | null {
     sprint: Array.isArray(parsed.sprint) ? parsed.sprint : [],
     score: Array.isArray(parsed.score) ? parsed.score : [],
     settings: { ...SETTINGS_DEFAULTS, ...(parsed.settings || {}) },
+    savedRuns: parseSavedRuns(parsed.savedRuns),
   };
 }
 
@@ -27,9 +70,9 @@ export function loadStorage(): StorageData {
       }
     }
 
-    return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS } };
+    return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS }, savedRuns: createEmptySavedRuns() };
   } catch {
-    return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS } };
+    return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS }, savedRuns: createEmptySavedRuns() };
   }
 }
 
@@ -38,6 +81,7 @@ export function saveStorage(data: StorageData): void {
     sprint: data.sprint,
     score: data.score,
     settings: data.settings,
+    savedRuns: data.savedRuns,
   }));
 }
 
@@ -97,5 +141,19 @@ export function saveScoreRecord(
   data.score.push(entry);
   data.score.sort((a, b) => b.score - a.score || a.timestamp.localeCompare(b.timestamp));
   data.score = data.score.slice(0, 10);
+  saveStorage(data);
+}
+
+export function getSavedRun(data: StorageData, mode: GameMode): SavedRun | null {
+  return data.savedRuns[mode];
+}
+
+export function setSavedRun(data: StorageData, run: SavedRun): void {
+  data.savedRuns[run.mode] = run;
+  saveStorage(data);
+}
+
+export function clearSavedRun(data: StorageData, mode: GameMode): void {
+  data.savedRuns[mode] = null;
   saveStorage(data);
 }

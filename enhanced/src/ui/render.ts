@@ -3,12 +3,15 @@ import { HIDDEN_ROWS, COLS, TARGET_LINES, MODE_LABELS, MODE_DESCRIPTIONS, DEFINI
 import { getCells, getGhostCells } from '../engine/pieces';
 import { elapsed, formatTime } from '../engine/state';
 import { populateMonsterCell, populateMonsterFigure } from './monsterDom';
+import { getVisibleScoreRecords, getVisibleSprintRecords } from '../demoRecords';
 
 export interface DomRefs {
   boardWrap: HTMLElement;
   board: HTMLElement;
   overlay: HTMLElement;
   faultToast: HTMLElement;
+  countdownPanel: HTMLElement;
+  countdownValue: HTMLElement;
   modeDescription: HTMLElement;
   timer: HTMLElement;
   scoreLabel: HTMLElement;
@@ -37,6 +40,8 @@ export function getDomRefs(): DomRefs {
     board: document.getElementById('board')!,
     overlay: document.getElementById('overlay')!,
     faultToast: document.getElementById('faultToast')!,
+    countdownPanel: document.getElementById('countdownPanel')!,
+    countdownValue: document.getElementById('countdownValue')!,
     modeDescription: document.getElementById('modeDescription')!,
     timer: document.getElementById('timer')!,
     scoreLabel: document.getElementById('scoreLabel')!,
@@ -71,13 +76,14 @@ function renderPiecePreview(container: HTMLElement, piece: string | null): void 
   }
 
   const pieceType = piece as keyof typeof DEFINITIONS;
-  container.classList.add(`piece-${pieceType.toLowerCase()}`);
   populateMonsterFigure(container, pieceType, {
     rotation: 0,
     now: performance.now(),
     animate: false,
+    fillRatio: 0.8,
     cellClassName: 'preview-cell',
     filledClassName: 'filled monster-preview',
+    layout: 'absolute',
   });
 }
 
@@ -90,8 +96,8 @@ export function render(
   now: number,
 ): void {
   const isTraining = state.mode === 'training';
-  const lookX = Math.max(-0.18, Math.min(0.18, Math.sin(now / 680) * 0.08 + (state.active ? (state.active.x - 4.5) / 18 : 0)));
-  const lookY = Math.max(-0.12, Math.min(0.12, Math.cos(now / 920) * 0.04 + (state.active ? (state.active.y - 8) / 70 : 0.02)));
+  const lookX = Math.max(-0.26, Math.min(0.26, Math.sin(now / 520) * 0.12 + (state.active ? (state.active.x - 4.5) / 14 : 0.02)));
+  const lookY = Math.max(-0.18, Math.min(0.18, Math.cos(now / 760) * 0.08 + (state.active ? (state.active.y - 8) / 48 : 0.03)));
 
   const rows = state.board.slice(HIDDEN_ROWS).map((row) => [...row]);
   const skinRows = state.boardSkin.slice(HIDDEN_ROWS).map((row) => [...row]);
@@ -189,7 +195,7 @@ export function render(
   renderPiecePreview(refs.hold, state.hold || null);
 
   refs.nextQueue.innerHTML = '';
-  state.queue.slice(0, 5).forEach((piece) => {
+  state.queue.slice(0, 3).forEach((piece) => {
     const item = document.createElement('li');
     item.className = 'queue-item';
     const preview = document.createElement('div');
@@ -205,10 +211,12 @@ export function render(
   refs.leaderboardTitle.textContent = isTraining
     ? 'Training Notes'
     : state.mode === 'sprint40'
-      ? 'Best 40L Times'
-      : 'Top 10 Scores';
+      ? 'Top 3 40L Times'
+      : 'Top 3 Scores';
   refs.leaderboard.innerHTML = '';
-  const entries = state.mode === 'sprint40' ? storage.sprint : storage.score;
+  const entries = state.mode === 'sprint40'
+    ? getVisibleSprintRecords(storage.sprint)
+    : getVisibleScoreRecords(storage.score);
   if (isTraining) {
     const item = document.createElement('li');
     const faultRate = state.pieces ? Math.round((state.trainingFaults / state.pieces) * 1000) / 10 : 0;
@@ -221,13 +229,13 @@ export function render(
       : 'No high scores yet. Survive a run to set the first record.';
     refs.leaderboard.appendChild(item);
   } else if (state.mode === 'sprint40') {
-    storage.sprint.forEach((entry, index) => {
+    entries.slice(0, 3).forEach((entry, index) => {
       const item = document.createElement('li');
       item.textContent = `${index + 1}. ${entry.nickname} - ${formatTime(entry.timeMs)} - ${entry.lines}L`;
       refs.leaderboard.appendChild(item);
     });
   } else {
-    storage.score.forEach((entry, index) => {
+    entries.slice(0, 3).forEach((entry, index) => {
       const item = document.createElement('li');
       item.textContent = `${index + 1}. ${entry.nickname} - ${entry.score} pts - ${entry.lines}L`;
       refs.leaderboard.appendChild(item);
@@ -249,11 +257,14 @@ export function render(
     refs.faultToast.classList.add('hidden');
   }
 
+  refs.countdownPanel.classList.add('hidden');
+
   switch (appPhase) {
     case 'countdown': {
       const count = Math.ceil(Math.max(0, state.countdownUntil - now) / 1000);
-      refs.overlay.textContent = count > 0 ? String(count) : 'GO';
-      refs.overlay.classList.remove('hidden');
+      refs.countdownValue.textContent = count > 0 ? String(count) : 'GO!';
+      refs.countdownPanel.classList.remove('hidden');
+      refs.overlay.classList.add('hidden');
       refs.statusText.textContent = isTraining
         ? 'Training ready. Place each piece with the fewest movement and rotation inputs you can.'
         : `${MODE_LABELS[state.mode]} ready. ${MODE_DESCRIPTIONS[state.mode]}`;
@@ -267,6 +278,11 @@ export function render(
       } else {
         refs.statusText.textContent = `${MODE_LABELS[state.mode]} active. DAS ${settings.dasMs}ms, ARR ${settings.arrMs}ms, lock delay ${settings.lockDelayMs}ms.`;
       }
+      break;
+    case 'paused':
+      refs.overlay.textContent = 'PAUSED';
+      refs.overlay.classList.remove('hidden');
+      refs.statusText.textContent = 'Paused. Press P to continue or O to restart this run fresh.';
       break;
     case 'sprint-clear':
       refs.overlay.textContent = '40 CLEAR';

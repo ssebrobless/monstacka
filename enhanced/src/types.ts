@@ -1,7 +1,8 @@
 export type PieceType = 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L';
 export type GameMode = 'arcade' | 'sprint40' | 'training';
 export type TrainingFeedbackMode = 'off' | 'show' | 'redo';
-export type AppPhase = 'menu' | 'countdown' | 'playing' | 'game-over' | 'sprint-clear';
+export type AppPhase = 'menu' | 'countdown' | 'playing' | 'paused' | 'game-over' | 'sprint-clear';
+export type ResumableAppPhase = 'countdown' | 'playing' | 'paused';
 
 export interface Cell {
   x: number;
@@ -76,8 +77,42 @@ export interface ScoreRecord {
   timestamp: string;
 }
 
+export interface SavedRunState {
+  board: string[][];
+  boardSkin: string[][];
+  active: Piece | null;
+  hold: PieceType | '';
+  holdUsed: boolean;
+  queue: PieceType[];
+  hasSpawned: boolean;
+  mode: GameMode;
+  lines: number;
+  score: number;
+  pieces: number;
+  trainingFeedback: TrainingFeedbackMode;
+  currentPieceInputs: number;
+  trainingFaults: number;
+  trainingPerfectStreak: number;
+  lastTrainingFaultMessage: string;
+  trainingSnapshot: TrainingSnapshot | null;
+}
+
+export interface SavedRun {
+  mode: GameMode;
+  phase: ResumableAppPhase;
+  savedAt: string;
+  elapsedMs: number;
+  remainingCountdownMs: number;
+  gravityElapsedMs: number;
+  lockRemainingMs: number;
+  state: SavedRunState;
+}
+
+export type SavedRunsByMode = Record<GameMode, SavedRun | null>;
+
 export interface StorageData {
   sprint: SprintRecord[];
   score: ScoreRecord[];
   settings: Settings;
+  savedRuns: SavedRunsByMode;
 }

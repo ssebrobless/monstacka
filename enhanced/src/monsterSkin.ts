@@ -337,3 +337,7 @@ export function getMonsterTile(skinKey: string): MonsterTile | null {
 export function getMonsterFigureCanvas(pieceType: PieceType, rotation = 0): HTMLCanvasElement | null {
   return figures.get(`${pieceType}:${rotation}`) ?? null;
 }
+
+export function getMonsterFigureBoxSize(pieceType: PieceType): number {
+  return MONSTER_SPECS[pieceType].boxSize;
+}
