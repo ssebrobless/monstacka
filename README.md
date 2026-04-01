@@ -25,7 +25,8 @@ The original PowerShell build is still kept in the repo as a reference and fallb
 - [classic-html/](./classic-html/) is the backend-free browser edition.
 - [enhanced/](./enhanced/) is the `MonStacka!` standalone desktop app source tree.
 - [src/](./src/), [web/](./web/), and [main.ps1](./main.ps1) are the original PowerShell reference build.
-- [Launcher.ps1](./Launcher.ps1), [Start-Tetris.cmd](./Start-Tetris.cmd), and [Start-Tetris.command](./Start-Tetris.command) provide the launcher flow.
+- [Launcher.ps1](./Launcher.ps1), [Start-Tetris.cmd](./Start-Tetris.cmd), and [Start-Tetris.command](./Start-Tetris.command) provide the version chooser.
+- [Launch-MonStacka.ps1](./Launch-MonStacka.ps1), [Start-MonStacka.cmd](./Start-MonStacka.cmd), and [Start-MonStacka.command](./Start-MonStacka.command) launch only the native `MonStacka!` desktop app.
 
 ## Versions
 
@@ -59,8 +60,8 @@ The original PowerShell build is still kept in the repo as a reference and fallb
 - Startup behavior:
   - the packaged desktop app can be launched directly on its own
   - the optional launcher offers `HTML` and `MonStacka!`
-  - if a built Tauri executable exists, the launcher opens the native app window
-  - otherwise it falls back to [enhanced/dist/index.html](./enhanced/dist/index.html) for development preview
+  - `MonStacka!` now launches only the native desktop executable
+  - if the native executable is missing, the launcher shows build/download instructions instead of opening the browser preview
 
 ## Controls
 
@@ -82,6 +83,12 @@ The original PowerShell build is still kept in the repo as a reference and fallb
 2. Choose `HTML` or `MonStacka!`.
 3. Click `Run`.
 
+### Launch `MonStacka!` directly
+
+- On Windows, double-click [Start-MonStacka.cmd](./Start-MonStacka.cmd).
+- On macOS, run [Start-MonStacka.command](./Start-MonStacka.command).
+- If the native desktop build is missing, these scripts will show instructions instead of opening the browser preview.
+
 ### Run the `HTML` edition directly
 
 - Open [classic-html/index.html](./classic-html/index.html) directly in a browser.
@@ -98,6 +105,7 @@ npm run build
 
 - Then open [enhanced/dist/index.html](./enhanced/dist/index.html) directly.
 - For layout and animation verification, append `?debug=1` to the preview URL.
+- This preview is for development only and is not the supported way to launch the desktop game.
 
 ### Run `MonStacka!` as a native desktop app window
 

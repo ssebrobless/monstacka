@@ -4,7 +4,7 @@ Add-Type -AssemblyName System.Drawing
 $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-function Get-EnhancedLaunchTarget {
+function Get-EnhancedExecutable {
     $releaseDir = Join-Path $scriptRoot 'enhanced\src-tauri\target\release'
     $preferredExecutables = @(
         'monstacka.exe',
@@ -31,12 +31,42 @@ function Get-EnhancedLaunchTarget {
         }
     }
 
-    $browserFallback = Join-Path $scriptRoot 'enhanced\dist\index.html'
-    if (Test-Path -LiteralPath $browserFallback) {
-        return $browserFallback
+    return $null
+}
+
+function Show-MonStackaUnavailable {
+    $message = @(
+        'MonStacka! desktop app was not found.',
+        '',
+        'This launcher no longer falls back to the browser preview, because that can launch a broken development build.',
+        '',
+        'To run MonStacka!, either:',
+        '1. Download the built desktop artifact/release from GitHub, or',
+        '2. Build it locally from enhanced\ with:',
+        '   npm install',
+        '   npm run tauri:build',
+        '',
+        'Expected executable location:',
+        (Join-Path $scriptRoot 'enhanced\src-tauri\target\release\monstacka.exe')
+    ) -join [Environment]::NewLine
+
+    [System.Windows.Forms.MessageBox]::Show(
+        $message,
+        'MonStacka! Not Built',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information
+    ) | Out-Null
+}
+
+function Open-MonStacka {
+    $target = Get-EnhancedExecutable
+
+    if (-not $target -or -not (Test-Path -LiteralPath $target)) {
+        Show-MonStackaUnavailable
+        return
     }
 
-    return $null
+    Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target) | Out-Null
 }
 
 function Open-Edition {
@@ -49,7 +79,8 @@ function Open-Edition {
             $target = Join-Path $scriptRoot 'classic-html\index.html'
         }
         'MonStacka!' {
-            $target = Get-EnhancedLaunchTarget
+            Open-MonStacka
+            return
         }
         default {
             return
@@ -65,12 +96,6 @@ function Open-Edition {
         ) | Out-Null
         return
     }
-
-    if ([IO.Path]::GetExtension($target) -ieq '.exe') {
-        Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target) | Out-Null
-        return
-    }
-
     Start-Process -FilePath $target | Out-Null
 }
 

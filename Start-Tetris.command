@@ -21,7 +21,7 @@ else if editionName is "MonStacka!" then
     if "$ENHANCED_APP" is not "" then
         do shell script "open " & quoted form of POSIX path of "$ENHANCED_APP"
     else
-        do shell script "open " & quoted form of POSIX path of "$SCRIPT_DIR/enhanced/dist/index.html"
+        display dialog "MonStacka! desktop app was not found.\n\nThis launcher no longer falls back to the browser preview, because that can launch a broken development build.\n\nBuild it from enhanced/ with npm install and npm run tauri:build, or download the packaged desktop artifact from GitHub." buttons {"OK"} default button "OK" with title "MonStacka! Not Built"
     end if
 end if
 EOF
