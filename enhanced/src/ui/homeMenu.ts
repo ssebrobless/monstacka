@@ -23,12 +23,16 @@ interface MonstosProfile {
 }
 
 export interface HomeMenuRefs {
+  homeArtboard: HTMLElement;
   monstosName: HTMLElement;
   monstosVoiceButton: HTMLButtonElement;
   monstosLoreButton: HTMLButtonElement;
-  monstosLoreMask: HTMLElement;
   monstosLoreBubble: HTMLElement;
+  monstosLoreSurface: HTMLElement;
+  monstosLoreTailOutline: SVGPathElement;
+  monstosLoreTailFill: SVGPathElement;
   monstosLoreText: HTMLElement;
+  monstosLoreMeasure: HTMLElement;
   monstosLeft: HTMLElement;
   monstosCenter: HTMLElement;
   monstosRight: HTMLElement;
@@ -93,12 +97,16 @@ const MONSTOS_PROFILES: Record<PieceType, MonstosProfile> = {
 
 export function getHomeMenuRefs(): HomeMenuRefs {
   return {
+    homeArtboard: document.getElementById('homeArtboard')!,
     monstosName: document.getElementById('monstosName')!,
     monstosVoiceButton: document.getElementById('monstosVoiceButton') as HTMLButtonElement,
     monstosLoreButton: document.getElementById('monstosLoreButton') as HTMLButtonElement,
-    monstosLoreMask: document.getElementById('monstosLoreMask')!,
     monstosLoreBubble: document.getElementById('monstosLoreBubble')!,
+    monstosLoreSurface: document.getElementById('monstosLoreSurface')!,
+    monstosLoreTailOutline: document.getElementById('monstosLoreTailOutline') as SVGPathElement,
+    monstosLoreTailFill: document.getElementById('monstosLoreTailFill') as SVGPathElement,
     monstosLoreText: document.getElementById('monstosLoreText')!,
+    monstosLoreMeasure: document.getElementById('monstosLoreMeasure')!,
     monstosLeft: document.getElementById('monstosLeft')!,
     monstosCenter: document.getElementById('monstosCenter')!,
     monstosRight: document.getElementById('monstosRight')!,
@@ -112,9 +120,9 @@ export function createHomeMenuState(): HomeMenuState {
   return {
     activeIndex: MONSTOS_ORDER.indexOf('I'),
     leaderboardMode: 'arcade',
-    loreOpen: true,
+    loreOpen: false,
     loreBubbleOpenedAt: performance.now(),
-    loreTypingPiece: 'I',
+    loreTypingPiece: null,
     loreVisibleText: '',
   };
 }
@@ -136,8 +144,9 @@ function renderScoreboard(refs: HomeMenuRefs, storage: StorageData, mode: HomeLe
   refs.homeLeaderboard.innerHTML = '';
   const visibleArcade = getVisibleScoreRecords(storage.score);
   const visibleSprint = getVisibleSprintRecords(storage.sprint);
+  const maxVisibleRows = 8;
 
-  for (let index = 0; index < 10; index += 1) {
+  for (let index = 0; index < maxVisibleRows; index += 1) {
     const item = document.createElement('li');
     item.className = 'home-score-row';
     const value = document.createElement('span');
@@ -197,42 +206,122 @@ function renderMonstosStage(
     lookX,
     lookY,
     animate,
-    fillRatio: animate ? 0.84 : 0.62,
+    fillRatio: getPreviewFillRatio(profile.pieceType, animate),
   });
 }
 
-function applyLoreFitClasses(refs: HomeMenuRefs): void {
-  refs.monstosLoreBubble.classList.remove('is-long', 'is-huge', 'is-overflowing');
-  refs.monstosLoreText.style.fontSize = '';
-  refs.monstosLoreText.style.lineHeight = '';
-  refs.monstosLoreText.style.letterSpacing = '';
+function getPreviewFillRatio(pieceType: PieceType, animate: boolean): number {
+  const activeFill: Record<PieceType, number> = {
+    I: 0.5,
+    O: 0.54,
+    T: 0.54,
+    S: 0.48,
+    Z: 0.48,
+    J: 0.5,
+    L: 0.5,
+  };
 
-  const contentLength = refs.monstosLoreText.textContent?.trim().length ?? 0;
-  let fontSize = contentLength < 90 ? 1.16 : contentLength < 145 ? 1.02 : contentLength < 215 ? 0.88 : 0.76;
-  let lineHeight = contentLength < 145 ? 1.08 : 1.03;
+  const sideFill: Record<PieceType, number> = {
+    I: 0.42,
+    O: 0.45,
+    T: 0.44,
+    S: 0.4,
+    Z: 0.4,
+    J: 0.42,
+    L: 0.42,
+  };
 
-  while (fontSize > 0.54) {
-    refs.monstosLoreText.style.fontSize = `${fontSize.toFixed(2)}rem`;
-    refs.monstosLoreText.style.lineHeight = `${lineHeight.toFixed(2)}`;
+  return animate ? activeFill[pieceType] : sideFill[pieceType];
+}
 
-    if (refs.monstosLoreText.scrollHeight <= refs.monstosLoreText.clientHeight + 2) {
-      break;
+function layoutLoreBubble(refs: HomeMenuRefs, content: string): void {
+  const measure = refs.monstosLoreMeasure;
+  const candidateWidths = content.length < 120
+    ? [260, 300, 340, 380]
+    : content.length < 190
+      ? [320, 360, 400, 440]
+      : [360, 410, 460, 500];
+  const maxHeight = 132;
+  const minHeight = 66;
+  let chosen = {
+    width: 380,
+    height: 96,
+    fontSize: 0.98,
+    lineHeight: 1.08,
+  };
+
+  measure.textContent = content;
+
+  outer: for (const width of candidateWidths) {
+    let fontSize = content.length < 110 ? 1.12 : content.length < 180 ? 0.98 : 0.9;
+    let lineHeight = content.length < 160 ? 1.1 : 1.04;
+
+    while (fontSize >= 0.7) {
+      measure.style.width = `${width}px`;
+      measure.style.fontSize = `${fontSize.toFixed(2)}rem`;
+      measure.style.lineHeight = `${lineHeight.toFixed(2)}`;
+      const measuredHeight = Math.ceil(measure.scrollHeight);
+
+      if (measuredHeight <= maxHeight) {
+        chosen = {
+          width,
+          height: Math.max(minHeight, Math.min(152, measuredHeight + 18)),
+          fontSize,
+          lineHeight,
+        };
+        break outer;
+      }
+
+      fontSize -= 0.04;
+      lineHeight = Math.max(0.98, lineHeight - 0.02);
     }
-
-    fontSize -= 0.04;
-    lineHeight = Math.max(0.96, lineHeight - 0.01);
   }
 
-  if (fontSize <= 0.88) {
-    refs.monstosLoreBubble.classList.add('is-long');
-  }
-  if (fontSize <= 0.72) {
-    refs.monstosLoreBubble.classList.add('is-huge');
-  }
-  if (refs.monstosLoreText.scrollHeight > refs.monstosLoreText.clientHeight + 2) {
-    refs.monstosLoreBubble.classList.add('is-overflowing');
-    refs.monstosLoreText.style.letterSpacing = '0.01em';
-  }
+  refs.monstosLoreBubble.style.setProperty('--lore-bubble-width', `${chosen.width}px`);
+  refs.monstosLoreBubble.style.setProperty('--lore-bubble-height', `${chosen.height}px`);
+  refs.monstosLoreText.style.fontSize = `${chosen.fontSize.toFixed(2)}rem`;
+  refs.monstosLoreText.style.lineHeight = `${chosen.lineHeight.toFixed(2)}`;
+
+  const surfaceLeft = refs.monstosLoreSurface.offsetLeft;
+  const surfaceTop = refs.monstosLoreSurface.offsetTop;
+  const surfaceHeight = refs.monstosLoreSurface.offsetHeight;
+  const buttonRight = refs.monstosLoreButton.offsetLeft - refs.monstosLoreBubble.offsetLeft + refs.monstosLoreButton.offsetWidth;
+  const buttonTop = refs.monstosLoreButton.offsetTop - refs.monstosLoreBubble.offsetTop;
+  const buttonHeight = refs.monstosLoreButton.offsetHeight;
+
+  const buttonTipX = buttonRight + 6;
+  const buttonTipY = buttonTop + buttonHeight * 0.92;
+
+  const bubbleAnchorOuterX = surfaceLeft + 18;
+  const bubbleAnchorOuterY = surfaceTop + surfaceHeight - 54;
+  const bubbleAnchorInnerX = surfaceLeft + 48;
+  const bubbleAnchorInnerY = surfaceTop + surfaceHeight - 16;
+
+  const topCtrl1X = bubbleAnchorOuterX - 12;
+  const topCtrl1Y = bubbleAnchorOuterY + 10;
+  const topCtrl2X = buttonTipX + (bubbleAnchorOuterX - buttonTipX) * 0.34;
+  const topCtrl2Y = buttonTipY - 8;
+
+  const bottomCtrl1X = buttonTipX + (bubbleAnchorInnerX - buttonTipX) * 0.3;
+  const bottomCtrl1Y = buttonTipY + 10;
+  const bottomCtrl2X = bubbleAnchorInnerX - 10;
+  const bottomCtrl2Y = bubbleAnchorInnerY + 6;
+
+  refs.monstosLoreTailOutline.setAttribute(
+    'd',
+    `M ${bubbleAnchorOuterX} ${bubbleAnchorOuterY}
+     C ${topCtrl1X} ${topCtrl1Y} ${topCtrl2X} ${topCtrl2Y} ${buttonTipX} ${buttonTipY}
+     C ${bottomCtrl1X} ${bottomCtrl1Y} ${bottomCtrl2X} ${bottomCtrl2Y} ${bubbleAnchorInnerX} ${bubbleAnchorInnerY}
+     Z`,
+  );
+
+  refs.monstosLoreTailFill.setAttribute(
+    'd',
+    `M ${bubbleAnchorOuterX + 5} ${bubbleAnchorOuterY + 3}
+     C ${topCtrl1X + 5} ${topCtrl1Y + 3} ${topCtrl2X + 4} ${topCtrl2Y - 2} ${buttonTipX + 3} ${buttonTipY + 1}
+     C ${bottomCtrl1X + 2} ${bottomCtrl1Y + 3} ${bottomCtrl2X + 3} ${bottomCtrl2Y + 2} ${bubbleAnchorInnerX - 4} ${bubbleAnchorInnerY}
+     Z`,
+  );
 }
 
 export function renderActiveHomeMonstosPreview(
@@ -256,9 +345,10 @@ export function renderHomeMenu(
 
   refs.monstosName.textContent = active.name;
   refs.monstosLoreText.textContent = state.loreVisibleText;
-  refs.monstosLoreMask.classList.toggle('is-open', state.loreOpen);
+  layoutLoreBubble(refs, active.lore);
+  refs.monstosLoreBubble.setAttribute('aria-hidden', String(!state.loreOpen));
+  refs.monstosLoreBubble.classList.toggle('is-open', state.loreOpen);
   refs.monstosLoreBubble.classList.toggle('is-collapsed', !state.loreOpen);
-  applyLoreFitClasses(refs);
   refs.monstosLoreButton.setAttribute('aria-pressed', String(state.loreOpen));
   refs.monstosVoiceButton.title = `${active.name}: voice preview coming later`;
 

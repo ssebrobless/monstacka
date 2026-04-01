@@ -3,6 +3,19 @@ export type GameMode = 'arcade' | 'sprint40' | 'training';
 export type TrainingFeedbackMode = 'off' | 'show' | 'redo';
 export type AppPhase = 'menu' | 'countdown' | 'playing' | 'paused' | 'game-over' | 'sprint-clear';
 export type ResumableAppPhase = 'countdown' | 'playing' | 'paused';
+export type ControlAction =
+  | 'left'
+  | 'right'
+  | 'soft'
+  | 'hard'
+  | 'ccw'
+  | 'cw'
+  | 'flip'
+  | 'hold'
+  | 'retry'
+  | 'pause'
+  | 'restartPaused';
+export type ControlBindings = Record<ControlAction, string>;
 
 export interface Cell {
   x: number;
@@ -59,6 +72,7 @@ export interface Settings {
   musicVolume: number;
   muted: boolean;
   trainingFeedback: TrainingFeedbackMode;
+  controls: ControlBindings;
 }
 
 export interface SprintRecord {

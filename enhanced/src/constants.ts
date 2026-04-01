@@ -1,4 +1,4 @@
-import type { PieceType, Cell, Settings, GameMode } from './types';
+import type { PieceType, Cell, Settings, GameMode, ControlAction, ControlBindings } from './types';
 
 export const COLS = 10;
 export const VISIBLE_ROWS = 20;
@@ -10,7 +10,47 @@ export const COUNTDOWN_MS = 1000;
 export const STORAGE_KEY = 'monstacka_local_v1';
 export const LEGACY_STORAGE_KEYS = ['eris_preview_tetris_v2'];
 export const MAX_NICKNAME_LENGTH = 5;
+export const MAX_LEADERBOARD_ENTRIES = 8;
 export const DEFAULT_MODE: GameMode = 'arcade';
+export const CONTROL_ORDER: ControlAction[] = [
+  'left',
+  'right',
+  'soft',
+  'hard',
+  'ccw',
+  'cw',
+  'flip',
+  'hold',
+  'retry',
+  'pause',
+  'restartPaused',
+];
+export const CONTROL_LABELS: Record<ControlAction, string> = {
+  left: 'Move Left',
+  right: 'Move Right',
+  soft: 'Soft Drop',
+  hard: 'Hard Drop',
+  ccw: 'Rotate CCW',
+  cw: 'Rotate CW',
+  flip: 'Rotate 180',
+  hold: 'Hold',
+  retry: 'Retry',
+  pause: 'Pause / Resume',
+  restartPaused: 'Restart Paused',
+};
+export const DEFAULT_CONTROLS: ControlBindings = {
+  left: 'Key:ArrowLeft',
+  right: 'Key:ArrowRight',
+  soft: 'Key:ArrowDown',
+  hard: 'Key:Space',
+  ccw: 'Key:KeyZ',
+  cw: 'Key:KeyX',
+  flip: 'Key:KeyA',
+  hold: 'Key:KeyC',
+  retry: 'Key:KeyR',
+  pause: 'Key:KeyP',
+  restartPaused: 'Key:KeyO',
+};
 export const SCORE_TABLE: Record<number, number> = {
   1: 100,
   2: 300,
@@ -38,6 +78,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   musicVolume: 40,
   muted: false,
   trainingFeedback: 'show',
+  controls: { ...DEFAULT_CONTROLS },
 };
 
 export const PIECE_COLORS: Record<PieceType, string> = {
@@ -115,17 +156,4 @@ export const KICKS_I: Record<string, number[][]> = {
   '3>2': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
   '3>0': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
   '0>3': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
-};
-
-export const KEYMAP: Record<string, string> = {
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
-  ArrowDown: 'soft',
-  Space: 'hard',
-  KeyZ: 'ccw',
-  KeyX: 'cw',
-  KeyC: 'flip',
-  ShiftLeft: 'hold',
-  ShiftRight: 'hold',
-  KeyR: 'retry',
 };

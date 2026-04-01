@@ -9,6 +9,7 @@
 <body>
     <main class="app-shell">
         <section id="homeScreen" class="screen-stage">
+            <div class="artboard-frame">
             <div id="homeArtboard" class="artboard home-artboard">
                 <button id="openSettingsButtonHome" type="button" class="art-hit hit-home-settings" data-region="home-settings" aria-label="Open settings"></button>
                 <button id="quitGameButtonHome" type="button" class="art-hit hit-home-quit" data-region="home-quit" aria-label="Quit MonStacka!"></button>
@@ -17,12 +18,16 @@
                     <span id="monstosName" class="home-name-text">BLYNDOOLIE</span>
                 </div>
 
-                <div id="monstosLoreMask" class="home-lore-mask" data-region="home-lore-fill" aria-hidden="true"></div>
-                <div id="monstosLoreBubble" class="home-lore-fill" data-region="home-lore-fill">
-                    <div id="monstosLoreText" class="home-lore-text">
-                        it sees all! good luck sneaking up... wait...it doesn't even blink... is it drooling on it's own eyes?
+                <div id="monstosLoreBubble" class="home-lore-fill is-collapsed" data-region="home-lore-fill" aria-hidden="true">
+                    <svg id="monstosLoreTail" class="home-lore-tail" viewBox="0 0 612 212" preserveAspectRatio="none" aria-hidden="true">
+                        <path id="monstosLoreTailOutline" class="home-lore-tail-outline"></path>
+                        <path id="monstosLoreTailFill" class="home-lore-tail-fill"></path>
+                    </svg>
+                    <div id="monstosLoreSurface" class="home-lore-surface">
+                        <div id="monstosLoreText" class="home-lore-text"></div>
                     </div>
                 </div>
+                <div id="monstosLoreMeasure" class="home-lore-measure" aria-hidden="true"></div>
 
                 <button id="monstosVoiceButton" type="button" class="art-hit hit-home-voice" data-region="home-voice" aria-label="Play Monstos sound preview"></button>
                 <button id="monstosLoreButton" type="button" class="art-hit hit-home-lore" data-region="home-lore" aria-label="Toggle Monstos lore"></button>
@@ -48,9 +53,11 @@
                 <button id="startSprintButton" type="button" class="art-hit hit-home-play-sprint" data-region="home-play-sprint" aria-label="Start X(4)-LINES mode"></button>
                 <button id="startTrainingButton" type="button" class="art-hit hit-home-play-training" data-region="home-play-training" aria-label="Start Training mode"></button>
             </div>
+            </div>
         </section>
 
         <section id="gameShell" class="screen-stage hidden">
+            <div class="artboard-frame">
             <div id="gameArtboard" class="artboard game-artboard">
                 <button id="openSettingsButtonGame" type="button" class="art-hit hit-game-settings" data-region="game-settings" aria-label="Open settings"></button>
                 <button id="quitGameButtonGame" type="button" class="art-hit hit-game-quit" data-region="game-quit" aria-label="Quit MonStacka!"></button>
@@ -102,6 +109,11 @@
                     </aside>
 
                     <section id="gameSecondaryZone" class="game-sidebar game-sidebar-secondary game-zone" data-region="game-secondary-zone">
+                        <div id="endStatePanel" class="panel end-state-panel hidden">
+                            <p id="endStateEyebrow" class="eyebrow">Run Status</p>
+                            <p id="endStateTitle" class="end-state-title">TOP OUT</p>
+                            <p id="endStateSummary" class="status-text">Arcade run ended.</p>
+                        </div>
                         <div class="panel">
                             <h2 id="leaderboardTitle">Top 3 Scores</h2>
                             <ol id="leaderboard" class="leaderboard"></ol>
@@ -112,6 +124,7 @@
                         </div>
                     </section>
                 </div>
+            </div>
             </div>
         </section>
     </main>
@@ -125,25 +138,42 @@
                 </div>
                 <button id="closeSettingsButton" type="button" class="modal-close secondary" aria-label="Close settings">Close</button>
             </div>
-            <form id="settingsForm" class="settings-form">
-                <label>DAS (ms)<input id="dasInput" type="number" min="0" max="300" step="1"></label>
-                <label>ARR (ms)<input id="arrInput" type="number" min="0" max="120" step="1"></label>
-                <label>Lock Delay (ms)<input id="lockDelayInput" type="number" min="0" max="1000" step="10"></label>
-                <label>Training Feedback
-                    <select id="trainingFeedbackInput">
-                        <option value="show">Show</option>
-                        <option value="redo">Redo</option>
-                        <option value="off">Off</option>
-                    </select>
-                </label>
-                <label class="toggle-row"><input id="mutedInput" type="checkbox">Mute Audio</label>
-                <label>SFX Volume<input id="sfxVolumeInput" type="range" min="0" max="100" step="1"></label>
-                <label>Music Volume<input id="musicVolumeInput" type="range" min="0" max="100" step="1"></label>
-                <div class="button-row">
-                    <button id="applySettingsButton" type="submit">Apply</button>
-                    <button id="resetSettingsButton" type="button" class="secondary">Defaults</button>
+            <div id="settingsMainView">
+                <form id="settingsForm" class="settings-form">
+                    <label>DAS (ms)<input id="dasInput" type="number" min="0" max="300" step="1"></label>
+                    <label>ARR (ms)<input id="arrInput" type="number" min="0" max="120" step="1"></label>
+                    <label>Lock Delay (ms)<input id="lockDelayInput" type="number" min="0" max="1000" step="10"></label>
+                    <label>Training Feedback
+                        <select id="trainingFeedbackInput">
+                            <option value="show">Show</option>
+                            <option value="redo">Redo</option>
+                            <option value="off">Off</option>
+                        </select>
+                    </label>
+                    <label class="toggle-row"><input id="mutedInput" type="checkbox">Mute Audio</label>
+                    <label>SFX Volume<input id="sfxVolumeInput" type="range" min="0" max="100" step="1"></label>
+                    <label>Music Volume<input id="musicVolumeInput" type="range" min="0" max="100" step="1"></label>
+                    <div class="button-row">
+                        <button id="applySettingsButton" type="submit">Apply</button>
+                        <button id="resetSettingsButton" type="button" class="secondary">Defaults</button>
+                        <button id="openControlsButton" type="button" class="secondary">Controls</button>
+                    </div>
+                </form>
+            </div>
+            <div id="controlsView" class="hidden">
+                <div class="controls-toolbar">
+                    <div>
+                        <p class="eyebrow">Controls</p>
+                        <h2>Bindings</h2>
+                    </div>
+                    <div class="button-row">
+                        <button id="controlsDefaultsButton" type="button" class="secondary">Default</button>
+                        <button id="controlsBackButton" type="button" class="secondary">Back</button>
+                    </div>
                 </div>
-            </form>
+                <p id="controlsCaptureHint" class="status-text">Click a binding, then press any key or mouse button. Changes save automatically.</p>
+                <div id="controlsList" class="controls-list"></div>
+            </div>
         </div>
     </div>
 

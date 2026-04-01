@@ -10,6 +10,10 @@ export interface DomRefs {
   board: HTMLElement;
   overlay: HTMLElement;
   faultToast: HTMLElement;
+  endStatePanel: HTMLElement;
+  endStateEyebrow: HTMLElement;
+  endStateTitle: HTMLElement;
+  endStateSummary: HTMLElement;
   countdownPanel: HTMLElement;
   countdownValue: HTMLElement;
   modeDescription: HTMLElement;
@@ -22,6 +26,7 @@ export interface DomRefs {
   lines: HTMLElement;
   hold: HTMLElement;
   nextQueue: HTMLElement;
+  retryButton: HTMLButtonElement;
   leaderboardTitle: HTMLElement;
   leaderboard: HTMLElement;
   statusText: HTMLElement;
@@ -40,6 +45,10 @@ export function getDomRefs(): DomRefs {
     board: document.getElementById('board')!,
     overlay: document.getElementById('overlay')!,
     faultToast: document.getElementById('faultToast')!,
+    endStatePanel: document.getElementById('endStatePanel')!,
+    endStateEyebrow: document.getElementById('endStateEyebrow')!,
+    endStateTitle: document.getElementById('endStateTitle')!,
+    endStateSummary: document.getElementById('endStateSummary')!,
     countdownPanel: document.getElementById('countdownPanel')!,
     countdownValue: document.getElementById('countdownValue')!,
     modeDescription: document.getElementById('modeDescription')!,
@@ -52,6 +61,7 @@ export function getDomRefs(): DomRefs {
     lines: document.getElementById('lines')!,
     hold: document.getElementById('hold')!,
     nextQueue: document.getElementById('nextQueue')!,
+    retryButton: document.getElementById('retryButton') as HTMLButtonElement,
     leaderboardTitle: document.getElementById('leaderboardTitle')!,
     leaderboard: document.getElementById('leaderboard')!,
     statusText: document.getElementById('statusText')!,
@@ -258,6 +268,8 @@ export function render(
   }
 
   refs.countdownPanel.classList.add('hidden');
+  refs.endStatePanel.classList.add('hidden');
+  refs.retryButton.classList.add('hidden');
 
   switch (appPhase) {
     case 'countdown': {
@@ -282,16 +294,27 @@ export function render(
     case 'paused':
       refs.overlay.textContent = 'PAUSED';
       refs.overlay.classList.remove('hidden');
+      refs.retryButton.classList.remove('hidden');
       refs.statusText.textContent = 'Paused. Press P to continue or O to restart this run fresh.';
       break;
     case 'sprint-clear':
-      refs.overlay.textContent = '40 CLEAR';
-      refs.overlay.classList.remove('hidden');
+      refs.overlay.classList.add('hidden');
+      refs.endStatePanel.classList.remove('hidden');
+      refs.retryButton.classList.remove('hidden');
+      refs.endStateEyebrow.textContent = 'Sprint Complete';
+      refs.endStateTitle.textContent = '40 CLEAR';
+      refs.endStateSummary.textContent = `Finished 40 Lines in ${formatTime(elapsed(state))}.`;
       refs.statusText.textContent = `Sprint complete in ${formatTime(elapsed(state))}.`;
       break;
     case 'game-over':
-      refs.overlay.textContent = 'TOP OUT';
-      refs.overlay.classList.remove('hidden');
+      refs.overlay.classList.add('hidden');
+      refs.endStatePanel.classList.remove('hidden');
+      refs.retryButton.classList.remove('hidden');
+      refs.endStateEyebrow.textContent = state.mode === 'arcade' ? 'Run Over' : 'Sprint Failed';
+      refs.endStateTitle.textContent = 'TOP OUT';
+      refs.endStateSummary.textContent = state.mode === 'arcade'
+        ? `${state.score} points after ${state.lines} cleared lines.`
+        : 'Top out before clearing all 40 lines.';
       refs.statusText.textContent = state.mode === 'arcade'
         ? `Arcade run ended with ${state.score} points after ${state.lines} cleared lines.`
         : 'Run ended by top out before clearing 40 lines.';

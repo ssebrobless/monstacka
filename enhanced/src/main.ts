@@ -1,5 +1,16 @@
 import './styles.css';
-import { SETTINGS_DEFAULTS, DEFAULT_MODE, MAX_NICKNAME_LENGTH, MODE_LABELS } from './constants';
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import {
+  SETTINGS_DEFAULTS,
+  DEFAULT_CONTROLS,
+  CONTROL_LABELS,
+  CONTROL_ORDER,
+  DEFAULT_MODE,
+  MAX_NICKNAME_LENGTH,
+  MAX_LEADERBOARD_ENTRIES,
+  MODE_LABELS,
+} from './constants';
 import { AudioManager } from './audio';
 import {
   loadStorage,
@@ -18,6 +29,7 @@ import {
 } from './engine/state';
 import { getGravityMs } from './engine/gravity';
 import { setupKeyboard, createInputState, clearHorizontalRepeat } from './input/keyboard';
+import { assignBinding, formatBindingLabel, keyboardToken, mouseToken } from './input/bindings';
 import { getDomRefs, render } from './ui/render';
 import {
   createHomeMenuState,
@@ -28,7 +40,8 @@ import {
 } from './ui/homeMenu';
 import { applyRegionMap, GAME_REGIONS, HOME_REGIONS } from './ui/regionMap';
 import { prepareMonsterSkin } from './monsterSkin';
-import type { AppPhase, GameMode } from './types';
+import { computeArtboardScale, computeBoardFit } from './layout';
+import type { AppPhase, ControlAction, GameMode } from './types';
 
 interface PendingRecord {
   mode: GameMode;
@@ -39,12 +52,31 @@ interface PendingRecord {
   pieces: number;
 }
 
+declare global {
+    interface Window {
+      monstackaDebug?: {
+        forceArcadeTopOut(score?: number, lines?: number, elapsedMs?: number): void;
+        forceSprintClear(timeMs?: number, pieces?: number): void;
+        snapshot(): {
+          appPhase: AppPhase;
+          mode: GameMode;
+          score: number;
+          lines: number;
+          pieces: number;
+          activeType: string | null;
+          activeX: number | null;
+          activeY: number | null;
+          hold: string;
+        };
+      };
+    }
+  }
+
 function init() {
   const storage = loadStorage();
   const settings = storage.settings;
   const state = createGameState(DEFAULT_MODE);
   const debugMode = new URLSearchParams(window.location.search).has('debug');
-  const isTauriApp = '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
   state.trainingFeedback = settings.trainingFeedback;
   const input = createInputState();
   const refs = getDomRefs();
@@ -70,6 +102,13 @@ function init() {
   const nicknameInput = document.getElementById('nicknameInput') as HTMLInputElement;
   const skipRecordButton = document.getElementById('skipRecordButton') as HTMLButtonElement;
   const settingsModal = document.getElementById('settingsModal')!;
+  const settingsMainView = document.getElementById('settingsMainView')!;
+  const controlsView = document.getElementById('controlsView')!;
+  const openControlsButton = document.getElementById('openControlsButton') as HTMLButtonElement;
+  const controlsBackButton = document.getElementById('controlsBackButton') as HTMLButtonElement;
+  const controlsDefaultsButton = document.getElementById('controlsDefaultsButton') as HTMLButtonElement;
+  const controlsList = document.getElementById('controlsList')!;
+  const controlsCaptureHint = document.getElementById('controlsCaptureHint')!;
   const openSettingsButtonHome = document.getElementById('openSettingsButtonHome') as HTMLButtonElement;
   const openSettingsButtonGame = document.getElementById('openSettingsButtonGame') as HTMLButtonElement;
   const closeSettingsButton = document.getElementById('closeSettingsButton') as HTMLButtonElement;
@@ -100,6 +139,51 @@ function init() {
   let monsterSkinReady = false;
   let lastMenuPreviewFrameAt = 0;
   let pausedAt = 0;
+  let awaitingControlAction: ControlAction | null = null;
+
+  function seedLeaderboardTestData() {
+    const arcadeSeeds = [
+      { nickname: 'SLM3R', score: 11850, lines: 29, timeMs: 120500, timestamp: 'test-arcade-mid-1' },
+      { nickname: 'GNASH', score: 8350, lines: 20, timeMs: 99500, timestamp: 'test-arcade-mid-2' },
+    ];
+    const sprintSeeds = [
+      { nickname: 'RUSH1', timeMs: 59050, lines: 40, pieces: 100, timestamp: 'test-sprint-mid-1' },
+      { nickname: 'DASH2', timeMs: 68840, lines: 40, pieces: 117, timestamp: 'test-sprint-mid-2' },
+    ];
+
+    let changed = false;
+
+    for (const entry of arcadeSeeds) {
+      if (!storage.score.some((record) => record.timestamp === entry.timestamp)) {
+        storage.score.push(entry);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      storage.score.sort((a, b) => b.score - a.score || a.timestamp.localeCompare(b.timestamp));
+      storage.score = storage.score.slice(0, MAX_LEADERBOARD_ENTRIES);
+    }
+
+    let sprintChanged = false;
+    for (const entry of sprintSeeds) {
+      if (!storage.sprint.some((record) => record.timestamp === entry.timestamp)) {
+        storage.sprint.push(entry);
+        sprintChanged = true;
+      }
+    }
+
+    if (sprintChanged) {
+      storage.sprint.sort((a, b) => a.timeMs - b.timeMs || a.timestamp.localeCompare(b.timestamp));
+      storage.sprint = storage.sprint.slice(0, MAX_LEADERBOARD_ENTRIES);
+    }
+
+    if (changed || sprintChanged) {
+      saveStorage(storage);
+    }
+  }
+
+  seedLeaderboardTestData();
 
   function showHomeScreen() {
     gameShell.classList.add('hidden');
@@ -125,16 +209,13 @@ function init() {
   }
 
   function fitBoardToZone() {
-    const zoneWidth = gameBoardZone.clientWidth;
-    const zoneHeight = gameBoardZone.clientHeight;
-    if (!zoneWidth || !zoneHeight) {
+    const fit = computeBoardFit(gameBoardZone.clientWidth, gameBoardZone.clientHeight);
+    if (!fit) {
       return;
     }
 
-    const boardWidth = Math.min(zoneWidth, zoneHeight / 2);
-    const boardHeight = boardWidth * 2;
-    refs.boardWrap.style.width = `${boardWidth.toFixed(2)}px`;
-    refs.boardWrap.style.height = `${boardHeight.toFixed(2)}px`;
+    refs.boardWrap.style.width = `${fit.width.toFixed(2)}px`;
+    refs.boardWrap.style.height = `${fit.height.toFixed(2)}px`;
   }
 
   function scheduleBoardFit() {
@@ -143,18 +224,141 @@ function init() {
     });
   }
 
-  function applyArtboardRegions() {
+  function updateArtboardScale() {
+    const scale = computeArtboardScale(window.innerWidth, window.innerHeight);
+    document.documentElement.style.setProperty('--artboard-scale', scale.toFixed(6));
+  }
+
+  function applyFixedArtboardLayout() {
+    // The internal UI stays in fixed 1920x1080 artboard pixels.
+    // Window resize must not mutate these coordinates.
     applyRegionMap(homeArtboard, HOME_REGIONS);
     applyRegionMap(gameArtboard, GAME_REGIONS);
+  }
+
+  function handleWindowResize() {
+    // Resize is only allowed to change the global stage scale and board fit.
+    updateArtboardScale();
     fitBoardToZone();
   }
 
+  function showSettingsMainView() {
+    settingsMainView.classList.remove('hidden');
+    controlsView.classList.add('hidden');
+  }
+
+  function showControlsView() {
+    settingsMainView.classList.add('hidden');
+    controlsView.classList.remove('hidden');
+  }
+
+  function stopBindingCapture(message = 'Click a binding, then press any key or mouse button. Changes save automatically.') {
+    awaitingControlAction = null;
+    controlsCaptureHint.textContent = message;
+  }
+
+  function renderControlsList() {
+    controlsList.innerHTML = '';
+
+    for (const { action, label, binding } of CONTROL_ORDER.map((controlAction) => ({
+      action: controlAction,
+      label: CONTROL_LABELS[controlAction],
+      binding: settings.controls[controlAction],
+    }))) {
+      const row = document.createElement('div');
+      row.className = 'controls-row';
+      row.dataset.action = action;
+
+      const labelEl = document.createElement('div');
+      labelEl.className = 'controls-label';
+      labelEl.textContent = label;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary controls-binding';
+      button.dataset.action = action;
+      if (awaitingControlAction === action) {
+        button.classList.add('is-listening');
+        button.textContent = 'Press input...';
+      } else {
+        button.textContent = formatBindingLabel(binding);
+      }
+      button.addEventListener('click', () => {
+        awaitingControlAction = action;
+        controlsCaptureHint.textContent = `${label}: press a key or mouse button. Press Escape to cancel or Backspace to clear.`;
+        renderControlsList();
+      });
+
+      row.appendChild(labelEl);
+      row.appendChild(button);
+      controlsList.appendChild(row);
+    }
+  }
+
   function closeSettingsModal() {
+    stopBindingCapture();
+    showSettingsMainView();
     settingsModal.classList.add('hidden');
   }
 
   function openSettingsModal() {
+    stopBindingCapture();
+    showSettingsMainView();
+    renderControlsList();
     settingsModal.classList.remove('hidden');
+  }
+
+  function applyControlBinding(action: ControlAction, binding: string) {
+    settings.controls = assignBinding(settings.controls, action, binding);
+    saveStorage(storage);
+    stopBindingCapture(`${CONTROL_LABELS[action]} set to ${formatBindingLabel(binding)}.`);
+    renderControlsList();
+  }
+
+  function clearControlBinding(action: ControlAction) {
+    settings.controls = assignBinding(settings.controls, action, '');
+    saveStorage(storage);
+    stopBindingCapture(`${CONTROL_LABELS[action]} cleared.`);
+    renderControlsList();
+  }
+
+  function handleBindingKeyCapture(event: KeyboardEvent) {
+    if (!awaitingControlAction || controlsView.classList.contains('hidden')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.code === 'Escape') {
+      stopBindingCapture();
+      renderControlsList();
+      return;
+    }
+    if (event.code === 'Backspace' || event.code === 'Delete') {
+      clearControlBinding(awaitingControlAction);
+      return;
+    }
+
+    applyControlBinding(awaitingControlAction, keyboardToken(event.code));
+  }
+
+  function handleBindingMouseCapture(event: MouseEvent) {
+    if (!awaitingControlAction || controlsView.classList.contains('hidden')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    applyControlBinding(awaitingControlAction, mouseToken(event.button));
+  }
+
+  function handleBindingContextMenu(event: MouseEvent) {
+    if (!awaitingControlAction || controlsView.classList.contains('hidden')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   function closeRecordModal() {
@@ -228,7 +432,7 @@ function init() {
       if (!qualifiesSprintRecord(storage, timeMs)) return;
       openRecordModal({
         mode: 'sprint40',
-        summary: `Top 10 time! Enter a 5-character nickname for your ${MODE_LABELS.sprint40} record: ${timeMs} ms.`,
+        summary: `Top ${MAX_LEADERBOARD_ENTRIES} time! Enter a 5-character nickname for your ${MODE_LABELS.sprint40} record: ${timeMs} ms.`,
         timeMs,
         lines: state.lines,
         pieces: state.pieces,
@@ -300,8 +504,66 @@ function init() {
     appPhase = nextPhase;
   }
 
+  function installDebugApi() {
+    if (!debugMode) {
+      return;
+    }
+
+    window.monstackaDebug = {
+      forceArcadeTopOut(score = 13337, lines = 22, elapsedMs = 94500) {
+        showGameScreen();
+        closeResumeModal();
+        closeRecordModal();
+        closeSettingsModal();
+        state.mode = 'arcade';
+        state.score = score;
+        state.lines = lines;
+        state.pieces = Math.max(state.pieces, lines * 3);
+        state.startTime = performance.now() - elapsedMs;
+        state.countdownUntil = 0;
+        state.completedTime = performance.now();
+        state.sprintComplete = false;
+        state.gameOver = true;
+        handledRunKey = '';
+        transitionTo('game-over');
+        renderCurrentView();
+      },
+      forceSprintClear(timeMs = 52890, pieces = 96) {
+        showGameScreen();
+        closeResumeModal();
+        closeRecordModal();
+        closeSettingsModal();
+        state.mode = 'sprint40';
+        state.lines = 40;
+        state.pieces = pieces;
+        state.score = 0;
+        state.startTime = performance.now() - timeMs;
+        state.countdownUntil = 0;
+        state.completedTime = performance.now();
+        state.sprintComplete = true;
+        state.gameOver = true;
+        handledRunKey = '';
+        transitionTo('sprint-clear');
+        renderCurrentView();
+      },
+        snapshot() {
+          return {
+            appPhase,
+            mode: state.mode,
+            score: state.score,
+            lines: state.lines,
+            pieces: state.pieces,
+            activeType: state.active?.type ?? null,
+            activeX: state.active?.x ?? null,
+            activeY: state.active?.y ?? null,
+            hold: state.hold,
+          };
+        },
+      };
+    }
+
   function saveCurrentRunIfResumable() {
-    if (appPhase !== 'countdown' && appPhase !== 'playing' && appPhase !== 'paused') {
+    if (appPhase !== 'playing' && appPhase !== 'paused') {
       return;
     }
 
@@ -419,20 +681,41 @@ function init() {
     startMode(mode);
   }
 
-  applyArtboardRegions();
-  window.addEventListener('resize', applyArtboardRegions);
+  function isGameplayInputBlocked() {
+    return awaitingControlAction !== null
+      || !settingsModal.classList.contains('hidden')
+      || !recordModal.classList.contains('hidden')
+      || !resumeModal.classList.contains('hidden');
+  }
+
+  applyFixedArtboardLayout();
+  handleWindowResize();
+  window.addEventListener('resize', handleWindowResize);
+  installDebugApi();
   void prepareMonsterSkin(() => {
     monsterSkinReady = true;
     renderCurrentView();
   });
 
-  setupKeyboard(state, input, settings, renderCurrentView, () => {
-    clearSavedRun(storage, state.mode);
-    transitionTo('countdown');
-    renderCurrentView();
-  }, (cue) => {
-    audio.play(cue, settings);
-  });
+  setupKeyboard(
+    state,
+    input,
+    settings,
+    renderCurrentView,
+    () => {
+      clearSavedRun(storage, state.mode);
+      transitionTo('countdown', state.mode);
+      renderCurrentView();
+    },
+    () => appPhase,
+    pauseRun,
+    resumeRun,
+    restartCurrentRun,
+    isGameplayInputBlocked,
+    (cue) => {
+      audio.play(cue, settings);
+    },
+  );
 
   document.getElementById('retryButton')!.addEventListener('click', () => {
     restartCurrentRun();
@@ -443,6 +726,21 @@ function init() {
   openSettingsButtonHome.addEventListener('click', openSettingsModal);
   openSettingsButtonGame.addEventListener('click', openSettingsModal);
   closeSettingsButton.addEventListener('click', closeSettingsModal);
+  openControlsButton.addEventListener('click', () => {
+    stopBindingCapture();
+    showControlsView();
+    renderControlsList();
+  });
+  controlsBackButton.addEventListener('click', () => {
+    stopBindingCapture();
+    showSettingsMainView();
+  });
+  controlsDefaultsButton.addEventListener('click', () => {
+    settings.controls = { ...DEFAULT_CONTROLS };
+    saveStorage(storage);
+    stopBindingCapture('Controls reset to default.');
+    renderControlsList();
+  });
   settingsModal.addEventListener('click', (event) => {
     if (event.target === settingsModal) {
       closeSettingsModal();
@@ -453,33 +751,36 @@ function init() {
       closeResumeModal();
     }
   });
+  document.addEventListener('keydown', handleBindingKeyCapture, true);
+  document.addEventListener('mousedown', handleBindingMouseCapture, true);
+  document.addEventListener('contextmenu', handleBindingContextMenu, true);
 
   const quitGame = async () => {
     closeSettingsModal();
     closeRecordModal();
     closeResumeModal();
 
-    if (isTauriApp) {
-      try {
-        const { getCurrentWindow } = await import('@tauri-apps/api/window');
-        await getCurrentWindow().close();
-        return;
-      } catch (error) {
-        console.error('Native MonStacka close failed, falling back to menu.', error);
-      }
-    }
-
     try {
-      window.close();
-    } catch {
-      // Browser contexts can block window.close(); fall back to menu.
+      await invoke('exit_app');
+      return;
+    } catch (error) {
+      console.error('Native MonStacka exit command failed, trying window close.', error);
+      try {
+        const currentWindow = getCurrentWindow();
+        await currentWindow.close();
+        return;
+      } catch (closeError) {
+        console.error('Native MonStacka close failed, trying destroy.', closeError);
+        try {
+          await getCurrentWindow().destroy();
+          return;
+        } catch (destroyError) {
+          console.error('Native MonStacka destroy failed, falling back to menu.', destroyError);
+        }
+      }
     }
 
-    window.setTimeout(() => {
-      if (!document.hidden) {
-        returnToMenu();
-      }
-    }, 100);
+    returnToMenu();
   };
 
   quitGameButtonHome.addEventListener('click', quitGame);
@@ -563,10 +864,14 @@ function init() {
   });
 
   resetSettingsButton.addEventListener('click', () => {
-    Object.assign(settings, SETTINGS_DEFAULTS);
+    Object.assign(settings, {
+      ...SETTINGS_DEFAULTS,
+      controls: { ...DEFAULT_CONTROLS },
+    });
     state.trainingFeedback = settings.trainingFeedback;
     saveStorage(storage);
     audio.syncSettings(settings);
+    renderControlsList();
     renderCurrentView();
   });
 
@@ -593,28 +898,6 @@ function init() {
   skipRecordButton.addEventListener('click', () => {
     closeRecordModal();
     renderCurrentView();
-  });
-
-  document.addEventListener('keydown', (event) => {
-    if (event.repeat) {
-      return;
-    }
-
-    if (event.code === 'KeyP') {
-      if (appPhase === 'playing') {
-        event.preventDefault();
-        pauseRun();
-      } else if (appPhase === 'paused') {
-        event.preventDefault();
-        resumeRun();
-      }
-      return;
-    }
-
-    if (event.code === 'KeyO' && appPhase === 'paused') {
-      event.preventDefault();
-      restartCurrentRun();
-    }
   });
 
   function tick(now: number) {

@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-03-31T22:08:58.248Z",
+  "generatedAt": "2026-04-01T04:39:50.626Z",
   "screenshots": {
     "home": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-initial.png",
-    "homeLoreCollapsed": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-lore-collapsed.png",
+    "homeLoreCollapsed": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-lore-open.png",
     "homeAfterNext": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-after-next.png",
     "arcadeStart": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\arcade-start.png",
     "arcadeAfterInput": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\arcade-after-input.png",
@@ -20,41 +20,61 @@
   "preview": {
     "initial": {
       "name": "BLYNDOOLIE",
-      "lore": "it sees all! good luck sneakin",
-      "loreBubbleClass": "home-lore-fill is-long is-huge",
+      "lore": "",
+      "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 891,
+        "htmlLength": 1182,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 1350,
+        "htmlLength": 1547,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 657,
+        "htmlLength": 808,
         "text": ""
       }
     },
-    "afterLoreToggle": {
+    "afterLoreOpen": {
+      "name": "BLYNDOOLIE",
+      "lore": "",
+      "loreBubbleClass": "home-lore-fill is-open",
+      "left": {
+        "childCount": 1,
+        "htmlLength": 1182,
+        "text": ""
+      },
+      "center": {
+        "childCount": 1,
+        "htmlLength": 1547,
+        "text": ""
+      },
+      "right": {
+        "childCount": 1,
+        "htmlLength": 808,
+        "text": ""
+      }
+    },
+    "afterLoreCollapse": {
       "name": "BLYNDOOLIE",
       "lore": "",
       "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 891,
+        "htmlLength": 1182,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 1353,
+        "htmlLength": 1547,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 657,
+        "htmlLength": 808,
         "text": ""
       }
     },
@@ -64,37 +84,38 @@
       "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 891,
+        "htmlLength": 1182,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 1353,
+        "htmlLength": 1547,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 657,
+        "htmlLength": 808,
         "text": ""
       }
     },
+    "voiceButtonDidChangeLoreState": false,
     "afterNext": {
       "name": "AGGRASO",
       "lore": "",
       "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 1337,
+        "htmlLength": 1532,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 670,
+        "htmlLength": 822,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 421,
+        "htmlLength": 443,
         "text": ""
       }
     }
@@ -103,51 +124,98 @@
     "sprint": [
       "00:52.890",
       "00:55.620",
+      "00:59.050",
       "01:00.110",
       "01:03.240",
       "01:06.510",
-      "01:10.300",
-      "01:14.220",
-      "01:18.110",
-      "01:22.630",
-      "01:27.450"
+      "01:08.840",
+      "01:10.300"
     ],
     "sprintTags": [
       "FASTY",
       "GLINT",
+      "RUSH1",
       "CHOMP",
       "SLICK",
       "GNAWS",
-      "BLINK",
-      "RINSE",
-      "SPINE",
-      "FLESH",
-      "DRONE"
+      "DASH2",
+      "BLINK"
     ],
     "arcade": [
       "12800 pts",
+      "11850 pts",
       "11100 pts",
       "9700 pts",
       "9100 pts",
       "8600 pts",
-      "8000 pts",
-      "7600 pts",
-      "7100 pts",
-      "6900 pts",
-      "6400 pts"
+      "8350 pts",
+      "8000 pts"
     ],
     "arcadeTags": [
       "GLOOP",
+      "SLM3R",
       "BLOBB",
       "MAWZ1",
       "SPLOT",
       "OOZER",
-      "FANG5",
-      "CREEP",
-      "STARE",
-      "SLURP",
-      "DRIPY"
+      "GNASH",
+      "FANG5"
+    ],
+    "arcadeAfterForcedSave": [
+      "13337 pts",
+      "12800 pts",
+      "11850 pts",
+      "11100 pts",
+      "9700 pts",
+      "9100 pts",
+      "8600 pts",
+      "8350 pts"
+    ],
+    "arcadeAfterForcedSaveTags": [
+      "RIP1",
+      "GLOOP",
+      "SLM3R",
+      "BLOBB",
+      "MAWZ1",
+      "SPLOT",
+      "OOZER",
+      "GNASH"
+    ],
+    "sprintAfterForcedSave": [
+      "00:52.890",
+      "00:52.890",
+      "00:55.620",
+      "00:59.050",
+      "01:00.110",
+      "01:03.240",
+      "01:06.510",
+      "01:08.840"
+    ],
+    "sprintAfterForcedSaveTags": [
+      "ZIPPY",
+      "FASTY",
+      "GLINT",
+      "RUSH1",
+      "CHOMP",
+      "SLICK",
+      "GNAWS",
+      "DASH2"
     ]
+  },
+  "ui": {
+    "homeSettingsOpen": {
+      "visible": true,
+      "mainVisible": true
+    },
+    "controlsView": {
+      "visible": true,
+      "rowCount": 11
+    },
+    "controlsBack": {
+      "mainVisible": true,
+      "controlsHidden": true
+    },
+    "homeSettingsClosed": true
   },
   "gameModes": {
     "arcade": {
@@ -157,11 +225,14 @@
         "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.312",
+        "timer": "00:00.343",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterInput": {
         "overlayHidden": true,
@@ -169,35 +240,75 @@
         "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "44",
         "lines": "0",
-        "timer": "00:00.704",
+        "timer": "00:00.779",
         "boardMonsterCells": 4,
         "boardGhostCells": 4,
-        "retryVisible": true,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "settingsOpenInGame": true,
+      "settingsClosedInGame": true,
+      "afterHomeFromProgress": {
+        "homeVisible": true,
         "resumeVisible": false
+      },
+      "resumePromptFromProgress": {
+        "visible": true,
+        "title": "Arcade Save Found",
+        "summary": "Continue your Arcade run from 44 points and 0 cleared lines. Saved 4/1/2026, 12:39:57 AM."
+      },
+      "continuedFromProgress": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:01.855",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "resumePromptAfterContinue": {
+        "visible": true,
+        "title": "Arcade Save Found",
+        "summary": "Continue your Arcade run from 44 points and 0 cleared lines. Saved 4/1/2026, 12:39:58 AM."
       },
       "paused": {
         "overlayHidden": false,
         "overlayText": "PAUSED",
         "status": "Paused. Press P to continue or O to restart this run fresh.",
-        "score": "44",
+        "score": "0",
         "lines": "0",
-        "timer": "00:00.983",
-        "boardMonsterCells": 4,
+        "timer": "00:00.448",
+        "boardMonsterCells": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
-        "resumeVisible": false
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "resumed": {
         "overlayHidden": true,
         "overlayText": "PAUSED",
         "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
-        "score": "44",
+        "score": "0",
         "lines": "0",
-        "timer": "00:00.973",
-        "boardMonsterCells": 4,
+        "timer": "00:00.447",
+        "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterPausedRestart": {
         "overlayHidden": true,
@@ -208,17 +319,55 @@
         "timer": "00:00.000",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterHome": {
         "homeVisible": true,
         "resumeVisible": false
       },
       "resumePrompt": {
-        "visible": true,
-        "title": "Arcade Save Found",
-        "summary": "Continue your Arcade run from 0 points and 0 cleared lines. Saved 3/31/2026, 6:09:03 PM."
+        "visible": false,
+        "title": "",
+        "summary": ""
+      },
+      "afterRestartModeRequest": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "Arcade ready. Play until you top out. Chase the highest score you can post.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.000",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "forcedTopOut": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Arcade run ended with 13337 points after 22 cleared lines.",
+        "score": "13337",
+        "lines": "22",
+        "timer": "01:34.500",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false,
+        "recordVisible": true,
+        "endStateVisible": true,
+        "endStateTitle": "TOP OUT",
+        "recordTitle": "Arcade Entry",
+        "recordSummary": "New high score! Enter a 5-character nickname for your 13337-point Arcade run."
+      },
+      "afterForcedRecordSave": {
+        "recordVisible": false
       }
     },
     "sprint40": {
@@ -228,11 +377,14 @@
         "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.330",
+        "timer": "00:00.322",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterInput": {
         "overlayHidden": true,
@@ -240,35 +392,75 @@
         "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "44",
         "lines": "0",
-        "timer": "00:00.735",
+        "timer": "00:00.723",
         "boardMonsterCells": 4,
         "boardGhostCells": 4,
-        "retryVisible": true,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "settingsOpenInGame": true,
+      "settingsClosedInGame": true,
+      "afterHomeFromProgress": {
+        "homeVisible": true,
         "resumeVisible": false
+      },
+      "resumePromptFromProgress": {
+        "visible": true,
+        "title": "40 Lines Save Found",
+        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 4/1/2026, 12:40:05 AM."
+      },
+      "continuedFromProgress": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
+        "score": "44",
+        "lines": "0",
+        "timer": "00:01.694",
+        "boardMonsterCells": 4,
+        "boardGhostCells": 4,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "resumePromptAfterContinue": {
+        "visible": true,
+        "title": "40 Lines Save Found",
+        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 4/1/2026, 12:40:06 AM."
       },
       "paused": {
         "overlayHidden": false,
         "overlayText": "PAUSED",
         "status": "Paused. Press P to continue or O to restart this run fresh.",
-        "score": "44",
+        "score": "0",
         "lines": "0",
-        "timer": "00:01.035",
-        "boardMonsterCells": 4,
+        "timer": "00:00.436",
+        "boardMonsterCells": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
-        "resumeVisible": false
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "resumed": {
         "overlayHidden": true,
         "overlayText": "PAUSED",
         "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
-        "score": "44",
+        "score": "0",
         "lines": "0",
-        "timer": "00:01.031",
-        "boardMonsterCells": 4,
+        "timer": "00:00.442",
+        "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterPausedRestart": {
         "overlayHidden": true,
@@ -279,17 +471,55 @@
         "timer": "00:00.000",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterHome": {
         "homeVisible": true,
         "resumeVisible": false
       },
       "resumePrompt": {
-        "visible": true,
-        "title": "40 Lines Save Found",
-        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 3/31/2026, 6:09:07 PM."
+        "visible": false,
+        "title": "",
+        "summary": ""
+      },
+      "afterRestartModeRequest": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "40 Lines ready. Clear 40 lines as fast as possible in a TETR.IO-style sprint mode.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.000",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "forcedClear": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Sprint complete in 00:52.890.",
+        "score": "0",
+        "lines": "40",
+        "timer": "00:52.890",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": true,
+        "resumeVisible": false,
+        "recordVisible": true,
+        "endStateVisible": true,
+        "endStateTitle": "40 CLEAR",
+        "recordTitle": "Sprint Entry",
+        "recordSummary": "Top 8 time! Enter a 5-character nickname for your 40 Lines record: 52890 ms."
+      },
+      "afterForcedRecordSave": {
+        "recordVisible": false
       }
     },
     "training": {
@@ -299,11 +529,14 @@
         "status": "Training active. 0 faults, 0% fault rate, 0 perfect streak, feedback SHOW.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.328",
+        "timer": "00:00.338",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterInput": {
         "overlayHidden": true,
@@ -311,35 +544,75 @@
         "status": "Training active. 0 faults, 0% fault rate, 1 perfect streak, feedback SHOW.",
         "score": "0",
         "lines": "1",
-        "timer": "00:00.692",
+        "timer": "00:00.732",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "settingsOpenInGame": true,
+      "settingsClosedInGame": true,
+      "afterHomeFromProgress": {
+        "homeVisible": true,
         "resumeVisible": false
+      },
+      "resumePromptFromProgress": {
+        "visible": true,
+        "title": "Training Save Found",
+        "summary": "Continue your Training run from 1 pieces with 0 faults. Saved 4/1/2026, 12:40:12 AM."
+      },
+      "continuedFromProgress": {
+        "overlayHidden": true,
+        "overlayText": "",
+        "status": "Training active. 0 faults, 0% fault rate, 1 perfect streak, feedback SHOW.",
+        "score": "0",
+        "lines": "1",
+        "timer": "00:01.702",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
+      },
+      "resumePromptAfterContinue": {
+        "visible": true,
+        "title": "Training Save Found",
+        "summary": "Continue your Training run from 1 pieces with 0 faults. Saved 4/1/2026, 12:40:13 AM."
       },
       "paused": {
         "overlayHidden": false,
         "overlayText": "PAUSED",
         "status": "Paused. Press P to continue or O to restart this run fresh.",
         "score": "0",
-        "lines": "1",
-        "timer": "00:00.946",
+        "lines": "0",
+        "timer": "00:00.442",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
-        "resumeVisible": false
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "resumed": {
         "overlayHidden": true,
         "overlayText": "PAUSED",
-        "status": "Training active. 0 faults, 0% fault rate, 1 perfect streak, feedback SHOW.",
+        "status": "Training active. 0 faults, 0% fault rate, 0 perfect streak, feedback SHOW.",
         "score": "0",
-        "lines": "1",
-        "timer": "00:00.930",
+        "lines": "0",
+        "timer": "00:00.442",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterPausedRestart": {
         "overlayHidden": true,
@@ -350,17 +623,35 @@
         "timer": "00:00.000",
         "boardMonsterCells": 0,
         "boardGhostCells": 4,
-        "retryVisible": true,
-        "resumeVisible": false
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       },
       "afterHome": {
         "homeVisible": true,
         "resumeVisible": false
       },
       "resumePrompt": {
-        "visible": true,
-        "title": "Training Save Found",
-        "summary": "Continue your Training run from 0 pieces with 0 faults. Saved 3/31/2026, 6:09:12 PM."
+        "visible": false,
+        "title": "",
+        "summary": ""
+      },
+      "afterRestartModeRequest": {
+        "overlayHidden": true,
+        "overlayText": "PAUSED",
+        "status": "Training ready. Place each piece with the fewest movement and rotation inputs you can.",
+        "score": "0",
+        "lines": "0",
+        "timer": "00:00.000",
+        "boardMonsterCells": 0,
+        "boardGhostCells": 4,
+        "retryVisible": false,
+        "resumeVisible": false,
+        "recordVisible": false,
+        "endStateVisible": false,
+        "endStateTitle": "TOP OUT"
       }
     }
   },

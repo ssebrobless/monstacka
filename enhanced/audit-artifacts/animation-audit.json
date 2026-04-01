@@ -1,49 +1,40 @@
 {
-  "generatedAt": "2026-03-31T22:02:12.651Z",
+  "generatedAt": "2026-04-01T04:26:54.065Z",
   "preview": {
     "initialLook": {
-      "xDelta": 0.288,
-      "yDelta": 0.099
+      "xDelta": 0,
+      "yDelta": 0
     },
     "redBlink": {
-      "maxBlink": 1,
+      "maxBlink": 0,
       "samples": 30
     },
     "pinkBlink": {
-      "maxBlink": 1,
+      "maxBlink": 0,
       "samples": 30
     },
     "orangeBlink": {
-      "maxBlink": 1,
+      "maxBlink": 0,
       "samples": 30
     },
     "tongue": {
-      "maxDelta": 0.315,
+      "maxDelta": 0,
       "samples": 12
     }
   },
   "gameplay": {
     "boardLook": {
-      "xDelta": 0.43000000000000005,
-      "yDelta": 0.236
+      "xDelta": 0,
+      "yDelta": 0
     },
     "boardBlink": {
-      "maxBlink": 1
+      "maxBlink": 0
     },
     "boardTongue": {
-      "maxDelta": 0.676,
+      "maxDelta": 0,
       "samples": 12
     },
-    "motionTransforms": [
-      "matrix(0.999987, -0.00517798, 0.00517798, 0.999987, 0.0140202, 0.422388)",
-      "matrix(0.999975, 0.0070647, -0.0070647, 0.999975, -0.468606, 1.52792)",
-      "matrix(0.999658, -0.0261575, 0.0261575, 0.999658, 1.91799, -1.8587)",
-      "matrix(1, 0, 0, 1, 0, 0)",
-      "matrix(1, 0, 0, 1, 0, -1.01862)",
-      "matrix(0.999658, 0.0261575, -0.0261575, 0.999658, -1.91799, -0.619568)",
-      "matrix(1, 0, 0, 1, 0, 0)",
-      "matrix(0.999999, -0.00166151, 0.00166151, 0.999999, 0.25386, -0.0491855)"
-    ]
+    "motionTransforms": []
   },
   "screenshots": {
     "previewInitial": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\animation-preview-initial.png",

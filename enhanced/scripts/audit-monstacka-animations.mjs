@@ -51,6 +51,20 @@ async function activateMonstos(page, targetName) {
   throw new Error(`Could not activate Monstos ${targetName}`);
 }
 
+async function waitForMonsterPreviewReady(page) {
+  for (let index = 0; index < 40; index += 1) {
+    const ready = await page.evaluate(() => {
+      const center = document.getElementById('monstosCenter');
+      return !!center && !center.classList.contains('preview-loading') && center.querySelector('.monster-body');
+    });
+    if (ready) {
+      return;
+    }
+    await page.waitForTimeout(150);
+  }
+  throw new Error('Monster preview did not finish loading in time.');
+}
+
 async function sampleBlink(page) {
   const series = await getNumberSeries(page, '#monstosCenter .monster-eye', '--blink', 30, 120);
   return {
@@ -103,7 +117,7 @@ async function main() {
   };
 
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1000);
+  await waitForMonsterPreviewReady(page);
 
   report.preview.initialLook = await sampleLook(page, '#monstosCenter .monster-eye');
   report.screenshots.previewInitial = await screenshot(page, 'animation-preview-initial.png');
@@ -122,7 +136,7 @@ async function main() {
   report.screenshots.previewTongue = await screenshot(page, 'animation-preview-tongue.png');
 
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(500);
+  await waitForMonsterPreviewReady(page);
   await page.click('#startArcadeButton');
   await page.waitForTimeout(1300);
   await ensureBoardDetails(page);

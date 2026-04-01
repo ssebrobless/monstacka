@@ -1,4 +1,5 @@
 import type { ScoreRecord, SprintRecord } from './types';
+import { MAX_LEADERBOARD_ENTRIES } from './constants';
 
 const DEMO_SCORE_RECORDS: ScoreRecord[] = [
   { nickname: 'GLOOP', score: 12800, lines: 31, timeMs: 122000, timestamp: 'demo-score-1' },
@@ -26,10 +27,18 @@ const DEMO_SPRINT_RECORDS: SprintRecord[] = [
   { nickname: 'DRONE', timeMs: 87450, lines: 40, pieces: 130, timestamp: 'demo-sprint-10' },
 ];
 
+function sortScoreRecords(records: ScoreRecord[]): ScoreRecord[] {
+  return [...records].sort((a, b) => b.score - a.score || a.timestamp.localeCompare(b.timestamp));
+}
+
+function sortSprintRecords(records: SprintRecord[]): SprintRecord[] {
+  return [...records].sort((a, b) => a.timeMs - b.timeMs || a.timestamp.localeCompare(b.timestamp));
+}
+
 export function getVisibleScoreRecords(records: ScoreRecord[]): ScoreRecord[] {
-  return records.length ? records : DEMO_SCORE_RECORDS;
+  return sortScoreRecords([...records, ...DEMO_SCORE_RECORDS]).slice(0, MAX_LEADERBOARD_ENTRIES);
 }
 
 export function getVisibleSprintRecords(records: SprintRecord[]): SprintRecord[] {
-  return records.length ? records : DEMO_SPRINT_RECORDS;
+  return sortSprintRecords([...records, ...DEMO_SPRINT_RECORDS]).slice(0, MAX_LEADERBOARD_ENTRIES);
 }

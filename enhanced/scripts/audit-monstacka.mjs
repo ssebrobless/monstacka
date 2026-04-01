@@ -3,7 +3,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const AUDIT_DIR = path.resolve('audit-artifacts');
-const BASE_URL = 'http://127.0.0.1:4173';
+const BASE_URL = 'http://127.0.0.1:4173?debug=1';
 
 async function ensureDir(dir) {
   await fs.mkdir(dir, { recursive: true });
@@ -54,6 +54,9 @@ async function getGameSnapshot(page) {
     boardGhostCells: document.querySelectorAll('#board .ghost').length,
     retryVisible: !document.getElementById('retryButton')?.closest('.hidden'),
     resumeVisible: !(document.getElementById('resumeModal')?.classList.contains('hidden') ?? true),
+    recordVisible: !(document.getElementById('recordModal')?.classList.contains('hidden') ?? true),
+    endStateVisible: !(document.getElementById('endStatePanel')?.classList.contains('hidden') ?? true),
+    endStateTitle: (document.getElementById('endStateTitle')?.textContent || '').trim(),
   }));
 }
 
@@ -77,6 +80,7 @@ async function main() {
     screenshots: {},
     preview: {},
     leaderboards: {},
+    ui: {},
     gameModes: {},
     consoleMessages,
     pageErrors,
@@ -87,14 +91,44 @@ async function main() {
   report.screenshots.home = await screenshot(page, 'home-initial.png');
   report.preview.initial = await getPreviewSnapshot(page);
 
+  await page.click('#openSettingsButtonHome');
+  await page.waitForTimeout(120);
+  report.ui.homeSettingsOpen = {
+    visible: !(await page.locator('#settingsModal').evaluate((node) => node.classList.contains('hidden'))),
+    mainVisible: !(await page.locator('#settingsMainView').evaluate((node) => node.classList.contains('hidden'))),
+  };
+  await page.click('#openControlsButton');
+  await page.waitForTimeout(120);
+  report.ui.controlsView = {
+    visible: !(await page.locator('#controlsView').evaluate((node) => node.classList.contains('hidden'))),
+    rowCount: await page.locator('#controlsList .controls-row').count(),
+  };
+  await page.click('#controlsBackButton');
+  await page.waitForTimeout(120);
+  report.ui.controlsBack = {
+    mainVisible: !(await page.locator('#settingsMainView').evaluate((node) => node.classList.contains('hidden'))),
+    controlsHidden: await page.locator('#controlsView').evaluate((node) => node.classList.contains('hidden')),
+  };
+  await page.click('#closeSettingsButton');
+  await page.waitForTimeout(120);
+  report.ui.homeSettingsClosed = await page.locator('#settingsModal').evaluate((node) => node.classList.contains('hidden'));
+
   await page.click('#monstosLoreButton');
   await page.waitForTimeout(250);
-  report.preview.afterLoreToggle = await getPreviewSnapshot(page);
-  report.screenshots.homeLoreCollapsed = await screenshot(page, 'home-lore-collapsed.png');
+  report.preview.afterLoreOpen = await getPreviewSnapshot(page);
+  report.screenshots.homeLoreCollapsed = await screenshot(page, 'home-lore-open.png');
 
+  await page.click('#monstosLoreButton');
+  await page.waitForTimeout(220);
+  report.preview.afterLoreCollapse = await getPreviewSnapshot(page);
+
+  const voiceBefore = await getPreviewSnapshot(page);
   await page.click('#monstosVoiceButton');
   await page.waitForTimeout(150);
   report.preview.afterVoiceButton = await getPreviewSnapshot(page);
+  report.preview.voiceButtonDidChangeLoreState =
+    voiceBefore.loreBubbleClass !== report.preview.afterVoiceButton.loreBubbleClass
+    || voiceBefore.lore !== report.preview.afterVoiceButton.lore;
 
   await page.click('#monstosNextButton');
   await page.waitForTimeout(250);
@@ -141,6 +175,45 @@ async function main() {
     report.gameModes[mode].afterInput = await getGameSnapshot(page);
     report.screenshots[`${mode}AfterInput`] = await screenshot(page, `${mode}-after-input.png`);
 
+    await page.click('#openSettingsButtonGame');
+    await page.waitForTimeout(120);
+    report.gameModes[mode].settingsOpenInGame = !(await page.locator('#settingsModal').evaluate((node) => node.classList.contains('hidden')));
+    await page.click('#closeSettingsButton');
+    await page.waitForTimeout(120);
+    report.gameModes[mode].settingsClosedInGame = await page.locator('#settingsModal').evaluate((node) => node.classList.contains('hidden'));
+
+    await page.click('#homeButtonGame');
+    await page.waitForTimeout(220);
+    report.gameModes[mode].afterHomeFromProgress = {
+      homeVisible: await page.locator('#homeScreen').isVisible(),
+      resumeVisible: !(await page.locator('#resumeModal').evaluate((node) => node.classList.contains('hidden'))),
+    };
+
+    await page.click(selector);
+    await page.waitForTimeout(220);
+    report.gameModes[mode].resumePromptFromProgress = {
+      visible: !(await page.locator('#resumeModal').evaluate((node) => node.classList.contains('hidden'))),
+      title: await page.locator('#resumeTitle').textContent(),
+      summary: await page.locator('#resumeSummary').textContent(),
+    };
+
+    await page.click('#continueSavedButton');
+    await page.waitForTimeout(350);
+    report.gameModes[mode].continuedFromProgress = await getGameSnapshot(page);
+    await page.click('#homeButtonGame');
+    await page.waitForTimeout(220);
+
+    await page.click(selector);
+    await page.waitForTimeout(220);
+    report.gameModes[mode].resumePromptAfterContinue = {
+      visible: !(await page.locator('#resumeModal').evaluate((node) => node.classList.contains('hidden'))),
+      title: await page.locator('#resumeTitle').textContent(),
+      summary: await page.locator('#resumeSummary').textContent(),
+    };
+
+    await page.click('#startFreshButton');
+    await page.waitForTimeout(1300);
+
     await page.keyboard.press('KeyP');
     await page.waitForTimeout(120);
     report.gameModes[mode].paused = await getGameSnapshot(page);
@@ -164,14 +237,62 @@ async function main() {
     report.screenshots[`${mode}AfterHome`] = await screenshot(page, `${mode}-after-home.png`);
 
     await page.click(selector);
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(350);
+    const resumeVisibleAfterRestart = !(await page.locator('#resumeModal').evaluate((node) => node.classList.contains('hidden')));
     report.gameModes[mode].resumePrompt = {
-      visible: !(await page.locator('#resumeModal').evaluate((node) => node.classList.contains('hidden'))),
-      title: await page.locator('#resumeTitle').textContent(),
-      summary: await page.locator('#resumeSummary').textContent(),
+      visible: resumeVisibleAfterRestart,
+      title: resumeVisibleAfterRestart ? await page.locator('#resumeTitle').textContent() : '',
+      summary: resumeVisibleAfterRestart ? await page.locator('#resumeSummary').textContent() : '',
     };
+    report.gameModes[mode].afterRestartModeRequest = await getGameSnapshot(page);
     report.screenshots[`${mode}Resume`] = await screenshot(page, `${mode}-resume.png`);
   }
+
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(500);
+  await page.click('#startArcadeButton');
+  await page.waitForTimeout(1100);
+  await page.evaluate(() => window.monstackaDebug?.forceArcadeTopOut(13337, 22, 94500));
+  await page.waitForTimeout(250);
+  report.gameModes.arcade.forcedTopOut = await getGameSnapshot(page);
+  report.gameModes.arcade.forcedTopOut.recordTitle = await page.locator('#recordModal h2').textContent();
+  report.gameModes.arcade.forcedTopOut.recordSummary = await page.locator('#recordSummary').textContent();
+  await page.fill('#nicknameInput', 'RIP1');
+  await page.locator('#nicknameForm').press('Enter');
+  await page.waitForTimeout(180);
+  report.gameModes.arcade.afterForcedRecordSave = {
+    recordVisible: !(await page.locator('#recordModal').evaluate((node) => node.classList.contains('hidden'))),
+  };
+
+  await page.click('#homeButtonGame');
+  await page.waitForTimeout(180);
+  await page.click('#leaderboardArcadeButton');
+  await page.waitForTimeout(120);
+  report.leaderboards.arcadeAfterForcedSave = await textList(page, '#homeLeaderboard .home-score-value');
+  report.leaderboards.arcadeAfterForcedSaveTags = await textList(page, '#homeLeaderboard .home-score-tag');
+
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(500);
+  await page.click('#startSprintButton');
+  await page.waitForTimeout(1100);
+  await page.evaluate(() => window.monstackaDebug?.forceSprintClear(52890, 96));
+  await page.waitForTimeout(250);
+  report.gameModes.sprint40.forcedClear = await getGameSnapshot(page);
+  report.gameModes.sprint40.forcedClear.recordTitle = await page.locator('#recordModal h2').textContent();
+  report.gameModes.sprint40.forcedClear.recordSummary = await page.locator('#recordSummary').textContent();
+  await page.fill('#nicknameInput', 'ZIPPY');
+  await page.locator('#nicknameForm').press('Enter');
+  await page.waitForTimeout(180);
+  report.gameModes.sprint40.afterForcedRecordSave = {
+    recordVisible: !(await page.locator('#recordModal').evaluate((node) => node.classList.contains('hidden'))),
+  };
+
+  await page.click('#homeButtonGame');
+  await page.waitForTimeout(180);
+  await page.click('#leaderboardSprintButton');
+  await page.waitForTimeout(120);
+  report.leaderboards.sprintAfterForcedSave = await textList(page, '#homeLeaderboard .home-score-value');
+  report.leaderboards.sprintAfterForcedSaveTags = await textList(page, '#homeLeaderboard .home-score-tag');
 
   await fs.writeFile(
     path.join(AUDIT_DIR, 'audit-report.json'),

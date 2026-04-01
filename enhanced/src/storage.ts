@@ -1,5 +1,11 @@
 import type { GameMode, SavedRun, SavedRunsByMode, Settings, SprintRecord, ScoreRecord, StorageData } from './types';
-import { STORAGE_KEY, LEGACY_STORAGE_KEYS, SETTINGS_DEFAULTS, MAX_NICKNAME_LENGTH } from './constants';
+import {
+  STORAGE_KEY,
+  LEGACY_STORAGE_KEYS,
+  SETTINGS_DEFAULTS,
+  MAX_NICKNAME_LENGTH,
+  MAX_LEADERBOARD_ENTRIES,
+} from './constants';
 
 function createEmptySavedRuns(): SavedRunsByMode {
   return {
@@ -47,10 +53,18 @@ function parseStorage(raw: string | null): StorageData | null {
   if (!raw) return null;
 
   const parsed = JSON.parse(raw || '{}');
+  const parsedSettings = parsed.settings || {};
   return {
     sprint: Array.isArray(parsed.sprint) ? parsed.sprint : [],
     score: Array.isArray(parsed.score) ? parsed.score : [],
-    settings: { ...SETTINGS_DEFAULTS, ...(parsed.settings || {}) },
+    settings: {
+      ...SETTINGS_DEFAULTS,
+      ...parsedSettings,
+      controls: {
+        ...SETTINGS_DEFAULTS.controls,
+        ...(parsedSettings.controls || {}),
+      },
+    },
     savedRuns: parseSavedRuns(parsed.savedRuns),
   };
 }
@@ -94,13 +108,13 @@ export function normalizeNickname(value: string): string {
 
 export function qualifiesSprintRecord(data: StorageData, timeMs: number): boolean {
   if (timeMs <= 0) return false;
-  if (data.sprint.length < 10) return true;
+  if (data.sprint.length < MAX_LEADERBOARD_ENTRIES) return true;
   return timeMs < data.sprint[data.sprint.length - 1].timeMs;
 }
 
 export function qualifiesScoreRecord(data: StorageData, score: number): boolean {
   if (score <= 0) return false;
-  if (data.score.length < 10) return true;
+  if (data.score.length < MAX_LEADERBOARD_ENTRIES) return true;
   return score > data.score[data.score.length - 1].score;
 }
 
@@ -120,7 +134,7 @@ export function saveSprintRecord(
   };
   data.sprint.push(entry);
   data.sprint.sort((a, b) => a.timeMs - b.timeMs || a.timestamp.localeCompare(b.timestamp));
-  data.sprint = data.sprint.slice(0, 10);
+  data.sprint = data.sprint.slice(0, MAX_LEADERBOARD_ENTRIES);
   saveStorage(data);
 }
 
@@ -140,7 +154,7 @@ export function saveScoreRecord(
   };
   data.score.push(entry);
   data.score.sort((a, b) => b.score - a.score || a.timestamp.localeCompare(b.timestamp));
-  data.score = data.score.slice(0, 10);
+  data.score = data.score.slice(0, MAX_LEADERBOARD_ENTRIES);
   saveStorage(data);
 }
 

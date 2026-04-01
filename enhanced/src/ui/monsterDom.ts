@@ -1,5 +1,6 @@
 import { DEFINITIONS } from '../constants';
 import { getMonsterFigureBoxSize, getMonsterFigureCanvas, getMonsterTile } from '../monsterSkin';
+import type { MonsterEye } from '../monsterSkin';
 import type { PieceType } from '../types';
 
 interface OccupiedNeighbors {
@@ -39,27 +40,42 @@ function addClassNames(target: HTMLElement, classNames?: string): void {
 }
 
 function createEyeNode(
-  x: number,
-  y: number,
-  size: number,
+  eyeSpec: MonsterEye,
   blinkAmount: number,
   lookX: number,
   lookY: number,
 ): HTMLElement {
   const eye = document.createElement('span');
   eye.className = 'monster-eye';
-  eye.style.setProperty('--eye-x', `${Math.round(x * 100)}%`);
-  eye.style.setProperty('--eye-y', `${Math.round(y * 100)}%`);
-  eye.style.setProperty('--eye-size', `${size}`);
+  eye.style.setProperty('--eye-x', `${Math.round(eyeSpec.x * 100)}%`);
+  eye.style.setProperty('--eye-y', `${Math.round(eyeSpec.y * 100)}%`);
+  eye.style.setProperty('--eye-size', `${eyeSpec.regionScale.toFixed(3)}`);
   eye.style.setProperty('--blink', `${blinkAmount}`);
   eye.style.setProperty('--look-x', `${lookX.toFixed(3)}`);
   eye.style.setProperty('--look-y', `${lookY.toFixed(3)}`);
+
+  const socket = cloneCanvas(eyeSpec.socketCanvas, 'monster-eye-socket');
+  eye.appendChild(socket);
+
+  const pupil = cloneCanvas(eyeSpec.pupilCanvas, 'monster-eye-pupil');
+  eye.appendChild(pupil);
+
   return eye;
 }
 
 function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.className = 'monster-art';
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(source, 0, 0);
+  return canvas;
+}
+
+function cloneCanvas(source: HTMLCanvasElement, className: string): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.className = className;
   canvas.width = source.width;
   canvas.height = source.height;
   const ctx = canvas.getContext('2d')!;
@@ -105,19 +121,21 @@ function cropMonsterFigureCanvas(
 }
 
 function createTongueNode(
+  source: HTMLCanvasElement,
   x: number,
   y: number,
   width: number,
   height: number,
   sway: number,
 ): HTMLElement {
-  const tongue = document.createElement('span');
+  const tongue = document.createElement('div');
   tongue.className = 'monster-tongue';
-  tongue.style.setProperty('--tongue-x', `${Math.round(x * 100)}%`);
-  tongue.style.setProperty('--tongue-y', `${Math.round(y * 100)}%`);
-  tongue.style.setProperty('--tongue-width', `${width}`);
-  tongue.style.setProperty('--tongue-height', `${height}`);
+  tongue.style.setProperty('--tongue-x', `${(x * 100).toFixed(2)}%`);
+  tongue.style.setProperty('--tongue-y', `${(y * 100).toFixed(2)}%`);
+  tongue.style.setProperty('--tongue-width', `${(width * 100).toFixed(2)}%`);
+  tongue.style.setProperty('--tongue-height', `${(height * 100).toFixed(2)}%`);
   tongue.style.setProperty('--tongue-sway', `${sway.toFixed(3)}`);
+  tongue.appendChild(cloneCanvas(source, 'monster-tongue-art'));
   return tongue;
 }
 
@@ -141,9 +159,9 @@ function createMonsterBodyNode(
 
   const motion = document.createElement('div');
   motion.className = 'monster-motion';
-  const driftX = (((motionSeed * 17) % 7) - 3) * 0.8;
-  const driftY = (((motionSeed * 29) % 7) - 3) * 0.62;
-  const driftTilt = (((motionSeed * 31) % 7) - 3) * 0.5;
+  const driftX = 0;
+  const driftY = 0;
+  const driftTilt = 0;
   motion.style.setProperty('--motion-x', `${driftX.toFixed(3)}px`);
   motion.style.setProperty('--motion-y', `${driftY.toFixed(3)}px`);
   motion.style.setProperty('--motion-tilt', `${driftTilt.toFixed(3)}deg`);
@@ -154,18 +172,18 @@ function createMonsterBodyNode(
 }
 
 function blinkAmount(now: number, seed: number): number {
-  const period = 2100 + (seed % 4) * 340;
+  const period = 1580 + (seed % 4) * 220;
   const phase = (now + seed * 173) % period;
-  const blinkWindow = 420;
+  const blinkWindow = 300;
   if (phase > period - blinkWindow) {
     const t = (phase - (period - blinkWindow)) / blinkWindow;
-    if (t < 0.28) {
-      return t / 0.28;
+    if (t < 0.22) {
+      return t / 0.22;
     }
-    if (t < 0.68) {
+    if (t < 0.62) {
       return 1;
     }
-    return 1 - ((t - 0.68) / 0.32);
+    return 1 - ((t - 0.62) / 0.38);
   }
   return 0;
 }
@@ -195,18 +213,10 @@ export function populateMonsterCell(
   }
 
   const [pieceType] = skinKey.split(':');
-  const scaleX = allowSquish && (occupiedNeighbors.left || occupiedNeighbors.right) ? 0.035 : 0;
-  const scaleY = allowSquish && (occupiedNeighbors.up || occupiedNeighbors.down) ? 0.022 : 0;
-  const shiftX = allowSquish && occupiedNeighbors.left && !occupiedNeighbors.right
-    ? 0.012
-    : allowSquish && occupiedNeighbors.right && !occupiedNeighbors.left
-      ? -0.012
-      : 0;
-  const shiftY = allowSquish && occupiedNeighbors.up && !occupiedNeighbors.down
-    ? 0.008
-    : allowSquish && occupiedNeighbors.down && !occupiedNeighbors.up
-      ? -0.012
-      : 0;
+  const scaleX = allowSquish && (occupiedNeighbors.left || occupiedNeighbors.right) ? 0.016 : 0;
+  const scaleY = allowSquish && (occupiedNeighbors.up || occupiedNeighbors.down) ? 0.012 : 0;
+  const shiftX = 0;
+  const shiftY = 0;
 
   cell.classList.add('monster-cell', `piece-${pieceType.toLowerCase()}`);
   const motionSeed = [...skinKey].reduce((total, char) => total + char.charCodeAt(0), 0);
@@ -216,17 +226,19 @@ export function populateMonsterCell(
   for (const eye of tile.eyes) {
     const blink = animate && eye.blink ? blinkAmount(options.now, eye.seed) : 0;
     const reactiveX = animate
-      ? (options.lookX || 0) + Math.sin((options.now + eye.seed * 41) / 860) * 0.14
+      ? (options.lookX || 0) + Math.sin((options.now + eye.seed * 41) / 760) * 0.3
       : options.lookX || 0;
     const reactiveY = animate
-      ? (options.lookY || 0) + Math.cos((options.now + eye.seed * 61) / 1080) * 0.09
+      ? (options.lookY || 0) + Math.cos((options.now + eye.seed * 61) / 930) * 0.22
       : options.lookY || 0;
-    motion.appendChild(createEyeNode(eye.x, eye.y, eye.size, blink, reactiveX, reactiveY));
+    motion.appendChild(createEyeNode(eye, blink, reactiveX, reactiveY));
   }
 
   if (tile.tongue) {
-    const sway = animate ? Math.sin((options.now + tile.tongue.seed * 97) / 380) * 0.34 : 0;
-    motion.appendChild(createTongueNode(tile.tongue.x, tile.tongue.y, tile.tongue.width, tile.tongue.height, sway));
+    const sway = animate ? Math.sin((options.now + tile.tongue.seed * 97) / 460) * 0.24 : 0;
+    motion.appendChild(
+      createTongueNode(tile.canvas, tile.tongue.x, tile.tongue.y, tile.tongue.width, tile.tongue.height, sway),
+    );
   }
 
   cell.appendChild(body);
@@ -282,18 +294,18 @@ export function populateMonsterFigure(
         for (const eye of tile.eyes) {
           const blink = (options.animate ?? false) && eye.blink ? blinkAmount(options.now, eye.seed) : 0;
           const reactiveX = options.animate
-            ? (options.lookX || 0) + Math.sin((options.now + eye.seed * 41) / 860) * 0.14
+            ? (options.lookX || 0) + Math.sin((options.now + eye.seed * 41) / 760) * 0.3
             : options.lookX || 0;
           const reactiveY = options.animate
-            ? (options.lookY || 0) + Math.cos((options.now + eye.seed * 61) / 1080) * 0.09
+            ? (options.lookY || 0) + Math.cos((options.now + eye.seed * 61) / 930) * 0.22
             : options.lookY || 0;
-          overlay.appendChild(createEyeNode(eye.x, eye.y, eye.size, blink, reactiveX, reactiveY));
+          overlay.appendChild(createEyeNode(eye, blink, reactiveX, reactiveY));
         }
 
         if (tile.tongue) {
-          const sway = options.animate ? Math.sin((options.now + tile.tongue.seed * 97) / 380) * 0.34 : 0;
+          const sway = options.animate ? Math.sin((options.now + tile.tongue.seed * 97) / 460) * 0.24 : 0;
           overlay.appendChild(
-            createTongueNode(tile.tongue.x, tile.tongue.y, tile.tongue.width, tile.tongue.height, sway),
+            createTongueNode(tile.canvas, tile.tongue.x, tile.tongue.y, tile.tongue.width, tile.tongue.height, sway),
           );
         }
 

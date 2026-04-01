@@ -1,9 +1,9 @@
-import type { GameState, Settings } from '../types';
-import { KEYMAP } from '../constants';
+import type { AppPhase, GameState, Settings } from '../types';
 import {
-  move, rotate, hardDrop, hold, dropOnce, reset,
+  move, rotate, hardDrop, hold, dropOnce,
 } from '../engine/state';
 import type { SoundCue } from '../audio';
+import { findActionForKeyboard, findActionForMouse } from './bindings';
 
 export interface InputState {
   horizontal: number;
@@ -56,6 +56,11 @@ export function setupKeyboard(
   settings: Settings,
   onRender: () => void,
   onReset: () => void,
+  getAppPhase: () => AppPhase,
+  onPause: () => void,
+  onResume: () => void,
+  onRestartPaused: () => void,
+  isInputBlocked: () => boolean,
   onSound: (cue: SoundCue) => void,
 ): () => void {
   function countTrainingInput(): void {
@@ -64,18 +69,50 @@ export function setupKeyboard(
     }
   }
 
-  function handleKeydown(event: KeyboardEvent) {
-    const action = KEYMAP[event.code];
-    if (!action) return;
+  function isInteractiveTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+    return Boolean(target.closest('button,input,select,textarea,label,a'));
+  }
+
+  function handleAction(action: string, event: Event, isRepeat = false) {
+    if (isInputBlocked()) {
+      return;
+    }
+
     event.preventDefault();
+    if ('stopPropagation' in event) {
+      event.stopPropagation();
+    }
 
     if (action === 'retry') {
+      if (getAppPhase() === 'menu') {
+        return;
+      }
       onReset();
       return;
     }
 
+    if (action === 'pause') {
+      const phase = getAppPhase();
+      if (phase === 'playing') {
+        onPause();
+      } else if (phase === 'paused') {
+        onResume();
+      }
+      return;
+    }
+
+    if (action === 'restartPaused') {
+      if (getAppPhase() === 'paused') {
+        onRestartPaused();
+      }
+      return;
+    }
+
     if (!state.startTime || state.gameOver) return;
-    if (event.repeat && action !== 'soft') return;
+    if (isRepeat && action !== 'soft') return;
 
     if (action === 'left' || action === 'right') {
       input.horizontal = action === 'left' ? -1 : 1;
@@ -114,8 +151,17 @@ export function setupKeyboard(
     onRender();
   }
 
+  function handleKeydown(event: KeyboardEvent) {
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+    const action = findActionForKeyboard(settings.controls, event.code);
+    if (!action) return;
+    handleAction(action, event, event.repeat);
+  }
+
   function handleKeyup(event: KeyboardEvent) {
-    const action = KEYMAP[event.code];
+    const action = findActionForKeyboard(settings.controls, event.code);
     if (!action) return;
     if ((action === 'left' && input.horizontal < 0) || (action === 'right' && input.horizontal > 0)) {
       input.horizontal = 0;
@@ -123,12 +169,32 @@ export function setupKeyboard(
     }
   }
 
+  function handleMousedown(event: MouseEvent) {
+    const action = findActionForMouse(settings.controls, event.button);
+    if (!action) return;
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+    handleAction(action, event, false);
+  }
+
+  function handleContextMenu(event: MouseEvent) {
+    const action = findActionForMouse(settings.controls, 2);
+    if (!action || isInputBlocked()) return;
+    if (isInteractiveTarget(event.target)) return;
+    event.preventDefault();
+  }
+
   document.addEventListener('keydown', handleKeydown);
   document.addEventListener('keyup', handleKeyup);
+  document.addEventListener('mousedown', handleMousedown);
+  document.addEventListener('contextmenu', handleContextMenu);
 
   return () => {
     document.removeEventListener('keydown', handleKeydown);
     document.removeEventListener('keyup', handleKeyup);
+    document.removeEventListener('mousedown', handleMousedown);
+    document.removeEventListener('contextmenu', handleContextMenu);
   };
 }
 

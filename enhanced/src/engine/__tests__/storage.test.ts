@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SETTINGS_DEFAULTS } from '../../constants';
+import { SETTINGS_DEFAULTS, MAX_LEADERBOARD_ENTRIES } from '../../constants';
 import {
   clearSavedRun,
   getSavedRun,
@@ -78,14 +78,14 @@ describe('storage helpers', () => {
 
   it('checks qualification rules for sprint and score leaderboards', () => {
     const data = createStorage();
-    data.sprint = Array.from({ length: 10 }, (_, index) => ({
+    data.sprint = Array.from({ length: MAX_LEADERBOARD_ENTRIES }, (_, index) => ({
       nickname: `S${index}`,
       timeMs: 1000 + index * 100,
       lines: 40,
       pieces: 60,
       timestamp: `2026-03-3${index}T00:00:00.000Z`,
     }));
-    data.score = Array.from({ length: 10 }, (_, index) => ({
+    data.score = Array.from({ length: MAX_LEADERBOARD_ENTRIES }, (_, index) => ({
       nickname: `P${index}`,
       score: 1000 - index * 50,
       lines: 20,
@@ -99,7 +99,7 @@ describe('storage helpers', () => {
     expect(qualifiesScoreRecord(data, 200)).toBe(false);
   });
 
-  it('saves records in sorted top-10 order', () => {
+  it('saves records in sorted top-8 order', () => {
     const data = createStorage();
 
     for (let index = 0; index < 12; index += 1) {
@@ -107,15 +107,15 @@ describe('storage helpers', () => {
       saveScoreRecord(data, `p${index}`, (index + 1) * 100, 20, 15000);
     }
 
-    expect(data.sprint).toHaveLength(10);
+    expect(data.sprint).toHaveLength(MAX_LEADERBOARD_ENTRIES);
     expect(data.sprint[0].nickname).toBe('S0');
     expect(data.sprint[0].timeMs).toBe(1000);
-    expect(data.sprint[9].timeMs).toBe(1090);
+    expect(data.sprint[MAX_LEADERBOARD_ENTRIES - 1].timeMs).toBe(1070);
 
-    expect(data.score).toHaveLength(10);
+    expect(data.score).toHaveLength(MAX_LEADERBOARD_ENTRIES);
     expect(data.score[0].nickname).toBe('P11');
     expect(data.score[0].score).toBe(1200);
-    expect(data.score[9].score).toBe(300);
+    expect(data.score[MAX_LEADERBOARD_ENTRIES - 1].score).toBe(500);
   });
 
   it('stores and clears saved runs per mode', () => {
