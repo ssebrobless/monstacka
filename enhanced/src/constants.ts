@@ -74,9 +74,10 @@ export const SETTINGS_DEFAULTS: Settings = {
   dasMs: 110,
   arrMs: 0,
   lockDelayMs: 250,
+  sfxEnabled: true,
   sfxVolume: 70,
-  musicVolume: 40,
-  muted: false,
+  musicEnabled: true,
+  musicVolume: 35,
   trainingFeedback: 'show',
   controls: { ...DEFAULT_CONTROLS },
 };

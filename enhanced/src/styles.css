@@ -304,6 +304,7 @@ select {
 
 .preview-stage.is-active .monster-ripple-layer {
     filter: url('#monster-edge-ripple-preview');
+    animation-duration: 0.24s;
 }
 
 .preview-stage.is-active .monster-body {
@@ -789,7 +790,12 @@ select {
 
 .monster-body.is-animated .monster-ripple-layer {
     filter: url('#monster-edge-ripple');
+    animation: monster-ripple-twitch 0.3s linear infinite;
     will-change: transform, filter;
+}
+
+.preview-stage.is-active .monster-ripple-layer {
+    animation-name: monster-ripple-twitch-preview;
 }
 
 .monster-art {
@@ -808,6 +814,8 @@ select {
     height: 100%;
     display: block;
     pointer-events: none;
+    transform: scale(1.01);
+    transform-origin: center;
 }
 
 .monster-eye-overlay {
@@ -1088,6 +1096,84 @@ button.secondary {
     }
     88% {
         transform: translate(-0.14px, -0.1px) rotate(0.09deg);
+    }
+}
+
+@keyframes monster-ripple-twitch {
+    0%, 100% {
+        transform: translate(0, 0) rotate(0deg) scale(1.004);
+    }
+    7% {
+        transform: translate(0.05px, -0.03px) rotate(-0.03deg) scale(1.008);
+    }
+    14% {
+        transform: translate(-0.04px, 0.03px) rotate(0.03deg) scale(1.006);
+    }
+    22% {
+        transform: translate(0.06px, 0.02px) rotate(-0.02deg) scale(1.01);
+    }
+    31% {
+        transform: translate(-0.03px, -0.05px) rotate(0.03deg) scale(1.007);
+    }
+    40% {
+        transform: translate(0.05px, 0.03px) rotate(-0.03deg) scale(1.011);
+    }
+    49% {
+        transform: translate(-0.05px, 0.04px) rotate(0.03deg) scale(1.008);
+    }
+    58% {
+        transform: translate(0.04px, -0.06px) rotate(-0.03deg) scale(1.01);
+    }
+    67% {
+        transform: translate(-0.06px, 0.02px) rotate(0.03deg) scale(1.007);
+    }
+    76% {
+        transform: translate(0.05px, -0.03px) rotate(-0.02deg) scale(1.009);
+    }
+    85% {
+        transform: translate(-0.04px, 0.05px) rotate(0.03deg) scale(1.006);
+    }
+    93% {
+        transform: translate(0.03px, -0.04px) rotate(-0.02deg) scale(1.008);
+    }
+}
+
+@keyframes monster-ripple-twitch-preview {
+    0%, 100% {
+        transform: translate(0, 0) rotate(0deg) scale(1.006);
+    }
+    7% {
+        transform: translate(0.08px, -0.05px) rotate(-0.04deg) scale(1.011);
+    }
+    14% {
+        transform: translate(-0.06px, 0.05px) rotate(0.04deg) scale(1.009);
+    }
+    22% {
+        transform: translate(0.08px, 0.03px) rotate(-0.03deg) scale(1.014);
+    }
+    31% {
+        transform: translate(-0.05px, -0.08px) rotate(0.04deg) scale(1.01);
+    }
+    40% {
+        transform: translate(0.08px, 0.04px) rotate(-0.03deg) scale(1.015);
+    }
+    49% {
+        transform: translate(-0.08px, 0.06px) rotate(0.04deg) scale(1.011);
+    }
+    58% {
+        transform: translate(0.07px, -0.08px) rotate(-0.03deg) scale(1.014);
+    }
+    67% {
+        transform: translate(-0.09px, 0.03px) rotate(0.04deg) scale(1.01);
+    }
+    76% {
+        transform: translate(0.07px, -0.04px) rotate(-0.03deg) scale(1.013);
+    }
+    85% {
+        transform: translate(-0.06px, 0.07px) rotate(0.04deg) scale(1.009);
+    }
+    93% {
+        transform: translate(0.04px, -0.06px) rotate(-0.03deg) scale(1.012);
     }
 }
 

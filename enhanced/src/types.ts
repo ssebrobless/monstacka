@@ -68,9 +68,10 @@ export interface Settings {
   dasMs: number;
   arrMs: number;
   lockDelayMs: number;
+  sfxEnabled: boolean;
   sfxVolume: number;
+  musicEnabled: boolean;
   musicVolume: number;
-  muted: boolean;
   trainingFeedback: TrainingFeedbackMode;
   controls: ControlBindings;
 }

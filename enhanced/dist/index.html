@@ -9,32 +9,40 @@
 <body>
     <svg class="filter-defs" aria-hidden="true" focusable="false">
         <defs>
-            <filter id="monster-edge-ripple" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
-                <feTurbulence type="fractalNoise" baseFrequency="0.034 0.095" numOctaves="2" seed="7" result="noiseA">
-                    <animate attributeName="baseFrequency" dur="1.8s" repeatCount="indefinite" values="0.034 0.095;0.04 0.115;0.036 0.1;0.043 0.125;0.034 0.095" />
+            <filter id="monster-edge-ripple" x="-16%" y="-16%" width="132%" height="132%" color-interpolation-filters="sRGB">
+                <feMorphology in="SourceGraphic" operator="dilate" radius="0.35" result="edgeBase" />
+                <feTurbulence type="fractalNoise" baseFrequency="0.22 0.56" numOctaves="2" seed="7" result="noiseA">
+                    <animate attributeName="baseFrequency" dur="0.48s" repeatCount="indefinite" values="0.22 0.56;0.245 0.62;0.228 0.58;0.252 0.66;0.22 0.56" />
                 </feTurbulence>
-                <feTurbulence type="fractalNoise" baseFrequency="0.02 0.055" numOctaves="1" seed="19" result="noiseB">
-                    <animate attributeName="baseFrequency" dur="1.25s" repeatCount="indefinite" values="0.02 0.055;0.026 0.074;0.022 0.06;0.028 0.078;0.02 0.055" />
+                <feTurbulence type="fractalNoise" baseFrequency="0.38 0.92" numOctaves="1" seed="19" result="noiseB">
+                    <animate attributeName="baseFrequency" dur="0.31s" repeatCount="indefinite" values="0.38 0.92;0.42 1.0;0.39 0.94;0.44 1.06;0.38 0.92" />
                 </feTurbulence>
-                <feDisplacementMap in="SourceGraphic" in2="noiseA" scale="1.45" xChannelSelector="R" yChannelSelector="G" result="warpA">
-                    <animate attributeName="scale" dur="1.45s" repeatCount="indefinite" values="1.2;2.0;1.45;1.9;1.2" />
+                <feDisplacementMap in="edgeBase" in2="noiseA" scale="0.58" xChannelSelector="R" yChannelSelector="G" result="warpA">
+                    <animate attributeName="scale" dur="0.38s" repeatCount="indefinite" values="0.34;0.72;0.46;0.68;0.34" />
                 </feDisplacementMap>
-                <feDisplacementMap in="warpA" in2="noiseB" scale="0.95" xChannelSelector="G" yChannelSelector="B">
-                    <animate attributeName="scale" dur="1.05s" repeatCount="indefinite" values="0.7;1.2;0.9;1.25;0.7" />
+                <feDisplacementMap in="warpA" in2="noiseB" scale="0.32" xChannelSelector="G" yChannelSelector="B" result="warpB">
+                    <animate attributeName="scale" dur="0.26s" repeatCount="indefinite" values="0.12;0.42;0.21;0.45;0.12" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpB" in2="noiseA" scale="0.14" xChannelSelector="B" yChannelSelector="R">
+                    <animate attributeName="scale" dur="0.21s" repeatCount="indefinite" values="0.05;0.18;0.1;0.2;0.05" />
                 </feDisplacementMap>
             </filter>
-            <filter id="monster-edge-ripple-preview" x="-14%" y="-14%" width="128%" height="128%" color-interpolation-filters="sRGB">
-                <feTurbulence type="fractalNoise" baseFrequency="0.04 0.12" numOctaves="2" seed="11" result="noiseA">
-                    <animate attributeName="baseFrequency" dur="1.8s" repeatCount="indefinite" values="0.04 0.12;0.046 0.135;0.042 0.122;0.05 0.145;0.04 0.12" />
+            <filter id="monster-edge-ripple-preview" x="-18%" y="-18%" width="136%" height="136%" color-interpolation-filters="sRGB">
+                <feMorphology in="SourceGraphic" operator="dilate" radius="0.45" result="edgeBase" />
+                <feTurbulence type="fractalNoise" baseFrequency="0.25 0.62" numOctaves="2" seed="11" result="noiseA">
+                    <animate attributeName="baseFrequency" dur="0.44s" repeatCount="indefinite" values="0.25 0.62;0.278 0.7;0.258 0.65;0.286 0.74;0.25 0.62" />
                 </feTurbulence>
-                <feTurbulence type="fractalNoise" baseFrequency="0.022 0.07" numOctaves="1" seed="23" result="noiseB">
-                    <animate attributeName="baseFrequency" dur="1.2s" repeatCount="indefinite" values="0.022 0.07;0.03 0.082;0.024 0.072;0.022 0.07" />
+                <feTurbulence type="fractalNoise" baseFrequency="0.42 1.0" numOctaves="1" seed="23" result="noiseB">
+                    <animate attributeName="baseFrequency" dur="0.28s" repeatCount="indefinite" values="0.42 1.0;0.46 1.1;0.43 1.03;0.48 1.16;0.42 1.0" />
                 </feTurbulence>
-                <feDisplacementMap in="SourceGraphic" in2="noiseA" scale="1.7" xChannelSelector="R" yChannelSelector="G" result="warpA">
-                    <animate attributeName="scale" dur="1.5s" repeatCount="indefinite" values="1.3;2.2;1.7;2.4;1.3" />
+                <feDisplacementMap in="edgeBase" in2="noiseA" scale="0.74" xChannelSelector="R" yChannelSelector="G" result="warpA">
+                    <animate attributeName="scale" dur="0.34s" repeatCount="indefinite" values="0.42;0.92;0.58;0.88;0.42" />
                 </feDisplacementMap>
-                <feDisplacementMap in="warpA" in2="noiseB" scale="1.1" xChannelSelector="G" yChannelSelector="B">
-                    <animate attributeName="scale" dur="1.0s" repeatCount="indefinite" values="0.8;1.4;1.0;1.5;0.8" />
+                <feDisplacementMap in="warpA" in2="noiseB" scale="0.4" xChannelSelector="G" yChannelSelector="B" result="warpB">
+                    <animate attributeName="scale" dur="0.22s" repeatCount="indefinite" values="0.16;0.52;0.26;0.56;0.16" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpB" in2="noiseA" scale="0.18" xChannelSelector="B" yChannelSelector="R">
+                    <animate attributeName="scale" dur="0.18s" repeatCount="indefinite" values="0.06;0.24;0.12;0.26;0.06" />
                 </feDisplacementMap>
             </filter>
         </defs>
@@ -183,8 +191,9 @@
                             <option value="off">Off</option>
                         </select>
                     </label>
-                    <label class="toggle-row"><input id="mutedInput" type="checkbox">Mute Audio</label>
+                    <label class="toggle-row"><input id="sfxEnabledInput" type="checkbox">Sound Effects On</label>
                     <label>SFX Volume<input id="sfxVolumeInput" type="range" min="0" max="100" step="1"></label>
+                    <label class="toggle-row"><input id="musicEnabledInput" type="checkbox">Music On</label>
                     <label>Music Volume<input id="musicVolumeInput" type="range" min="0" max="100" step="1"></label>
                     <div class="button-row">
                         <button id="applySettingsButton" type="submit">Apply</button>

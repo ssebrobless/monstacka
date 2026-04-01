@@ -83,6 +83,7 @@ function init() {
   const homeRefs = getHomeMenuRefs();
   const homeState = createHomeMenuState();
   const audio = new AudioManager();
+  audio.boot(settings);
 
   const homeScreen = document.getElementById('homeScreen')!;
   const gameShell = document.getElementById('gameShell')!;
@@ -853,9 +854,10 @@ function init() {
     settings.arrMs = Math.max(0, Number(refs.arrInput.value || SETTINGS_DEFAULTS.arrMs));
     settings.lockDelayMs = Math.max(0, Number(refs.lockDelayInput.value || SETTINGS_DEFAULTS.lockDelayMs));
     settings.trainingFeedback = refs.trainingFeedbackInput.value as typeof settings.trainingFeedback;
+    settings.sfxEnabled = refs.sfxEnabledInput.checked;
     settings.sfxVolume = Math.max(0, Math.min(100, Number(refs.sfxVolumeInput.value || SETTINGS_DEFAULTS.sfxVolume)));
+    settings.musicEnabled = refs.musicEnabledInput.checked;
     settings.musicVolume = Math.max(0, Math.min(100, Number(refs.musicVolumeInput.value || SETTINGS_DEFAULTS.musicVolume)));
-    settings.muted = refs.mutedInput.checked;
     state.trainingFeedback = settings.trainingFeedback;
     saveStorage(storage);
     audio.syncSettings(settings);

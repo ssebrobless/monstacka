@@ -54,12 +54,15 @@ function parseStorage(raw: string | null): StorageData | null {
 
   const parsed = JSON.parse(raw || '{}');
   const parsedSettings = parsed.settings || {};
+  const legacyMuted = parsedSettings.muted === true;
   return {
     sprint: Array.isArray(parsed.sprint) ? parsed.sprint : [],
     score: Array.isArray(parsed.score) ? parsed.score : [],
     settings: {
       ...SETTINGS_DEFAULTS,
       ...parsedSettings,
+      sfxEnabled: parsedSettings.sfxEnabled ?? !legacyMuted,
+      musicEnabled: parsedSettings.musicEnabled ?? !legacyMuted,
       controls: {
         ...SETTINGS_DEFAULTS.controls,
         ...(parsedSettings.controls || {}),

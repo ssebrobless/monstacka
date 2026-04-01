@@ -35,8 +35,9 @@ export interface DomRefs {
   arrInput: HTMLInputElement;
   lockDelayInput: HTMLInputElement;
   trainingFeedbackInput: HTMLSelectElement;
-  mutedInput: HTMLInputElement;
+  sfxEnabledInput: HTMLInputElement;
   sfxVolumeInput: HTMLInputElement;
+  musicEnabledInput: HTMLInputElement;
   musicVolumeInput: HTMLInputElement;
 }
 
@@ -71,8 +72,9 @@ export function getDomRefs(): DomRefs {
     arrInput: document.getElementById('arrInput') as HTMLInputElement,
     lockDelayInput: document.getElementById('lockDelayInput') as HTMLInputElement,
     trainingFeedbackInput: document.getElementById('trainingFeedbackInput') as HTMLSelectElement,
-    mutedInput: document.getElementById('mutedInput') as HTMLInputElement,
+    sfxEnabledInput: document.getElementById('sfxEnabledInput') as HTMLInputElement,
     sfxVolumeInput: document.getElementById('sfxVolumeInput') as HTMLInputElement,
+    musicEnabledInput: document.getElementById('musicEnabledInput') as HTMLInputElement,
     musicVolumeInput: document.getElementById('musicVolumeInput') as HTMLInputElement,
   };
 }
@@ -416,8 +418,9 @@ export function render(
   if (document.activeElement !== refs.arrInput) refs.arrInput.value = String(settings.arrMs);
   if (document.activeElement !== refs.lockDelayInput) refs.lockDelayInput.value = String(settings.lockDelayMs);
   refs.trainingFeedbackInput.value = settings.trainingFeedback;
-  refs.mutedInput.checked = settings.muted;
+  refs.sfxEnabledInput.checked = settings.sfxEnabled;
   if (document.activeElement !== refs.sfxVolumeInput) refs.sfxVolumeInput.value = String(settings.sfxVolume);
+  refs.musicEnabledInput.checked = settings.musicEnabled;
   if (document.activeElement !== refs.musicVolumeInput) refs.musicVolumeInput.value = String(settings.musicVolume);
 
   if (isTraining && state.lastTrainingFaultMessage && now - state.lastTrainingFaultAt < 1500) {
