@@ -7,6 +7,38 @@
     <link rel="stylesheet" href="./src/styles.css">
 </head>
 <body>
+    <svg class="filter-defs" aria-hidden="true" focusable="false">
+        <defs>
+            <filter id="monster-edge-ripple" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.034 0.095" numOctaves="2" seed="7" result="noiseA">
+                    <animate attributeName="baseFrequency" dur="1.8s" repeatCount="indefinite" values="0.034 0.095;0.04 0.115;0.036 0.1;0.043 0.125;0.034 0.095" />
+                </feTurbulence>
+                <feTurbulence type="fractalNoise" baseFrequency="0.02 0.055" numOctaves="1" seed="19" result="noiseB">
+                    <animate attributeName="baseFrequency" dur="1.25s" repeatCount="indefinite" values="0.02 0.055;0.026 0.074;0.022 0.06;0.028 0.078;0.02 0.055" />
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="noiseA" scale="1.45" xChannelSelector="R" yChannelSelector="G" result="warpA">
+                    <animate attributeName="scale" dur="1.45s" repeatCount="indefinite" values="1.2;2.0;1.45;1.9;1.2" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpA" in2="noiseB" scale="0.95" xChannelSelector="G" yChannelSelector="B">
+                    <animate attributeName="scale" dur="1.05s" repeatCount="indefinite" values="0.7;1.2;0.9;1.25;0.7" />
+                </feDisplacementMap>
+            </filter>
+            <filter id="monster-edge-ripple-preview" x="-14%" y="-14%" width="128%" height="128%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.04 0.12" numOctaves="2" seed="11" result="noiseA">
+                    <animate attributeName="baseFrequency" dur="1.8s" repeatCount="indefinite" values="0.04 0.12;0.046 0.135;0.042 0.122;0.05 0.145;0.04 0.12" />
+                </feTurbulence>
+                <feTurbulence type="fractalNoise" baseFrequency="0.022 0.07" numOctaves="1" seed="23" result="noiseB">
+                    <animate attributeName="baseFrequency" dur="1.2s" repeatCount="indefinite" values="0.022 0.07;0.03 0.082;0.024 0.072;0.022 0.07" />
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="noiseA" scale="1.7" xChannelSelector="R" yChannelSelector="G" result="warpA">
+                    <animate attributeName="scale" dur="1.5s" repeatCount="indefinite" values="1.3;2.2;1.7;2.4;1.3" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpA" in2="noiseB" scale="1.1" xChannelSelector="G" yChannelSelector="B">
+                    <animate attributeName="scale" dur="1.0s" repeatCount="indefinite" values="0.8;1.4;1.0;1.5;0.8" />
+                </feDisplacementMap>
+            </filter>
+        </defs>
+    </svg>
     <main class="app-shell">
         <section id="homeScreen" class="screen-stage">
             <div class="artboard-frame">
@@ -69,6 +101,7 @@
                             <div id="overlay" class="overlay hidden"></div>
                             <div id="faultToast" class="fault-toast hidden"></div>
                             <div id="board" class="board"></div>
+                            <div id="boardMonsterLayer" class="board-monster-layer"></div>
                         </div>
                     </div>
 

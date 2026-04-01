@@ -30,6 +30,14 @@ body {
     background: #3448c7;
 }
 
+.filter-defs {
+    position: fixed;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
 button,
 input,
 select {
@@ -290,7 +298,20 @@ select {
 }
 
 .preview-stage.is-active .monster-motion {
-    animation-duration: 2.2s;
+    animation-name: monster-jiggle-preview;
+    animation-duration: 1.18s;
+}
+
+.preview-stage.is-active .monster-ripple-layer {
+    filter: url('#monster-edge-ripple-preview');
+}
+
+.preview-stage.is-active .monster-body {
+    animation-duration: 1.9s;
+}
+
+.preview-stage.is-active .monster-art {
+    animation-duration: 0.92s;
 }
 
 .preview-stage.preview-loading {
@@ -399,9 +420,11 @@ select {
     position: relative;
     width: 100%;
     height: 100%;
+    overflow: hidden;
 }
 
 .board {
+    position: relative;
     display: grid;
     gap: 3px;
     width: 100%;
@@ -411,6 +434,24 @@ select {
     background: rgba(8, 12, 24, 0.52);
     border: 1px solid rgba(199, 214, 255, 0.2);
     backdrop-filter: blur(4px);
+}
+
+.board-monster-layer {
+    position: absolute;
+    inset: 10px;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.board-piece-figure {
+    position: absolute;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.board-piece-figure > .monster-body {
+    inset: -2%;
 }
 
 .board.lock-flash {
@@ -716,16 +757,24 @@ select {
     inset: 0;
 }
 
+.monster-art-layer,
+.monster-ripple-layer {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
 .cell.monster-cell > .monster-body {
-    inset: -6%;
+    inset: -4%;
 }
 
 .preview-cell.monster-cell > .monster-body {
-    inset: -5%;
+    inset: -3%;
 }
 
 .monster-figure-body {
-    inset: -3%;
+    inset: -2%;
 }
 
 .monster-body.is-animated {
@@ -733,8 +782,14 @@ select {
 }
 
 .monster-body.is-animated > .monster-motion {
-    animation: monster-jiggle 2.9s ease-in-out infinite;
+    animation: monster-jiggle 1.85s linear infinite;
     animation-delay: var(--motion-delay, 0s);
+    will-change: transform;
+}
+
+.monster-body.is-animated .monster-ripple-layer {
+    filter: url('#monster-edge-ripple');
+    will-change: transform, filter;
 }
 
 .monster-art {
@@ -746,55 +801,30 @@ select {
     pointer-events: none;
 }
 
+.monster-ripple-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+}
+
+.monster-eye-overlay {
+    position: absolute;
+    display: block;
+    pointer-events: none;
+    image-rendering: auto;
+}
+
 .monster-body.is-animated .monster-art {
-    animation: monster-skin-pulse 1.85s ease-in-out infinite;
+    animation: monster-skin-pulse 1.35s ease-in-out infinite;
+    will-change: transform;
 }
 
 .monster-figure-overlay {
     position: absolute;
     overflow: visible;
-}
-
-.monster-eye {
-    position: absolute;
-    left: var(--eye-x);
-    top: var(--eye-y);
-    width: calc(var(--eye-size) * 100%);
-    height: calc(var(--eye-size) * 100%);
-    min-width: 8px;
-    min-height: 8px;
-    background: transparent;
-    overflow: hidden;
-    transform: translate(-50%, -50%);
-    transform-origin: center;
-    pointer-events: none;
-}
-
-.monster-eye-socket,
-.monster-eye-pupil {
-    position: absolute;
-    inset: 0;
-    transform-origin: center;
-    pointer-events: none;
-}
-
-.monster-eye-pupil {
-    display: block;
-    transform: translate(
-        calc(var(--look-x) * 8%),
-        calc(var(--look-y) * 7%)
-    );
-}
-
-.monster-eye::before {
-    content: "";
-    position: absolute;
-    inset: -2%;
-    background: var(--eyelid-color, rgba(88, 46, 60, 0.92));
-    border-radius: 999px;
-    transform-origin: top center;
-    transform: scaleY(var(--blink));
-    opacity: calc(var(--blink) * 0.96);
 }
 
 .monster-tongue {
@@ -816,14 +846,6 @@ select {
     display: block;
     animation: monster-tongue-wag 1.45s ease-in-out infinite;
 }
-
-.piece-i .monster-eye { --eyelid-color: rgba(77, 212, 236, 0.94); }
-.piece-o .monster-eye { --eyelid-color: rgba(247, 214, 93, 0.94); }
-.piece-t .monster-eye { --eyelid-color: rgba(163, 53, 178, 0.94); }
-.piece-s .monster-eye { --eyelid-color: rgba(233, 73, 40, 0.94); }
-.piece-z .monster-eye { --eyelid-color: rgba(102, 186, 76, 0.94); }
-.piece-j .monster-eye { --eyelid-color: rgba(232, 94, 179, 0.94); }
-.piece-l .monster-eye { --eyelid-color: rgba(245, 152, 48, 0.94); }
 
 .ghost {
     opacity: 0.28;
@@ -1010,14 +1032,17 @@ button.secondary {
     0%, 100% {
         transform: scale(1, 1);
     }
-    24% {
-        transform: scale(1.028, 0.988);
+    18% {
+        transform: scale(1.013, 0.995);
     }
-    52% {
-        transform: scale(1.014, 1.006);
+    36% {
+        transform: scale(1.008, 1.006);
     }
-    74% {
-        transform: scale(0.992, 1.02);
+    58% {
+        transform: scale(0.997, 1.01);
+    }
+    78% {
+        transform: scale(1.011, 0.997);
     }
 }
 
@@ -1025,14 +1050,44 @@ button.secondary {
     0%, 100% {
         transform: translate(0, 0) rotate(0deg);
     }
+    16% {
+        transform: translate(0.14px, -0.08px) rotate(-0.08deg);
+    }
+    34% {
+        transform: translate(-0.1px, 0.12px) rotate(0.06deg);
+    }
+    52% {
+        transform: translate(0.16px, 0.04px) rotate(-0.05deg);
+    }
+    70% {
+        transform: translate(-0.08px, -0.14px) rotate(0.04deg);
+    }
+    86% {
+        transform: translate(0.09px, 0.09px) rotate(-0.03deg);
+    }
+}
+
+@keyframes monster-jiggle-preview {
+    0%, 100% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+    12% {
+        transform: translate(0.22px, -0.18px) rotate(-0.16deg);
+    }
     26% {
-        transform: translate(calc(var(--motion-x, 0px) * 0.18), calc(var(--motion-y, 0px) * -0.08)) rotate(calc(var(--motion-tilt, 0deg) * -0.12));
+        transform: translate(-0.16px, 0.2px) rotate(0.12deg);
     }
-    58% {
-        transform: translate(calc(var(--motion-x, 0px) * -0.14), calc(var(--motion-y, 0px) * 0.22)) rotate(calc(var(--motion-tilt, 0deg) * 0.16));
+    40% {
+        transform: translate(0.26px, 0.06px) rotate(-0.1deg);
     }
-    78% {
-        transform: translate(calc(var(--motion-x, 0px) * 0.08), calc(var(--motion-y, 0px) * 0.12)) rotate(calc(var(--motion-tilt, 0deg) * 0.08));
+    56% {
+        transform: translate(-0.18px, -0.24px) rotate(0.11deg);
+    }
+    72% {
+        transform: translate(0.2px, 0.18px) rotate(-0.08deg);
+    }
+    88% {
+        transform: translate(-0.14px, -0.1px) rotate(0.09deg);
     }
 }
 

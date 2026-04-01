@@ -1,6 +1,11 @@
 import { DEFINITIONS } from '../constants';
-import { getMonsterFigureBoxSize, getMonsterFigureCanvas, getMonsterTile } from '../monsterSkin';
-import type { MonsterEye } from '../monsterSkin';
+import {
+  getMonsterEyeFrame,
+  getMonsterFigureBoxSize,
+  getMonsterFigureCanvas,
+  getMonsterFigureEyes,
+  getMonsterTile,
+} from '../monsterSkin';
 import type { PieceType } from '../types';
 
 interface OccupiedNeighbors {
@@ -31,36 +36,17 @@ interface MonsterFigureOptions {
   fillRatio?: number;
 }
 
+interface MonsterBoardFigureOptions {
+  now: number;
+  animate?: boolean;
+}
+
 function addClassNames(target: HTMLElement, classNames?: string): void {
   if (!classNames) return;
   const tokens = classNames.split(/\s+/).map((token) => token.trim()).filter(Boolean);
   if (tokens.length) {
     target.classList.add(...tokens);
   }
-}
-
-function createEyeNode(
-  eyeSpec: MonsterEye,
-  blinkAmount: number,
-  lookX: number,
-  lookY: number,
-): HTMLElement {
-  const eye = document.createElement('span');
-  eye.className = 'monster-eye';
-  eye.style.setProperty('--eye-x', `${Math.round(eyeSpec.x * 100)}%`);
-  eye.style.setProperty('--eye-y', `${Math.round(eyeSpec.y * 100)}%`);
-  eye.style.setProperty('--eye-size', `${eyeSpec.regionScale.toFixed(3)}`);
-  eye.style.setProperty('--blink', `${blinkAmount}`);
-  eye.style.setProperty('--look-x', `${lookX.toFixed(3)}`);
-  eye.style.setProperty('--look-y', `${lookY.toFixed(3)}`);
-
-  const socket = cloneCanvas(eyeSpec.socketCanvas, 'monster-eye-socket');
-  eye.appendChild(socket);
-
-  const pupil = cloneCanvas(eyeSpec.pupilCanvas, 'monster-eye-pupil');
-  eye.appendChild(pupil);
-
-  return eye;
 }
 
 function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -73,13 +59,134 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
-function cloneCanvas(source: HTMLCanvasElement, className: string): HTMLCanvasElement {
+function createMonsterEdgeOutlineNode(source: HTMLCanvasElement): HTMLCanvasElement | null {
+  const sourceCtx = source.getContext('2d', { willReadFrequently: true });
+  if (!sourceCtx) {
+    return null;
+  }
+
+  const imageData = sourceCtx.getImageData(0, 0, source.width, source.height);
+  const alpha = new Uint8Array(source.width * source.height);
+  const edge = new Uint8Array(source.width * source.height);
+  const expanded = new Uint8Array(source.width * source.height);
+
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      const index = y * source.width + x;
+      alpha[index] = imageData.data[index * 4 + 3] > 8 ? 1 : 0;
+    }
+  }
+
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      const index = y * source.width + x;
+      if (!alpha[index]) {
+        continue;
+      }
+
+      let isEdge = false;
+      for (let offsetY = -1; offsetY <= 1 && !isEdge; offsetY += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          if (!offsetX && !offsetY) {
+            continue;
+          }
+          const sampleX = x + offsetX;
+          const sampleY = y + offsetY;
+          if (
+            sampleX < 0 ||
+            sampleY < 0 ||
+            sampleX >= source.width ||
+            sampleY >= source.height ||
+            !alpha[sampleY * source.width + sampleX]
+          ) {
+            isEdge = true;
+            break;
+          }
+        }
+      }
+
+      if (isEdge) {
+        edge[index] = 1;
+      }
+    }
+  }
+
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      const index = y * source.width + x;
+      if (!edge[index]) {
+        continue;
+      }
+
+      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          const sampleX = x + offsetX;
+          const sampleY = y + offsetY;
+          if (
+            sampleX < 0 ||
+            sampleY < 0 ||
+            sampleX >= source.width ||
+            sampleY >= source.height
+          ) {
+            continue;
+          }
+
+          const sampleIndex = sampleY * source.width + sampleX;
+          if (alpha[sampleIndex]) {
+            expanded[sampleIndex] = 1;
+          }
+        }
+      }
+    }
+  }
+
   const canvas = document.createElement('canvas');
-  canvas.className = className;
+  canvas.className = 'monster-ripple-art';
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d')!;
+  const output = ctx.createImageData(source.width, source.height);
+  let visiblePixels = 0;
+
+  for (let index = 0; index < expanded.length; index += 1) {
+    if (!expanded[index]) {
+      continue;
+    }
+    visiblePixels += 1;
+    const sourceOffset = index * 4;
+    output.data[sourceOffset] = imageData.data[sourceOffset];
+    output.data[sourceOffset + 1] = imageData.data[sourceOffset + 1];
+    output.data[sourceOffset + 2] = imageData.data[sourceOffset + 2];
+    output.data[sourceOffset + 3] = imageData.data[sourceOffset + 3];
+  }
+
+  if (!visiblePixels) {
+    return null;
+  }
+
+  ctx.putImageData(output, 0, 0);
+  return canvas;
+}
+
+function createMonsterOverlayNode(
+  source: HTMLCanvasElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  hostWidth: number,
+  hostHeight: number,
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'monster-eye-overlay';
   canvas.width = source.width;
   canvas.height = source.height;
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(source, 0, 0);
+  canvas.style.left = `${(x / hostWidth) * 100}%`;
+  canvas.style.top = `${(y / hostHeight) * 100}%`;
+  canvas.style.width = `${(width / hostWidth) * 100}%`;
+  canvas.style.height = `${(height / hostHeight) * 100}%`;
   return canvas;
 }
 
@@ -90,8 +197,10 @@ function cropMonsterFigureCanvas(
   minY: number,
   widthCells: number,
   heightCells: number,
+  now: number,
+  animate: boolean,
 ): HTMLCanvasElement | null {
-  const source = getMonsterFigureCanvas(pieceType, rotation);
+  const source = getMonsterFigureCanvas(pieceType, rotation, now, animate);
   if (!source) {
     return null;
   }
@@ -120,23 +229,24 @@ function cropMonsterFigureCanvas(
   return canvas;
 }
 
-function createTongueNode(
-  source: HTMLCanvasElement,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  sway: number,
-): HTMLElement {
-  const tongue = document.createElement('div');
-  tongue.className = 'monster-tongue';
-  tongue.style.setProperty('--tongue-x', `${(x * 100).toFixed(2)}%`);
-  tongue.style.setProperty('--tongue-y', `${(y * 100).toFixed(2)}%`);
-  tongue.style.setProperty('--tongue-width', `${(width * 100).toFixed(2)}%`);
-  tongue.style.setProperty('--tongue-height', `${(height * 100).toFixed(2)}%`);
-  tongue.style.setProperty('--tongue-sway', `${sway.toFixed(3)}`);
-  tongue.appendChild(cloneCanvas(source, 'monster-tongue-art'));
-  return tongue;
+function getFigureCropBounds(pieceType: PieceType, rotation: number): {
+  minX: number;
+  minY: number;
+  widthCells: number;
+  heightCells: number;
+} {
+  const definition = DEFINITIONS[pieceType][rotation];
+  const minX = Math.min(...definition.map((cell) => cell.x));
+  const maxX = Math.max(...definition.map((cell) => cell.x));
+  const minY = Math.min(...definition.map((cell) => cell.y));
+  const maxY = Math.max(...definition.map((cell) => cell.y));
+
+  return {
+    minX,
+    minY,
+    widthCells: maxX - minX + 1,
+    heightCells: maxY - minY + 1,
+  };
 }
 
 function createMonsterBodyNode(
@@ -147,7 +257,12 @@ function createMonsterBodyNode(
   shiftX: number,
   shiftY: number,
   motionSeed: number,
-): { body: HTMLDivElement; motion: HTMLDivElement } {
+): {
+  body: HTMLDivElement;
+  motion: HTMLDivElement;
+  artLayer: HTMLDivElement;
+  rippleLayer: HTMLDivElement;
+} {
   const body = document.createElement('div');
   body.className = 'monster-body';
   body.classList.toggle('is-animated', animate);
@@ -166,26 +281,15 @@ function createMonsterBodyNode(
   motion.style.setProperty('--motion-y', `${driftY.toFixed(3)}px`);
   motion.style.setProperty('--motion-tilt', `${driftTilt.toFixed(3)}deg`);
   motion.style.setProperty('--motion-delay', `${((motionSeed % 9) * -0.23).toFixed(2)}s`);
+  const artLayer = document.createElement('div');
+  artLayer.className = 'monster-art-layer';
+  const rippleLayer = document.createElement('div');
+  rippleLayer.className = 'monster-ripple-layer';
+  motion.appendChild(artLayer);
+  motion.appendChild(rippleLayer);
   body.appendChild(motion);
 
-  return { body, motion };
-}
-
-function blinkAmount(now: number, seed: number): number {
-  const period = 1580 + (seed % 4) * 220;
-  const phase = (now + seed * 173) % period;
-  const blinkWindow = 300;
-  if (phase > period - blinkWindow) {
-    const t = (phase - (period - blinkWindow)) / blinkWindow;
-    if (t < 0.22) {
-      return t / 0.22;
-    }
-    if (t < 0.62) {
-      return 1;
-    }
-    return 1 - ((t - 0.62) / 0.38);
-  }
-  return 0;
+  return { body, motion, artLayer, rippleLayer };
 }
 
 export function populateMonsterCell(
@@ -194,8 +298,8 @@ export function populateMonsterCell(
   occupiedNeighbors: OccupiedNeighbors,
   options: MonsterCellOptions,
 ): void {
-  const tile = getMonsterTile(skinKey);
   const animate = options.animate ?? true;
+  const tile = getMonsterTile(skinKey, options.now, animate);
   const allowSquish = options.allowSquish ?? animate;
   const baseClassName = options.baseClassName || 'cell';
 
@@ -220,24 +324,35 @@ export function populateMonsterCell(
 
   cell.classList.add('monster-cell', `piece-${pieceType.toLowerCase()}`);
   const motionSeed = [...skinKey].reduce((total, char) => total + char.charCodeAt(0), 0);
-  const { body, motion } = createMonsterBodyNode(pieceType, animate, scaleX, scaleY, shiftX, shiftY, motionSeed);
-  motion.appendChild(createMonsterArtNode(tile.canvas));
-
-  for (const eye of tile.eyes) {
-    const blink = animate && eye.blink ? blinkAmount(options.now, eye.seed) : 0;
-    const reactiveX = animate
-      ? (options.lookX || 0) + Math.sin((options.now + eye.seed * 41) / 760) * 0.3
-      : options.lookX || 0;
-    const reactiveY = animate
-      ? (options.lookY || 0) + Math.cos((options.now + eye.seed * 61) / 930) * 0.22
-      : options.lookY || 0;
-    motion.appendChild(createEyeNode(eye, blink, reactiveX, reactiveY));
+  const { body, artLayer, rippleLayer } = createMonsterBodyNode(
+    pieceType,
+    animate,
+    scaleX,
+    scaleY,
+    shiftX,
+    shiftY,
+    motionSeed,
+  );
+  artLayer.appendChild(createMonsterArtNode(tile.canvas));
+  const outlineNode = createMonsterEdgeOutlineNode(tile.canvas);
+  if (outlineNode) {
+    rippleLayer.appendChild(outlineNode);
   }
-
-  if (tile.tongue) {
-    const sway = animate ? Math.sin((options.now + tile.tongue.seed * 97) / 460) * 0.24 : 0;
-    motion.appendChild(
-      createTongueNode(tile.canvas, tile.tongue.x, tile.tongue.y, tile.tongue.width, tile.tongue.height, sway),
+  for (const eye of tile.eyes) {
+    const eyeFrame = getMonsterEyeFrame(eye, options.now, animate);
+    if (!eyeFrame) {
+      continue;
+    }
+    artLayer.appendChild(
+      createMonsterOverlayNode(
+        eyeFrame,
+        eye.x,
+        eye.y,
+        eye.width,
+        eye.height,
+        tile.canvas.width,
+        tile.canvas.height,
+      ),
     );
   }
 
@@ -270,46 +385,63 @@ export function populateMonsterFigure(
     const dominantSpan = Math.max(widthCells / 4, heightCells / 4);
     const fillRatio = options.fillRatio ?? 0.82;
     frame.style.setProperty('--figure-scale', `${(fillRatio / dominantSpan).toFixed(3)}`);
-    const figureArt = cropMonsterFigureCanvas(pieceType, rotation, minX, minY, widthCells, heightCells);
+    const figureArt = cropMonsterFigureCanvas(
+      pieceType,
+      rotation,
+      minX,
+      minY,
+      widthCells,
+      heightCells,
+      options.now,
+      options.animate ?? false,
+    );
 
     if (figureArt) {
       const motionSeed = pieceType.charCodeAt(0) + rotation * 37;
-      const { body, motion } = createMonsterBodyNode(pieceType, options.animate ?? false, 0, 0, 0, 0, motionSeed);
+      const { body, artLayer, rippleLayer } = createMonsterBodyNode(
+        pieceType,
+        options.animate ?? false,
+        0,
+        0,
+        0,
+        0,
+        motionSeed,
+      );
       body.classList.add('monster-figure-body');
-      motion.appendChild(createMonsterArtNode(figureArt));
-
-      for (const [index, cellDef] of definition.entries()) {
-        const tile = getMonsterTile(`${pieceType}:${rotation}:${index}`);
-        if (!tile || (!tile.eyes.length && !tile.tongue)) {
+      artLayer.appendChild(createMonsterArtNode(figureArt));
+      const outlineNode = createMonsterEdgeOutlineNode(figureArt);
+      if (outlineNode) {
+        rippleLayer.appendChild(outlineNode);
+      }
+      const cellPx = figureArt.width / widthCells;
+      const cropOffsetX = minX * cellPx;
+      const cropOffsetY = minY * cellPx;
+      for (const eye of getMonsterFigureEyes(pieceType, rotation)) {
+        const eyeFrame = getMonsterEyeFrame(eye, options.now, options.animate ?? false);
+        if (!eyeFrame) {
           continue;
         }
-
-        const overlay = document.createElement('div');
-        overlay.className = 'monster-figure-overlay';
-        overlay.style.left = `${((cellDef.x - minX) / widthCells) * 100}%`;
-        overlay.style.top = `${((cellDef.y - minY) / heightCells) * 100}%`;
-        overlay.style.width = `${100 / widthCells}%`;
-        overlay.style.height = `${100 / heightCells}%`;
-
-        for (const eye of tile.eyes) {
-          const blink = (options.animate ?? false) && eye.blink ? blinkAmount(options.now, eye.seed) : 0;
-          const reactiveX = options.animate
-            ? (options.lookX || 0) + Math.sin((options.now + eye.seed * 41) / 760) * 0.3
-            : options.lookX || 0;
-          const reactiveY = options.animate
-            ? (options.lookY || 0) + Math.cos((options.now + eye.seed * 61) / 930) * 0.22
-            : options.lookY || 0;
-          overlay.appendChild(createEyeNode(eye, blink, reactiveX, reactiveY));
+        const localX = eye.x - cropOffsetX;
+        const localY = eye.y - cropOffsetY;
+        if (
+          localX + eye.width <= 0 ||
+          localY + eye.height <= 0 ||
+          localX >= figureArt.width ||
+          localY >= figureArt.height
+        ) {
+          continue;
         }
-
-        if (tile.tongue) {
-          const sway = options.animate ? Math.sin((options.now + tile.tongue.seed * 97) / 460) * 0.24 : 0;
-          overlay.appendChild(
-            createTongueNode(tile.canvas, tile.tongue.x, tile.tongue.y, tile.tongue.width, tile.tongue.height, sway),
-          );
-        }
-
-        motion.appendChild(overlay);
+        artLayer.appendChild(
+          createMonsterOverlayNode(
+            eyeFrame,
+            localX,
+            localY,
+            eye.width,
+            eye.height,
+            figureArt.width,
+            figureArt.height,
+          ),
+        );
       }
 
       frame.appendChild(body);
@@ -404,4 +536,79 @@ export function populateMonsterPreviewFigure(
     filledClassName: 'filled monster-preview',
     layout: 'absolute',
   });
+}
+
+export function populateMonsterBoardFigure(
+  container: HTMLElement,
+  pieceType: PieceType,
+  rotation: number,
+  options: MonsterBoardFigureOptions,
+): void {
+  const { minX, minY, widthCells, heightCells } = getFigureCropBounds(pieceType, rotation);
+  const figureArt = cropMonsterFigureCanvas(
+    pieceType,
+    rotation,
+    minX,
+    minY,
+    widthCells,
+    heightCells,
+    options.now,
+    options.animate ?? true,
+  );
+
+  container.replaceChildren();
+
+  if (!figureArt) {
+    return;
+  }
+
+  const motionSeed = pieceType.charCodeAt(0) + rotation * 37;
+  const { body, artLayer, rippleLayer } = createMonsterBodyNode(
+    pieceType,
+    options.animate ?? true,
+    0,
+    0,
+    0,
+    0,
+    motionSeed,
+  );
+  body.classList.add('monster-figure-body');
+  artLayer.appendChild(createMonsterArtNode(figureArt));
+  const outlineNode = createMonsterEdgeOutlineNode(figureArt);
+  if (outlineNode) {
+    rippleLayer.appendChild(outlineNode);
+  }
+
+  const cellPx = figureArt.width / widthCells;
+  const cropOffsetX = minX * cellPx;
+  const cropOffsetY = minY * cellPx;
+  for (const eye of getMonsterFigureEyes(pieceType, rotation)) {
+    const eyeFrame = getMonsterEyeFrame(eye, options.now, options.animate ?? true);
+    if (!eyeFrame) {
+      continue;
+    }
+    const localX = eye.x - cropOffsetX;
+    const localY = eye.y - cropOffsetY;
+    if (
+      localX + eye.width <= 0 ||
+      localY + eye.height <= 0 ||
+      localX >= figureArt.width ||
+      localY >= figureArt.height
+    ) {
+      continue;
+    }
+    artLayer.appendChild(
+      createMonsterOverlayNode(
+        eyeFrame,
+        localX,
+        localY,
+        eye.width,
+        eye.height,
+        figureArt.width,
+        figureArt.height,
+      ),
+    );
+  }
+
+  container.appendChild(body);
 }

@@ -2,12 +2,13 @@ import type { AppPhase, GameState, Settings, StorageData } from '../types';
 import { HIDDEN_ROWS, COLS, TARGET_LINES, MODE_LABELS, MODE_DESCRIPTIONS, DEFINITIONS } from '../constants';
 import { getCells, getGhostCells } from '../engine/pieces';
 import { elapsed, formatTime } from '../engine/state';
-import { populateMonsterCell, populateMonsterFigure } from './monsterDom';
+import { populateMonsterBoardFigure, populateMonsterCell, populateMonsterFigure } from './monsterDom';
 import { getVisibleScoreRecords, getVisibleSprintRecords } from '../demoRecords';
 
 export interface DomRefs {
   boardWrap: HTMLElement;
   board: HTMLElement;
+  boardMonsterLayer: HTMLElement;
   overlay: HTMLElement;
   faultToast: HTMLElement;
   endStatePanel: HTMLElement;
@@ -43,6 +44,7 @@ export function getDomRefs(): DomRefs {
   return {
     boardWrap: document.getElementById('boardWrap')!,
     board: document.getElementById('board')!,
+    boardMonsterLayer: document.getElementById('boardMonsterLayer')!,
     overlay: document.getElementById('overlay')!,
     faultToast: document.getElementById('faultToast')!,
     endStatePanel: document.getElementById('endStatePanel')!,
@@ -73,6 +75,85 @@ export function getDomRefs(): DomRefs {
     sfxVolumeInput: document.getElementById('sfxVolumeInput') as HTMLInputElement,
     musicVolumeInput: document.getElementById('musicVolumeInput') as HTMLInputElement,
   };
+}
+
+interface ParsedSkinKey {
+  pieceType: keyof typeof DEFINITIONS;
+  rotation: number;
+  index: number;
+}
+
+interface BoardPieceGroup {
+  pieceType: keyof typeof DEFINITIONS;
+  rotation: number;
+  anchorX: number;
+  anchorY: number;
+  indices: Set<number>;
+  cells: Array<{ x: number; y: number }>;
+  complete: boolean;
+}
+
+function parseSkinKey(skinKey: string): ParsedSkinKey | null {
+  const [pieceType, rotationText, indexText] = skinKey.split(':');
+  if (!pieceType || rotationText === undefined || indexText === undefined) {
+    return null;
+  }
+
+  return {
+    pieceType: pieceType as keyof typeof DEFINITIONS,
+    rotation: Number(rotationText),
+    index: Number(indexText),
+  };
+}
+
+function buildLockedPieceGroups(skinRows: string[][]): BoardPieceGroup[] {
+  const groups = new Map<string, BoardPieceGroup>();
+
+  for (let rowIndex = 0; rowIndex < skinRows.length; rowIndex += 1) {
+    for (let colIndex = 0; colIndex < COLS; colIndex += 1) {
+      const skinKey = skinRows[rowIndex][colIndex];
+      if (!skinKey) {
+        continue;
+      }
+
+      const parsed = parseSkinKey(skinKey);
+      if (!parsed) {
+        continue;
+      }
+
+      const definition = DEFINITIONS[parsed.pieceType][parsed.rotation];
+      const anchorX = colIndex - definition[parsed.index].x;
+      const anchorY = rowIndex - definition[parsed.index].y;
+      const groupKey = `${parsed.pieceType}:${parsed.rotation}:${anchorX}:${anchorY}`;
+      const group = groups.get(groupKey) ?? {
+        pieceType: parsed.pieceType,
+        rotation: parsed.rotation,
+        anchorX,
+        anchorY,
+        indices: new Set<number>(),
+        cells: [],
+        complete: false,
+      };
+
+      group.indices.add(parsed.index);
+      group.cells.push({ x: colIndex, y: rowIndex });
+      groups.set(groupKey, group);
+    }
+  }
+
+  for (const group of groups.values()) {
+    const definition = DEFINITIONS[group.pieceType][group.rotation];
+    group.complete = definition.every((cell, index) => {
+      const y = group.anchorY + cell.y;
+      const x = group.anchorX + cell.x;
+      if (y < 0 || y >= skinRows.length || x < 0 || x >= COLS) {
+        return false;
+      }
+      return skinRows[y][x] === `${group.pieceType}:${group.rotation}:${index}`;
+    });
+  }
+
+  return [...groups.values()];
 }
 
 function renderPiecePreview(container: HTMLElement, piece: string | null): void {
@@ -138,12 +219,46 @@ export function render(
     }
   }
 
+  const lockedGroups = buildLockedPieceGroups(skinRows);
+  const completeCellKeys = new Set<string>();
+  for (const group of lockedGroups) {
+    if (!group.complete) {
+      continue;
+    }
+    for (const cell of group.cells) {
+      completeCellKeys.add(`${cell.x}:${cell.y}`);
+    }
+  }
+
+  let activeGroup: BoardPieceGroup | null = null;
+  if (state.active) {
+    const definition = DEFINITIONS[state.active.type][state.active.rotation];
+    const activeCells = getCells(state.active)
+      .filter((cell) => cell.y >= HIDDEN_ROWS)
+      .map((cell) => ({ x: cell.x, y: cell.y - HIDDEN_ROWS }));
+    if (activeCells.length) {
+      activeGroup = {
+        pieceType: state.active.type,
+        rotation: state.active.rotation,
+        anchorX: state.active.x,
+        anchorY: state.active.y - HIDDEN_ROWS,
+        indices: new Set(definition.map((_, index) => index)),
+        cells: activeCells,
+        complete: true,
+      };
+      for (const cell of activeCells) {
+        completeCellKeys.add(`${cell.x}:${cell.y}`);
+      }
+    }
+  }
+
   rows.flat().forEach((value, index) => {
     const cell = refs.board.children[index] as HTMLElement;
     const rowIndex = Math.floor(index / COLS);
     const colIndex = index % COLS;
     const skinKey = skinRows[rowIndex][colIndex];
     const occupied = Boolean(skinKey);
+    const isWholePieceCell = completeCellKeys.has(`${colIndex}:${rowIndex}`);
 
     if (!value) {
       cell.className = 'cell';
@@ -170,6 +285,15 @@ export function render(
     };
 
     if (occupied) {
+      if (isWholePieceCell) {
+        cell.className = 'cell';
+        cell.replaceChildren();
+        cell.style.removeProperty('--squish-scale-x');
+        cell.style.removeProperty('--squish-scale-y');
+        cell.style.removeProperty('--squish-shift-x');
+        cell.style.removeProperty('--squish-shift-y');
+        return;
+      }
       populateMonsterCell(cell, skinKey, occupiedNeighbors, {
         now,
         lookX,
@@ -184,6 +308,42 @@ export function render(
       cell.classList.add(`piece-${value.toLowerCase()}`);
     }
   });
+
+  refs.boardMonsterLayer.replaceChildren();
+  const gap = Number.parseFloat(getComputedStyle(refs.board).gap || '3') || 3;
+  const innerWidth = refs.board.clientWidth - 20;
+  const innerHeight = refs.board.clientHeight - 20;
+  const cellWidth = (innerWidth - gap * (COLS - 1)) / COLS;
+  const cellHeight = (innerHeight - gap * (rows.length - 1)) / rows.length;
+
+  const renderBoardGroup = (group: BoardPieceGroup): void => {
+    const definition = DEFINITIONS[group.pieceType][group.rotation];
+    const minX = Math.min(...definition.map((cell) => cell.x));
+    const maxX = Math.max(...definition.map((cell) => cell.x));
+    const minY = Math.min(...definition.map((cell) => cell.y));
+    const maxY = Math.max(...definition.map((cell) => cell.y));
+    const leftCell = group.anchorX + minX;
+    const topCell = group.anchorY + minY;
+    const widthCells = maxX - minX + 1;
+    const heightCells = maxY - minY + 1;
+
+    const pieceFigure = document.createElement('div');
+    pieceFigure.className = 'board-piece-figure';
+    pieceFigure.style.left = `${leftCell * (cellWidth + gap)}px`;
+    pieceFigure.style.top = `${topCell * (cellHeight + gap)}px`;
+    pieceFigure.style.width = `${widthCells * cellWidth + Math.max(0, widthCells - 1) * gap}px`;
+    pieceFigure.style.height = `${heightCells * cellHeight + Math.max(0, heightCells - 1) * gap}px`;
+    populateMonsterBoardFigure(pieceFigure, group.pieceType, group.rotation, {
+      now,
+      animate: true,
+    });
+    refs.boardMonsterLayer.appendChild(pieceFigure);
+  };
+
+  lockedGroups.filter((group) => group.complete).forEach(renderBoardGroup);
+  if (activeGroup) {
+    renderBoardGroup(activeGroup);
+  }
 
   refs.board.classList.toggle('lock-flash', now - state.lastLockAt < 120);
   refs.boardWrap.classList.toggle('line-clear-flash', now - state.lastLineClearAt < 180);
