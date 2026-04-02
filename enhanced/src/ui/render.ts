@@ -386,32 +386,37 @@ export function render(
       ? 'Top 3 40L Times'
       : 'Top 3 Scores';
   refs.leaderboard.innerHTML = '';
-  const entries = state.mode === 'sprint40'
-    ? getVisibleSprintRecords(storage.sprint)
-    : getVisibleScoreRecords(storage.score);
   if (isTraining) {
     const item = document.createElement('li');
     const faultRate = state.pieces ? Math.round((state.trainingFaults / state.pieces) * 1000) / 10 : 0;
     item.textContent = `No leaderboard in Training mode. Fault rate ${faultRate}% with ${settings.trainingFeedback.toUpperCase()} feedback.`;
     refs.leaderboard.appendChild(item);
-  } else if (!entries.length) {
-    const item = document.createElement('li');
-    item.textContent = state.mode === 'sprint40'
-      ? 'No completed 40-line runs yet.'
-      : 'No high scores yet. Survive a run to set the first record.';
-    refs.leaderboard.appendChild(item);
   } else if (state.mode === 'sprint40') {
-    entries.slice(0, 3).forEach((entry, index) => {
+    const entries = getVisibleSprintRecords(storage.sprint);
+    if (!entries.length) {
       const item = document.createElement('li');
-      item.textContent = `${index + 1}. ${entry.nickname} - ${formatTime(entry.timeMs)} - ${entry.lines}L`;
+      item.textContent = 'No completed 40-line runs yet.';
       refs.leaderboard.appendChild(item);
-    });
+    } else {
+      entries.slice(0, 3).forEach((entry, index) => {
+        const item = document.createElement('li');
+        item.textContent = `${index + 1}. ${entry.nickname} - ${formatTime(entry.timeMs)} - ${entry.lines}L`;
+        refs.leaderboard.appendChild(item);
+      });
+    }
   } else {
-    entries.slice(0, 3).forEach((entry, index) => {
+    const entries = getVisibleScoreRecords(storage.score);
+    if (!entries.length) {
       const item = document.createElement('li');
-      item.textContent = `${index + 1}. ${entry.nickname} - ${entry.score} pts - ${entry.lines}L`;
+      item.textContent = 'No high scores yet. Survive a run to set the first record.';
       refs.leaderboard.appendChild(item);
-    });
+    } else {
+      entries.slice(0, 3).forEach((entry, index) => {
+        const item = document.createElement('li');
+        item.textContent = `${index + 1}. ${entry.nickname} - ${entry.score} pts - ${entry.lines}L`;
+        refs.leaderboard.appendChild(item);
+      });
+    }
   }
 
   const settingsModalHidden = document.getElementById('settingsModal')?.classList.contains('hidden') ?? true;

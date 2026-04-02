@@ -161,7 +161,7 @@ export class AudioManager {
     const element = new Audio(monstackaBgmUrl);
     element.loop = true;
     element.preload = 'auto';
-    element.playsInline = true;
+    element.setAttribute('playsinline', '');
     this.musicElement = element;
   }
 

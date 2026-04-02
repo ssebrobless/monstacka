@@ -103,8 +103,8 @@ export function getHomeMenuRefs(): HomeMenuRefs {
     monstosLoreButton: document.getElementById('monstosLoreButton') as HTMLButtonElement,
     monstosLoreBubble: document.getElementById('monstosLoreBubble')!,
     monstosLoreSurface: document.getElementById('monstosLoreSurface')!,
-    monstosLoreTailOutline: document.getElementById('monstosLoreTailOutline') as SVGPathElement,
-    monstosLoreTailFill: document.getElementById('monstosLoreTailFill') as SVGPathElement,
+    monstosLoreTailOutline: document.getElementById('monstosLoreTailOutline') as unknown as SVGPathElement,
+    monstosLoreTailFill: document.getElementById('monstosLoreTailFill') as unknown as SVGPathElement,
     monstosLoreText: document.getElementById('monstosLoreText')!,
     monstosLoreMeasure: document.getElementById('monstosLoreMeasure')!,
     monstosLeft: document.getElementById('monstosLeft')!,
@@ -329,7 +329,13 @@ export function renderActiveHomeMonstosPreview(
   state: HomeMenuState,
   now: number,
 ): void {
-  renderMonstosStage(refs.monstosCenter, getProfileAtOffset(state, 0), now, true);
+  const active = getProfileAtOffset(state, 0);
+  renderMonstosStage(refs.monstosCenter, active, now, true);
+
+  if (state.loreOpen) {
+    syncLoreBubbleState(state, active, now);
+    refs.monstosLoreText.textContent = state.loreVisibleText;
+  }
 }
 
 export function renderHomeMenu(

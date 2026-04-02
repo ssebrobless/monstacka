@@ -44,6 +44,7 @@ import {
   cycleHomeMonstos,
   getActiveMonstos,
   getHomeMenuRefs,
+  renderActiveHomeMonstosPreview,
   renderHomeMenu,
 } from './ui/homeMenu';
 import { applyRegionMap, GAME_REGIONS, HOME_REGIONS } from './ui/regionMap';
@@ -1735,7 +1736,8 @@ function init() {
   homeRefs.monstosVoiceButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    audio.play('previewBeep', settings);
+    const active = getActiveMonstos(homeState);
+    audio.playMonstosPreview(active.pieceType, settings);
   });
 
   homeRefs.leaderboardArcadeButton.addEventListener('click', () => {
@@ -1822,7 +1824,7 @@ function init() {
     switch (appPhase) {
       case 'menu':
         if (monsterSkinReady && now - lastMenuPreviewFrameAt >= 33) {
-          renderCurrentView(now);
+          renderActiveHomeMonstosPreview(homeRefs, homeState, now);
           lastMenuPreviewFrameAt = now;
         }
         break;
