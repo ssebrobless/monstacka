@@ -159,6 +159,23 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
 };
 
 const INDEPENDENT_EYE_SEEDS: Partial<Record<PieceType, EyeSeedSpec[]>> = {
+  S: [
+    { cellIndex: 0, x: 14, y: 8, width: 28, height: 28, style: 'blink' },
+    { cellIndex: 1, x: 76, y: 12, width: 24, height: 24, style: 'blink' },
+  ],
+  Z: [
+    { cellIndex: 1, x: 12, y: 8, width: 62, height: 58, style: 'roam' },
+  ],
+  O: [
+    { cellIndex: 0, x: 22, y: 10, width: 68, height: 64, style: 'roam' },
+  ],
+  J: [
+    { cellIndex: 3, x: 10, y: 18, width: 42, height: 42, style: 'blink' },
+    { cellIndex: 3, x: 62, y: 22, width: 38, height: 38, style: 'blink' },
+  ],
+  L: [
+    { cellIndex: 0, x: 20, y: 16, width: 52, height: 52, style: 'blink' },
+  ],
   I: [
     { cellIndex: 0, x: 0, y: 2, width: 54, height: 50, style: 'roam' },
     { cellIndex: 0, x: 58, y: 40, width: 54, height: 52, style: 'roam' },
@@ -174,12 +191,12 @@ const INDEPENDENT_EYE_SEEDS: Partial<Record<PieceType, EyeSeedSpec[]>> = {
     { cellIndex: 3, x: 84, y: 42, width: 28, height: 34, style: 'roam' },
   ],
   T: [
-    { cellIndex: 0, x: 0, y: 24, width: 46, height: 46, style: 'blink' },
-    { cellIndex: 0, x: 42, y: 0, width: 24, height: 24, style: 'blink' },
-    { cellIndex: 0, x: 61, y: 22, width: 28, height: 28, style: 'blink' },
-    { cellIndex: 2, x: 30, y: 0, width: 24, height: 24, style: 'blink' },
-    { cellIndex: 2, x: 8, y: 24, width: 28, height: 28, style: 'blink' },
-    { cellIndex: 2, x: 66, y: 22, width: 46, height: 46, style: 'blink' },
+    { cellIndex: 0, x: 0, y: 24, width: 46, height: 46, style: 'roam' },
+    { cellIndex: 0, x: 42, y: 0, width: 24, height: 24, style: 'roam' },
+    { cellIndex: 0, x: 61, y: 22, width: 28, height: 28, style: 'roam' },
+    { cellIndex: 2, x: 30, y: 0, width: 24, height: 24, style: 'roam' },
+    { cellIndex: 2, x: 8, y: 24, width: 28, height: 28, style: 'roam' },
+    { cellIndex: 2, x: 66, y: 22, width: 46, height: 46, style: 'roam' },
   ],
 };
 
