@@ -1,0 +1,295 @@
+{
+  "generatedAt": "2026-04-01T20:28:26.257Z",
+  "home": {
+    "fullscreen-ish": {
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "scale": 0.814815,
+      "scroll": {
+        "width": 1600,
+        "height": 900
+      },
+      "bodyScroll": {
+        "width": 1600,
+        "height": 900
+      },
+      "artboardRect": {
+        "left": 17.78125,
+        "top": 10,
+        "right": 1582.22607421875,
+        "bottom": 890.0001831054688,
+        "width": 1564.44482421875,
+        "height": 880.0001831054688
+      },
+      "artboardFitsViewport": true
+    },
+    "medium": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "scale": 0.648148,
+      "scroll": {
+        "width": 1280,
+        "height": 720
+      },
+      "bodyScroll": {
+        "width": 1280,
+        "height": 720
+      },
+      "artboardRect": {
+        "left": 17.78125,
+        "top": 10,
+        "right": 1262.2254638671875,
+        "bottom": 709.9998168945312,
+        "width": 1244.4442138671875,
+        "height": 699.9998168945312
+      },
+      "artboardFitsViewport": true
+    },
+    "small": {
+      "viewport": {
+        "width": 900,
+        "height": 560
+      },
+      "scale": 0.458333,
+      "scroll": {
+        "width": 900,
+        "height": 560
+      },
+      "bodyScroll": {
+        "width": 900,
+        "height": 560
+      },
+      "artboardRect": {
+        "left": 10,
+        "top": 32.5,
+        "right": 889.9993286132812,
+        "bottom": 527.4996337890625,
+        "width": 879.9993286132812,
+        "height": 494.9996337890625
+      },
+      "artboardFitsViewport": true
+    },
+    "tiny": {
+      "viewport": {
+        "width": 760,
+        "height": 460
+      },
+      "scale": 0.385417,
+      "scroll": {
+        "width": 760,
+        "height": 460
+      },
+      "bodyScroll": {
+        "width": 760,
+        "height": 460
+      },
+      "artboardRect": {
+        "left": 10,
+        "top": 21.875,
+        "right": 750.0006713867188,
+        "bottom": 438.1253662109375,
+        "width": 740.0006713867188,
+        "height": 416.2503662109375
+      },
+      "artboardFitsViewport": true
+    }
+  },
+  "homeSettings": {
+    "fullscreen-ish": {
+      "modalHidden": false,
+      "modalRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1600,
+        "bottom": 900,
+        "width": 1600,
+        "height": 900
+      },
+      "cardRect": {
+        "left": 441.4814147949219,
+        "top": 190.88882446289062,
+        "right": 1158.5185241699219,
+        "bottom": 709.1112365722656,
+        "width": 717.037109375,
+        "height": 518.222412109375
+      },
+      "cardFitsViewport": true
+    },
+    "medium": {
+      "modalHidden": false,
+      "modalRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 720,
+        "width": 1280,
+        "height": 720
+      },
+      "cardRect": {
+        "left": 354.81488037109375,
+        "top": 153.88893127441406,
+        "right": 925.1851196289062,
+        "bottom": 566.1110992431641,
+        "width": 570.3702392578125,
+        "height": 412.22216796875
+      },
+      "cardFitsViewport": true
+    },
+    "small": {
+      "modalHidden": false,
+      "modalRect": {
+        "left": 0,
+        "top": 0,
+        "right": 900,
+        "bottom": 560,
+        "width": 900,
+        "height": 560
+      },
+      "cardRect": {
+        "left": 248.33348083496094,
+        "top": 134.25010681152344,
+        "right": 651.6664886474609,
+        "bottom": 425.74986267089844,
+        "width": 403.3330078125,
+        "height": 291.499755859375
+      },
+      "cardFitsViewport": true
+    },
+    "tiny": {
+      "modalHidden": false,
+      "modalRect": {
+        "left": 0,
+        "top": 0,
+        "right": 760,
+        "bottom": 460,
+        "width": 760,
+        "height": 460
+      },
+      "cardRect": {
+        "left": 270.41650390625,
+        "top": 107.43739318847656,
+        "right": 609.58349609375,
+        "bottom": 352.5626220703125,
+        "width": 339.1669921875,
+        "height": 245.12522888183594
+      },
+      "cardFitsViewport": true
+    }
+  },
+  "game": {
+    "fullscreen-ish": {
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "scale": 0.814815,
+      "scroll": {
+        "width": 1600,
+        "height": 900
+      },
+      "bodyScroll": {
+        "width": 1600,
+        "height": 900
+      },
+      "artboardRect": {
+        "left": 17.78125,
+        "top": 10,
+        "right": 1582.22607421875,
+        "bottom": 890.0001831054688,
+        "width": 1564.44482421875,
+        "height": 880.0001831054688
+      },
+      "artboardFitsViewport": true
+    },
+    "medium": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "scale": 0.648148,
+      "scroll": {
+        "width": 1280,
+        "height": 720
+      },
+      "bodyScroll": {
+        "width": 1280,
+        "height": 720
+      },
+      "artboardRect": {
+        "left": 17.78125,
+        "top": 10,
+        "right": 1262.2254638671875,
+        "bottom": 709.9998168945312,
+        "width": 1244.4442138671875,
+        "height": 699.9998168945312
+      },
+      "artboardFitsViewport": true
+    },
+    "small": {
+      "viewport": {
+        "width": 900,
+        "height": 560
+      },
+      "scale": 0.458333,
+      "scroll": {
+        "width": 900,
+        "height": 560
+      },
+      "bodyScroll": {
+        "width": 900,
+        "height": 560
+      },
+      "artboardRect": {
+        "left": 10,
+        "top": 32.5,
+        "right": 889.9993286132812,
+        "bottom": 527.4996337890625,
+        "width": 879.9993286132812,
+        "height": 494.9996337890625
+      },
+      "artboardFitsViewport": true
+    },
+    "tiny": {
+      "viewport": {
+        "width": 760,
+        "height": 460
+      },
+      "scale": 0.385417,
+      "scroll": {
+        "width": 760,
+        "height": 460
+      },
+      "bodyScroll": {
+        "width": 760,
+        "height": 460
+      },
+      "artboardRect": {
+        "left": 10,
+        "top": 21.875,
+        "right": 750.0006713867188,
+        "bottom": 438.1253662109375,
+        "width": 740.0006713867188,
+        "height": 416.2503662109375
+      },
+      "artboardFitsViewport": true
+    }
+  },
+  "screenshots": {
+    "home-fullscreen-ish": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-home-fullscreen-ish.png",
+    "settings-fullscreen-ish": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-settings-fullscreen-ish.png",
+    "game-fullscreen-ish": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-game-fullscreen-ish.png",
+    "home-medium": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-home-medium.png",
+    "settings-medium": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-settings-medium.png",
+    "game-medium": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-game-medium.png",
+    "home-small": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-home-small.png",
+    "settings-small": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-settings-small.png",
+    "game-small": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-game-small.png",
+    "home-tiny": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-home-tiny.png",
+    "settings-tiny": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-settings-tiny.png",
+    "game-tiny": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\resize-game-tiny.png"
+  }
+}

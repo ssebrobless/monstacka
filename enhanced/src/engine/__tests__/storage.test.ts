@@ -3,6 +3,7 @@ import { SETTINGS_DEFAULTS, MAX_LEADERBOARD_ENTRIES } from '../../constants';
 import {
   clearSavedRun,
   getSavedRun,
+  loadStorage,
   normalizeNickname,
   qualifiesScoreRecord,
   qualifiesSprintRecord,
@@ -16,7 +17,11 @@ function createStorage(): StorageData {
   return {
     sprint: [],
     score: [],
-    settings: { ...SETTINGS_DEFAULTS },
+    settings: {
+      ...SETTINGS_DEFAULTS,
+      controls: { ...SETTINGS_DEFAULTS.controls },
+      gamepadControls: { ...SETTINGS_DEFAULTS.gamepadControls },
+    },
     savedRuns: {
       arcade: null,
       sprint40: null,
@@ -128,5 +133,28 @@ describe('storage helpers', () => {
 
     clearSavedRun(data, 'sprint40');
     expect(getSavedRun(data, 'sprint40')).toBeNull();
+  });
+
+  it('hydrates controller bindings when loading storage', () => {
+    localStorage.setItem('monstacka_local_v1', JSON.stringify({
+      sprint: [],
+      score: [],
+      settings: {
+        controls: {
+          ...SETTINGS_DEFAULTS.controls,
+          hold: 'Key:KeyV',
+        },
+      },
+      savedRuns: {
+        arcade: null,
+        sprint40: null,
+        training: null,
+      },
+    }));
+
+    const storage = loadStorage();
+    expect(storage.settings.controls.hold).toBe('Key:KeyV');
+    expect(storage.settings.gamepadControls.left).toBe(SETTINGS_DEFAULTS.gamepadControls.left);
+    expect(storage.settings.gamepadControls.pause).toBe(SETTINGS_DEFAULTS.gamepadControls.pause);
   });
 });

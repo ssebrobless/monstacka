@@ -414,14 +414,17 @@ export function render(
     });
   }
 
-  if (document.activeElement !== refs.dasInput) refs.dasInput.value = String(settings.dasMs);
-  if (document.activeElement !== refs.arrInput) refs.arrInput.value = String(settings.arrMs);
-  if (document.activeElement !== refs.lockDelayInput) refs.lockDelayInput.value = String(settings.lockDelayMs);
-  refs.trainingFeedbackInput.value = settings.trainingFeedback;
-  refs.sfxEnabledInput.checked = settings.sfxEnabled;
-  if (document.activeElement !== refs.sfxVolumeInput) refs.sfxVolumeInput.value = String(settings.sfxVolume);
-  refs.musicEnabledInput.checked = settings.musicEnabled;
-  if (document.activeElement !== refs.musicVolumeInput) refs.musicVolumeInput.value = String(settings.musicVolume);
+  const settingsModalHidden = document.getElementById('settingsModal')?.classList.contains('hidden') ?? true;
+  if (settingsModalHidden) {
+    if (document.activeElement !== refs.dasInput) refs.dasInput.value = String(settings.dasMs);
+    if (document.activeElement !== refs.arrInput) refs.arrInput.value = String(settings.arrMs);
+    if (document.activeElement !== refs.lockDelayInput) refs.lockDelayInput.value = String(settings.lockDelayMs);
+    refs.trainingFeedbackInput.value = settings.trainingFeedback;
+    refs.sfxEnabledInput.checked = settings.sfxEnabled;
+    if (document.activeElement !== refs.sfxVolumeInput) refs.sfxVolumeInput.value = String(settings.sfxVolume);
+    refs.musicEnabledInput.checked = settings.musicEnabled;
+    if (document.activeElement !== refs.musicVolumeInput) refs.musicVolumeInput.value = String(settings.musicVolume);
+  }
 
   if (isTraining && state.lastTrainingFaultMessage && now - state.lastTrainingFaultAt < 1500) {
     refs.faultToast.textContent = state.lastTrainingFaultMessage;

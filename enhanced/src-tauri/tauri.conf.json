@@ -15,8 +15,6 @@
         "title": "MonStacka!",
         "width": 1280,
         "height": 860,
-        "minWidth": 1100,
-        "minHeight": 780,
         "center": true,
         "resizable": true,
         "fullscreen": false

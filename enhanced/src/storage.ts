@@ -7,6 +7,45 @@ import {
   MAX_LEADERBOARD_ENTRIES,
 } from './constants';
 
+function createDefaultSettings(): Settings {
+  return {
+    ...SETTINGS_DEFAULTS,
+    controls: { ...SETTINGS_DEFAULTS.controls },
+    gamepadControls: { ...SETTINGS_DEFAULTS.gamepadControls },
+  };
+}
+
+function normalizeGamepadControls(bindings: Partial<Settings['gamepadControls']> | undefined): Partial<Settings['gamepadControls']> {
+  if (!bindings) {
+    return {};
+  }
+
+  const normalized = { ...bindings };
+  if (
+    normalized.pause === 'Pad:Button9'
+    && normalized.retry === 'Pad:Button8'
+  ) {
+    normalized.pause = 'Pad:Button8';
+    normalized.retry = 'Pad:Button9';
+  }
+
+  if (
+    normalized.left === 'Pad:Button14'
+    && normalized.right === 'Pad:Button15'
+    && normalized.soft === 'Pad:Button13'
+    && normalized.hard === 'Pad:Button0'
+    && normalized.ccw === 'Pad:Button2'
+    && normalized.cw === 'Pad:Button1'
+    && normalized.flip === 'Pad:Button3'
+    && normalized.hold === 'Pad:Button4'
+  ) {
+    normalized.hard = 'Pad:Button12';
+    normalized.ccw = 'Pad:Button0';
+  }
+
+  return normalized;
+}
+
 function createEmptySavedRuns(): SavedRunsByMode {
   return {
     arcade: null,
@@ -55,17 +94,22 @@ function parseStorage(raw: string | null): StorageData | null {
   const parsed = JSON.parse(raw || '{}');
   const parsedSettings = parsed.settings || {};
   const legacyMuted = parsedSettings.muted === true;
+  const defaultSettings = createDefaultSettings();
   return {
     sprint: Array.isArray(parsed.sprint) ? parsed.sprint : [],
     score: Array.isArray(parsed.score) ? parsed.score : [],
     settings: {
-      ...SETTINGS_DEFAULTS,
+      ...defaultSettings,
       ...parsedSettings,
       sfxEnabled: parsedSettings.sfxEnabled ?? !legacyMuted,
       musicEnabled: parsedSettings.musicEnabled ?? !legacyMuted,
       controls: {
-        ...SETTINGS_DEFAULTS.controls,
+        ...defaultSettings.controls,
         ...(parsedSettings.controls || {}),
+      },
+      gamepadControls: {
+        ...defaultSettings.gamepadControls,
+        ...normalizeGamepadControls(parsedSettings.gamepadControls || {}),
       },
     },
     savedRuns: parseSavedRuns(parsed.savedRuns),
@@ -87,9 +131,9 @@ export function loadStorage(): StorageData {
       }
     }
 
-    return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS }, savedRuns: createEmptySavedRuns() };
+    return { sprint: [], score: [], settings: createDefaultSettings(), savedRuns: createEmptySavedRuns() };
   } catch {
-    return { sprint: [], score: [], settings: { ...SETTINGS_DEFAULTS }, savedRuns: createEmptySavedRuns() };
+    return { sprint: [], score: [], settings: createDefaultSettings(), savedRuns: createEmptySavedRuns() };
   }
 }
 

@@ -10,6 +10,7 @@ export const COUNTDOWN_MS = 1000;
 export const STORAGE_KEY = 'monstacka_local_v1';
 export const LEGACY_STORAGE_KEYS = ['eris_preview_tetris_v2'];
 export const MAX_NICKNAME_LENGTH = 5;
+export const MIN_NICKNAME_LENGTH = 3;
 export const MAX_LEADERBOARD_ENTRIES = 8;
 export const DEFAULT_MODE: GameMode = 'arcade';
 export const CONTROL_ORDER: ControlAction[] = [
@@ -51,6 +52,19 @@ export const DEFAULT_CONTROLS: ControlBindings = {
   pause: 'Key:KeyP',
   restartPaused: 'Key:KeyO',
 };
+export const DEFAULT_GAMEPAD_CONTROLS: ControlBindings = {
+  left: 'Pad:Button14',
+  right: 'Pad:Button15',
+  soft: 'Pad:Button13',
+  hard: 'Pad:Button12',
+  ccw: 'Pad:Button0',
+  cw: 'Pad:Button1',
+  flip: 'Pad:Button3',
+  hold: 'Pad:Button4',
+  retry: 'Pad:Button9',
+  pause: 'Pad:Button8',
+  restartPaused: 'Pad:Button10',
+};
 export const SCORE_TABLE: Record<number, number> = {
   1: 100,
   2: 300,
@@ -80,6 +94,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   musicVolume: 35,
   trainingFeedback: 'show',
   controls: { ...DEFAULT_CONTROLS },
+  gamepadControls: { ...DEFAULT_GAMEPAD_CONTROLS },
 };
 
 export const PIECE_COLORS: Record<PieceType, string> = {

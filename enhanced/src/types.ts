@@ -16,6 +16,7 @@ export type ControlAction =
   | 'pause'
   | 'restartPaused';
 export type ControlBindings = Record<ControlAction, string>;
+export type ControlBindingSource = 'controls' | 'gamepadControls';
 
 export interface Cell {
   x: number;
@@ -74,6 +75,7 @@ export interface Settings {
   musicVolume: number;
   trainingFeedback: TrainingFeedbackMode;
   controls: ControlBindings;
+  gamepadControls: ControlBindings;
 }
 
 export interface SprintRecord {

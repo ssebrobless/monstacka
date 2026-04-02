@@ -95,7 +95,7 @@ const OVERLAY_BLINK_COOLDOWN_VARIATION_MS = 1700;
 const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   I: {
     boundsByFrame: [
-      { x: 520, y: 120, width: 151, height: 572 },
+      { x: 403, y: 182, width: 151, height: 571 },
       { x: 401, y: 182, width: 153, height: 571 },
       { x: 401, y: 182, width: 153, height: 571 },
     ],
@@ -104,7 +104,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   },
   O: {
     boundsByFrame: [
-      { x: 40, y: 360, width: 304, height: 292 },
+      { x: 43, y: 314, width: 299, height: 289 },
       { x: 43, y: 314, width: 299, height: 289 },
       { x: 43, y: 314, width: 299, height: 289 },
     ],
@@ -113,7 +113,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   },
   T: {
     boundsByFrame: [
-      { x: 860, y: 340, width: 432, height: 291 },
+      { x: 622, y: 371, width: 432, height: 291 },
       { x: 622, y: 371, width: 432, height: 291 },
       { x: 622, y: 371, width: 432, height: 291 },
     ],
@@ -122,7 +122,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   },
   S: {
     boundsByFrame: [
-      { x: 40, y: 20, width: 430, height: 289 },
+      { x: 38, y: 5, width: 430, height: 289 },
       { x: 38, y: 5, width: 430, height: 289 },
       { x: 38, y: 5, width: 430, height: 289 },
     ],
@@ -131,7 +131,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   },
   Z: {
     boundsByFrame: [
-      { x: 900, y: 20, width: 437, height: 292 },
+      { x: 585, y: 19, width: 435, height: 292 },
       { x: 585, y: 19, width: 435, height: 292 },
       { x: 585, y: 19, width: 435, height: 292 },
     ],
@@ -140,7 +140,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   },
   J: {
     boundsByFrame: [
-      { x: 80, y: 700, width: 296, height: 429 },
+      { x: 49, y: 626, width: 293, height: 427 },
       { x: 49, y: 626, width: 293, height: 427 },
       { x: 49, y: 626, width: 293, height: 427 },
     ],
@@ -149,7 +149,7 @@ const MONSTER_SPECS: Record<PieceType, PieceArtSpec> = {
   },
   L: {
     boundsByFrame: [
-      { x: 860, y: 700, width: 291, height: 430 },
+      { x: 595, y: 622, width: 291, height: 430 },
       { x: 595, y: 622, width: 291, height: 430 },
       { x: 595, y: 622, width: 291, height: 430 },
     ],
@@ -762,7 +762,7 @@ async function buildMonsterTiles(): Promise<void> {
 
   for (const [pieceType, spec] of Object.entries(MONSTER_SPECS) as Array<[PieceType, PieceArtSpec]>) {
     const baseMask = buildSilhouetteMask(frames[0], spec.boundsByFrame[0]);
-    silhouetteMasks.set(pieceType, dilateMask(baseMask, 1));
+    silhouetteMasks.set(pieceType, baseMask);
   }
 
   for (const [pieceType, spec] of Object.entries(MONSTER_SPECS) as Array<[PieceType, PieceArtSpec]>) {
@@ -797,15 +797,19 @@ async function buildMonsterTiles(): Promise<void> {
 
     for (let rotation = 0; rotation < 4; rotation += 1) {
       const turns = ((rotation - spec.baseRotation) % 4 + 4) % 4;
-      const rawRotatedCanvases = baseCanvases.map((canvas) => rotateCanvas(canvas, turns));
+      const definition = DEFINITIONS[pieceType][rotation];
+      const rawRotatedCanvases = baseCanvases.map((canvas) =>
+        retainConnectedPiece(rotateCanvas(canvas, turns), definition));
       const eyePlacements = buildEyePlacements(pieceType, rotation);
-      const neutralizedCanvases = neutralizeEyeRegions(rawRotatedCanvases, eyePlacements);
+      const bodyCanvases = eyePlacements.length
+        ? neutralizeEyeRegions(rawRotatedCanvases, eyePlacements).map((canvas) =>
+          retainConnectedPiece(canvas, definition))
+        : rawRotatedCanvases;
       const figureKey = `${pieceType}:${rotation}`;
 
-      neutralizedCanvases.forEach((canvas, frameIndex) => {
+      bodyCanvases.forEach((canvas, frameIndex) => {
         setFramedValue(figures, figureKey, frameIndex, canvas);
       });
-
       if (eyePlacements.length) {
         figureEyes.set(figureKey, eyePlacements.map((eye) => ({
           x: eye.x,
@@ -817,9 +821,10 @@ async function buildMonsterTiles(): Promise<void> {
           style: eye.style,
           seed: eye.seed,
         })));
+      } else {
+        figureEyes.delete(figureKey);
       }
 
-      const definition = DEFINITIONS[pieceType][rotation];
       definition.forEach((cell, index) => {
         const key = `${pieceType}:${rotation}:${index}`;
         const tileEyeLayers = eyePlacements
@@ -835,7 +840,7 @@ async function buildMonsterTiles(): Promise<void> {
             seed: eye.seed,
           }));
 
-        neutralizedCanvases.forEach((canvas, frameIndex) => {
+        bodyCanvases.forEach((canvas, frameIndex) => {
           const tileCanvas = cropCellCanvas(canvas, cell.x, cell.y);
           setFramedValue(tiles, key, frameIndex, {
             canvas: tileCanvas,

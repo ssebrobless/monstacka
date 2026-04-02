@@ -7,6 +7,12 @@ describe('layout invariants', () => {
     expect(scale).toBeCloseTo(Math.min((1600 - 20) / ARTBOARD_WIDTH, (900 - 20) / ARTBOARD_HEIGHT), 6);
   });
 
+  it('continues shrinking for very small windows instead of clamping to a large minimum', () => {
+    const scale = computeArtboardScale(300, 200);
+    expect(scale).toBeCloseTo(Math.min((300 - 20) / ARTBOARD_WIDTH, (200 - 20) / ARTBOARD_HEIGHT), 6);
+    expect(scale).toBeLessThan(0.2);
+  });
+
   it('never changes internal layout math when window shape changes', () => {
     const wideScale = computeArtboardScale(1920, 1080);
     const narrowScale = computeArtboardScale(1280, 720);

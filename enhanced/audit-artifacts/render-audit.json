@@ -1,0 +1,276 @@
+{
+  "generatedAt": "2026-04-01T20:27:35.035Z",
+  "preview": {
+    "SORRISOL": {
+      "size": {
+        "width": 336,
+        "height": 224
+      },
+      "hasRipple": true,
+      "loadingTextVisible": false,
+      "eyeOverlayCount": 0,
+      "maxEmptyLeak": 1919,
+      "minSeamHit": 396,
+      "seamHits": [
+        {
+          "seam": "0:1-right",
+          "minHits": 396,
+          "maxHits": 444
+        },
+        {
+          "seam": "1:0-right",
+          "minHits": 435,
+          "maxHits": 444
+        },
+        {
+          "seam": "1:0-down",
+          "minHits": 448,
+          "maxHits": 448
+        }
+      ],
+      "emptyLeakCells": [
+        {
+          "cell": "0:0",
+          "maxOpaquePixels": 1919
+        },
+        {
+          "cell": "2:1",
+          "maxOpaquePixels": 490
+        }
+      ]
+    },
+    "BLYNDOOLIE": {
+      "size": {
+        "width": 112,
+        "height": 448
+      },
+      "hasRipple": true,
+      "loadingTextVisible": false,
+      "eyeOverlayCount": 12,
+      "maxEmptyLeak": 0,
+      "minSeamHit": 96,
+      "seamHits": [
+        {
+          "seam": "0:0-down",
+          "minHits": 100,
+          "maxHits": 432
+        },
+        {
+          "seam": "0:1-down",
+          "minHits": 240,
+          "maxHits": 428
+        },
+        {
+          "seam": "0:2-down",
+          "minHits": 96,
+          "maxHits": 430
+        }
+      ],
+      "emptyLeakCells": []
+    },
+    "AGGRASO": {
+      "size": {
+        "width": 336,
+        "height": 224
+      },
+      "hasRipple": true,
+      "loadingTextVisible": false,
+      "eyeOverlayCount": 0,
+      "maxEmptyLeak": 9820,
+      "minSeamHit": 0,
+      "seamHits": [
+        {
+          "seam": "0:0-right",
+          "minHits": 0,
+          "maxHits": 440
+        },
+        {
+          "seam": "1:0-down",
+          "minHits": 220,
+          "maxHits": 448
+        },
+        {
+          "seam": "1:1-right",
+          "minHits": 384,
+          "maxHits": 436
+        }
+      ],
+      "emptyLeakCells": [
+        {
+          "cell": "2:0",
+          "maxOpaquePixels": 7496
+        },
+        {
+          "cell": "0:1",
+          "maxOpaquePixels": 9820
+        }
+      ]
+    },
+    "MUWERDE": {
+      "size": {
+        "width": 224,
+        "height": 224
+      },
+      "hasRipple": true,
+      "loadingTextVisible": false,
+      "eyeOverlayCount": 0,
+      "maxEmptyLeak": 0,
+      "minSeamHit": 292,
+      "seamHits": [
+        {
+          "seam": "0:0-right",
+          "minHits": 448,
+          "maxHits": 448
+        },
+        {
+          "seam": "0:0-down",
+          "minHits": 436,
+          "maxHits": 448
+        },
+        {
+          "seam": "1:0-down",
+          "minHits": 436,
+          "maxHits": 444
+        },
+        {
+          "seam": "0:1-right",
+          "minHits": 292,
+          "maxHits": 444
+        }
+      ],
+      "emptyLeakCells": []
+    },
+    "LYSERGICADA": {
+      "size": {
+        "width": 336,
+        "height": 224
+      },
+      "hasRipple": true,
+      "loadingTextVisible": false,
+      "eyeOverlayCount": 6,
+      "maxEmptyLeak": 10006,
+      "minSeamHit": 218,
+      "seamHits": [
+        {
+          "seam": "0:0-right",
+          "minHits": 352,
+          "maxHits": 444
+        },
+        {
+          "seam": "1:0-right",
+          "minHits": 444,
+          "maxHits": 448
+        },
+        {
+          "seam": "1:0-down",
+          "minHits": 218,
+          "maxHits": 448
+        }
+      ],
+      "emptyLeakCells": [
+        {
+          "cell": "0:1",
+          "maxOpaquePixels": 6428
+        },
+        {
+          "cell": "2:1",
+          "maxOpaquePixels": 10006
+        }
+      ]
+    },
+    "DOUSEMA": {
+      "size": {
+        "width": 224,
+        "height": 336
+      },
+      "hasRipple": true,
+      "loadingTextVisible": false,
+      "eyeOverlayCount": 0,
+      "maxEmptyLeak": 8361,
+      "minSeamHit": 208,
+      "seamHits": [
+        {
+          "seam": "1:0-down",
+          "minHits": 340,
+          "maxHits": 340
+        },
+        {
+          "seam": "1:1-down",
+          "minHits": 348,
+          "maxHits": 348
+        },
+        {
+          "seam": "0:2-right",
+          "minHits": 208,
+          "maxHits": 208
+        }
+      ],
+      "emptyLeakCells": [
+        {
+          "cell": "0:0",
+          "maxOpaquePixels": 2972
+        },
+        {
+          "cell": "0:1",
+          "maxOpaquePixels": 8361
+        }
+      ]
+    },
+    "GALIFFAMBOS": {
+      "size": {
+        "width": 224,
+        "height": 336
+      },
+      "hasRipple": true,
+      "loadingTextVisible": false,
+      "eyeOverlayCount": 0,
+      "maxEmptyLeak": 1293,
+      "minSeamHit": 0,
+      "seamHits": [
+        {
+          "seam": "0:0-right",
+          "minHits": 0,
+          "maxHits": 0
+        },
+        {
+          "seam": "1:0-down",
+          "minHits": 0,
+          "maxHits": 0
+        },
+        {
+          "seam": "1:1-down",
+          "minHits": 64,
+          "maxHits": 64
+        }
+      ],
+      "emptyLeakCells": [
+        {
+          "cell": "0:1",
+          "maxOpaquePixels": 1293
+        },
+        {
+          "cell": "0:2",
+          "maxOpaquePixels": 965
+        }
+      ]
+    }
+  },
+  "gameplay": {
+    "boardFigures": 8,
+    "boardArtCanvases": 8,
+    "boardRippleCanvases": 8,
+    "holdArtCanvases": 0,
+    "nextArtCanvases": 3,
+    "nextRippleCanvases": 3
+  },
+  "screenshots": {
+    "SORRISOL": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-preview-s.png",
+    "BLYNDOOLIE": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-preview-i.png",
+    "AGGRASO": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-preview-z.png",
+    "MUWERDE": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-preview-o.png",
+    "LYSERGICADA": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-preview-t.png",
+    "DOUSEMA": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-preview-j.png",
+    "GALIFFAMBOS": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-preview-l.png",
+    "gameplay": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\render-gameplay-board.png"
+  }
+}

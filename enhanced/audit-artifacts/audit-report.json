@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-01T04:39:50.626Z",
+  "generatedAt": "2026-04-01T20:31:27.154Z",
   "screenshots": {
     "home": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-initial.png",
     "homeLoreCollapsed": "C:\\Users\\fishe\\Documents\\projects\\Tetris\\repo_review\\enhanced\\audit-artifacts\\home-lore-open.png",
@@ -24,37 +24,37 @@
       "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 1182,
+        "htmlLength": 589,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 1547,
+        "htmlLength": 2260,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 808,
+        "htmlLength": 588,
         "text": ""
       }
     },
     "afterLoreOpen": {
       "name": "BLYNDOOLIE",
-      "lore": "",
+      "lore": "it se",
       "loreBubbleClass": "home-lore-fill is-open",
       "left": {
         "childCount": 1,
-        "htmlLength": 1182,
+        "htmlLength": 589,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 1547,
+        "htmlLength": 2260,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 808,
+        "htmlLength": 588,
         "text": ""
       }
     },
@@ -64,17 +64,17 @@
       "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 1182,
+        "htmlLength": 589,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 1547,
+        "htmlLength": 2260,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 808,
+        "htmlLength": 588,
         "text": ""
       }
     },
@@ -84,17 +84,17 @@
       "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 1182,
+        "htmlLength": 589,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 1547,
+        "htmlLength": 2260,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 808,
+        "htmlLength": 588,
         "text": ""
       }
     },
@@ -105,101 +105,101 @@
       "loreBubbleClass": "home-lore-fill is-collapsed",
       "left": {
         "childCount": 1,
-        "htmlLength": 1532,
+        "htmlLength": 2248,
         "text": ""
       },
       "center": {
         "childCount": 1,
-        "htmlLength": 822,
+        "htmlLength": 600,
         "text": ""
       },
       "right": {
         "childCount": 1,
-        "htmlLength": 443,
+        "htmlLength": 589,
         "text": ""
       }
     }
   },
   "leaderboards": {
     "sprint": [
-      "00:52.890",
-      "00:55.620",
       "00:59.050",
-      "01:00.110",
-      "01:03.240",
-      "01:06.510",
       "01:08.840",
-      "01:10.300"
+      "--:--.---",
+      "--:--.---",
+      "--:--.---",
+      "--:--.---",
+      "--:--.---",
+      "--:--.---"
     ],
     "sprintTags": [
-      "FASTY",
-      "GLINT",
       "RUSH1",
-      "CHOMP",
-      "SLICK",
-      "GNAWS",
       "DASH2",
-      "BLINK"
+      "-----",
+      "-----",
+      "-----",
+      "-----",
+      "-----",
+      "-----"
     ],
     "arcade": [
-      "12800 pts",
       "11850 pts",
-      "11100 pts",
-      "9700 pts",
-      "9100 pts",
-      "8600 pts",
       "8350 pts",
-      "8000 pts"
+      "---",
+      "---",
+      "---",
+      "---",
+      "---",
+      "---"
     ],
     "arcadeTags": [
-      "GLOOP",
       "SLM3R",
-      "BLOBB",
-      "MAWZ1",
-      "SPLOT",
-      "OOZER",
       "GNASH",
-      "FANG5"
+      "-----",
+      "-----",
+      "-----",
+      "-----",
+      "-----",
+      "-----"
     ],
     "arcadeAfterForcedSave": [
       "13337 pts",
-      "12800 pts",
       "11850 pts",
-      "11100 pts",
-      "9700 pts",
-      "9100 pts",
-      "8600 pts",
-      "8350 pts"
+      "8350 pts",
+      "---",
+      "---",
+      "---",
+      "---",
+      "---"
     ],
     "arcadeAfterForcedSaveTags": [
       "RIP1",
-      "GLOOP",
       "SLM3R",
-      "BLOBB",
-      "MAWZ1",
-      "SPLOT",
-      "OOZER",
-      "GNASH"
+      "GNASH",
+      "-----",
+      "-----",
+      "-----",
+      "-----",
+      "-----"
     ],
     "sprintAfterForcedSave": [
       "00:52.890",
-      "00:52.890",
-      "00:55.620",
       "00:59.050",
-      "01:00.110",
-      "01:03.240",
-      "01:06.510",
-      "01:08.840"
+      "01:08.840",
+      "--:--.---",
+      "--:--.---",
+      "--:--.---",
+      "--:--.---",
+      "--:--.---"
     ],
     "sprintAfterForcedSaveTags": [
       "ZIPPY",
-      "FASTY",
-      "GLINT",
       "RUSH1",
-      "CHOMP",
-      "SLICK",
-      "GNAWS",
-      "DASH2"
+      "DASH2",
+      "-----",
+      "-----",
+      "-----",
+      "-----",
+      "-----"
     ]
   },
   "ui": {
@@ -209,7 +209,7 @@
     },
     "controlsView": {
       "visible": true,
-      "rowCount": 11
+      "rowCount": 12
     },
     "controlsBack": {
       "mainVisible": true,
@@ -225,8 +225,11 @@
         "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.343",
-        "boardMonsterCells": 0,
+        "timer": "00:00.431",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -238,10 +241,13 @@
         "overlayHidden": true,
         "overlayText": "",
         "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
-        "score": "44",
+        "score": "42",
         "lines": "0",
-        "timer": "00:00.779",
-        "boardMonsterCells": 4,
+        "timer": "00:01.116",
+        "boardFigureCount": 1,
+        "boardMonsterBodies": 1,
+        "boardMonsterArt": 1,
+        "boardRippleArt": 1,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -258,16 +264,19 @@
       "resumePromptFromProgress": {
         "visible": true,
         "title": "Arcade Save Found",
-        "summary": "Continue your Arcade run from 44 points and 0 cleared lines. Saved 4/1/2026, 12:39:57 AM."
+        "summary": "Continue your Arcade run from 42 points and 0 cleared lines. Saved 4/1/2026, 4:31:39 PM."
       },
       "continuedFromProgress": {
         "overlayHidden": true,
         "overlayText": "",
         "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
-        "score": "44",
+        "score": "42",
         "lines": "0",
-        "timer": "00:01.855",
-        "boardMonsterCells": 4,
+        "timer": "00:03.309",
+        "boardFigureCount": 3,
+        "boardMonsterBodies": 3,
+        "boardMonsterArt": 3,
+        "boardRippleArt": 3,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -278,7 +287,7 @@
       "resumePromptAfterContinue": {
         "visible": true,
         "title": "Arcade Save Found",
-        "summary": "Continue your Arcade run from 44 points and 0 cleared lines. Saved 4/1/2026, 12:39:58 AM."
+        "summary": "Continue your Arcade run from 42 points and 0 cleared lines. Saved 4/1/2026, 4:31:42 PM."
       },
       "paused": {
         "overlayHidden": false,
@@ -286,8 +295,11 @@
         "status": "Paused. Press P to continue or O to restart this run fresh.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.448",
-        "boardMonsterCells": 0,
+        "timer": "00:00.609",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
         "resumeVisible": false,
@@ -301,8 +313,11 @@
         "status": "Arcade active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.447",
-        "boardMonsterCells": 0,
+        "timer": "00:00.609",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -317,7 +332,10 @@
         "score": "0",
         "lines": "0",
         "timer": "00:00.000",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -341,7 +359,10 @@
         "score": "0",
         "lines": "0",
         "timer": "00:00.000",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -356,7 +377,10 @@
         "score": "13337",
         "lines": "22",
         "timer": "01:34.500",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
         "resumeVisible": false,
@@ -377,8 +401,11 @@
         "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.322",
-        "boardMonsterCells": 0,
+        "timer": "00:00.425",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -390,10 +417,13 @@
         "overlayHidden": true,
         "overlayText": "",
         "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
-        "score": "44",
+        "score": "42",
         "lines": "0",
-        "timer": "00:00.723",
-        "boardMonsterCells": 4,
+        "timer": "00:01.161",
+        "boardFigureCount": 1,
+        "boardMonsterBodies": 1,
+        "boardMonsterArt": 1,
+        "boardRippleArt": 1,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -410,16 +440,19 @@
       "resumePromptFromProgress": {
         "visible": true,
         "title": "40 Lines Save Found",
-        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 4/1/2026, 12:40:05 AM."
+        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 4/1/2026, 4:31:52 PM."
       },
       "continuedFromProgress": {
         "overlayHidden": true,
         "overlayText": "",
         "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
-        "score": "44",
+        "score": "42",
         "lines": "0",
-        "timer": "00:01.694",
-        "boardMonsterCells": 4,
+        "timer": "00:02.938",
+        "boardFigureCount": 2,
+        "boardMonsterBodies": 2,
+        "boardMonsterArt": 2,
+        "boardRippleArt": 2,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -430,7 +463,7 @@
       "resumePromptAfterContinue": {
         "visible": true,
         "title": "40 Lines Save Found",
-        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 4/1/2026, 12:40:06 AM."
+        "summary": "Continue your 40 Lines run from 0 cleared lines. Saved 4/1/2026, 4:31:55 PM."
       },
       "paused": {
         "overlayHidden": false,
@@ -438,8 +471,11 @@
         "status": "Paused. Press P to continue or O to restart this run fresh.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.436",
-        "boardMonsterCells": 0,
+        "timer": "00:00.612",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
         "resumeVisible": false,
@@ -453,8 +489,11 @@
         "status": "40 Lines active. DAS 110ms, ARR 0ms, lock delay 250ms.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.442",
-        "boardMonsterCells": 0,
+        "timer": "00:00.608",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -469,7 +508,10 @@
         "score": "0",
         "lines": "0",
         "timer": "00:00.000",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -493,7 +535,10 @@
         "score": "0",
         "lines": "0",
         "timer": "00:00.000",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -508,7 +553,10 @@
         "score": "0",
         "lines": "40",
         "timer": "00:52.890",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
         "resumeVisible": false,
@@ -529,8 +577,11 @@
         "status": "Training active. 0 faults, 0% fault rate, 0 perfect streak, feedback SHOW.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.338",
-        "boardMonsterCells": 0,
+        "timer": "00:00.455",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -544,8 +595,11 @@
         "status": "Training active. 0 faults, 0% fault rate, 1 perfect streak, feedback SHOW.",
         "score": "0",
         "lines": "1",
-        "timer": "00:00.732",
-        "boardMonsterCells": 0,
+        "timer": "00:01.227",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -562,7 +616,7 @@
       "resumePromptFromProgress": {
         "visible": true,
         "title": "Training Save Found",
-        "summary": "Continue your Training run from 1 pieces with 0 faults. Saved 4/1/2026, 12:40:12 AM."
+        "summary": "Continue your Training run from 1 pieces with 0 faults. Saved 4/1/2026, 4:32:07 PM."
       },
       "continuedFromProgress": {
         "overlayHidden": true,
@@ -570,8 +624,11 @@
         "status": "Training active. 0 faults, 0% fault rate, 1 perfect streak, feedback SHOW.",
         "score": "0",
         "lines": "1",
-        "timer": "00:01.702",
-        "boardMonsterCells": 0,
+        "timer": "00:04.042",
+        "boardFigureCount": 2,
+        "boardMonsterBodies": 2,
+        "boardMonsterArt": 2,
+        "boardRippleArt": 2,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -582,7 +639,7 @@
       "resumePromptAfterContinue": {
         "visible": true,
         "title": "Training Save Found",
-        "summary": "Continue your Training run from 1 pieces with 0 faults. Saved 4/1/2026, 12:40:13 AM."
+        "summary": "Continue your Training run from 1 pieces with 0 faults. Saved 4/1/2026, 4:32:09 PM."
       },
       "paused": {
         "overlayHidden": false,
@@ -590,8 +647,11 @@
         "status": "Paused. Press P to continue or O to restart this run fresh.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.442",
-        "boardMonsterCells": 0,
+        "timer": "00:00.583",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": true,
         "resumeVisible": false,
@@ -605,8 +665,11 @@
         "status": "Training active. 0 faults, 0% fault rate, 0 perfect streak, feedback SHOW.",
         "score": "0",
         "lines": "0",
-        "timer": "00:00.442",
-        "boardMonsterCells": 0,
+        "timer": "00:00.583",
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -621,7 +684,10 @@
         "score": "0",
         "lines": "0",
         "timer": "00:00.000",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,
@@ -645,7 +711,10 @@
         "score": "0",
         "lines": "0",
         "timer": "00:00.000",
-        "boardMonsterCells": 0,
+        "boardFigureCount": 0,
+        "boardMonsterBodies": 0,
+        "boardMonsterArt": 0,
+        "boardRippleArt": 0,
         "boardGhostCells": 4,
         "retryVisible": false,
         "resumeVisible": false,

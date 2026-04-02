@@ -4,14 +4,16 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   SETTINGS_DEFAULTS,
   DEFAULT_CONTROLS,
+  DEFAULT_GAMEPAD_CONTROLS,
   CONTROL_LABELS,
   CONTROL_ORDER,
   DEFAULT_MODE,
   MAX_NICKNAME_LENGTH,
+  MIN_NICKNAME_LENGTH,
   MAX_LEADERBOARD_ENTRIES,
   MODE_LABELS,
 } from './constants';
-import { AudioManager } from './audio';
+import { AudioManager, type SoundCue } from './audio';
 import {
   loadStorage,
   saveStorage,
@@ -28,7 +30,13 @@ import {
   captureSavedRun, createGameState, reset, restoreSavedRun, dropOnce, lockPiece, elapsed,
 } from './engine/state';
 import { getGravityMs } from './engine/gravity';
-import { setupKeyboard, createInputState, clearHorizontalRepeat } from './input/keyboard';
+import {
+  setupKeyboard,
+  setupGamepad,
+  createInputState,
+  clearHorizontalRepeat,
+  type BindingCaptureTarget,
+} from './input/keyboard';
 import { assignBinding, formatBindingLabel, keyboardToken, mouseToken } from './input/bindings';
 import { getDomRefs, render } from './ui/render';
 import {
@@ -41,7 +49,7 @@ import {
 import { applyRegionMap, GAME_REGIONS, HOME_REGIONS } from './ui/regionMap';
 import { prepareMonsterSkin } from './monsterSkin';
 import { computeArtboardScale, computeBoardFit } from './layout';
-import type { AppPhase, ControlAction, GameMode } from './types';
+import type { AppPhase, ControlAction, ControlBindingSource, GameMode } from './types';
 
 interface PendingRecord {
   mode: GameMode;
@@ -50,6 +58,55 @@ interface PendingRecord {
   timeMs?: number;
   lines: number;
   pieces: number;
+}
+
+type HomeControllerFocus =
+  | 'arcade'
+  | 'sprint'
+  | 'training'
+  | 'quit'
+  | 'settings'
+  | 'leaderboardArcade'
+  | 'leaderboardSprint'
+  | 'preview';
+
+type GameControllerFocus = 'settings' | 'quit' | 'home';
+
+type SettingsFieldKey =
+  | 'das'
+  | 'arr'
+  | 'lockDelay'
+  | 'trainingFeedback'
+  | 'sfxEnabled'
+  | 'sfxVolume'
+  | 'musicEnabled'
+  | 'musicVolume';
+
+type ControllerUiSurface =
+  | 'none'
+  | 'home'
+  | 'paused'
+  | 'settings-main'
+  | 'settings-controls'
+  | 'resume'
+  | 'record';
+
+interface UiGamepadSnapshot {
+  up: boolean;
+  down: boolean;
+  left: boolean;
+  right: boolean;
+  a: boolean;
+  b: boolean;
+  x: boolean;
+  y: boolean;
+  lb: boolean;
+  rb: boolean;
+  lt: boolean;
+  rt: boolean;
+  view: boolean;
+  menu: boolean;
+  l3: boolean;
 }
 
 declare global {
@@ -101,6 +158,7 @@ function init() {
   const cancelResumeButton = document.getElementById('cancelResumeButton') as HTMLButtonElement;
   const nicknameForm = document.getElementById('nicknameForm') as HTMLFormElement;
   const nicknameInput = document.getElementById('nicknameInput') as HTMLInputElement;
+  const saveRecordButton = nicknameForm.querySelector('button[type="submit"]') as HTMLButtonElement;
   const skipRecordButton = document.getElementById('skipRecordButton') as HTMLButtonElement;
   const settingsModal = document.getElementById('settingsModal')!;
   const settingsMainView = document.getElementById('settingsMainView')!;
@@ -140,7 +198,36 @@ function init() {
   let monsterSkinReady = false;
   let lastMenuPreviewFrameAt = 0;
   let pausedAt = 0;
-  let awaitingControlAction: ControlAction | null = null;
+  let awaitingBindingTarget: BindingCaptureTarget | null = null;
+  let gamepadCaptureReadyAt = 0;
+  let homeControllerFocus: HomeControllerFocus = 'arcade';
+  let pausedControllerFocus: GameControllerFocus = 'settings';
+  let settingsFieldFocusIndex = 0;
+  let settingsEditing = false;
+  let controlsFocusIndex = 0;
+  let controlsFocusSource: ControlBindingSource = 'gamepadControls';
+  let resumeFocusIndex = 0;
+  let recordFocusIndex = 0;
+  let recordTextEditing = false;
+  let recordNicknameCommitted = '';
+  let recordNicknamePreview = 'A';
+  let previousUiGamepad: UiGamepadSnapshot = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    a: false,
+    b: false,
+    x: false,
+    y: false,
+    lb: false,
+    rb: false,
+    lt: false,
+    rt: false,
+    view: false,
+    menu: false,
+    l3: false,
+  };
 
   function seedLeaderboardTestData() {
     const arcadeSeeds = [
@@ -203,10 +290,12 @@ function init() {
       if (!monsterSkinReady) {
         homeRefs.monstosCenter.textContent = 'Loading...';
       }
+      syncControllerFocusVisuals();
       return;
     }
 
     render(refs, state, settings, storage, appPhase, now);
+    syncControllerFocusVisuals();
   }
 
   function fitBoardToZone() {
@@ -243,28 +332,462 @@ function init() {
     fitBoardToZone();
   }
 
+  const settingsFieldOrder: SettingsFieldKey[] = [
+    'das',
+    'arr',
+    'lockDelay',
+    'trainingFeedback',
+    'sfxEnabled',
+    'sfxVolume',
+    'musicEnabled',
+    'musicVolume',
+  ];
+
+  function getConnectedGamepad(): Gamepad | null {
+    const pads = navigator.getGamepads?.() ?? [];
+    for (const pad of pads) {
+      if (pad?.connected) {
+        return pad;
+      }
+    }
+    return null;
+  }
+
+  function readUiGamepadSnapshot(gamepad: Gamepad | null): UiGamepadSnapshot {
+    const axisX = gamepad?.axes[0] ?? 0;
+    const axisY = gamepad?.axes[1] ?? 0;
+    const button = (index: number) => Boolean(gamepad?.buttons[index]?.pressed || (gamepad?.buttons[index]?.value ?? 0) >= 0.5);
+    return {
+      up: button(12) || axisY <= -0.55,
+      down: button(13) || axisY >= 0.55,
+      left: button(14) || axisX <= -0.55,
+      right: button(15) || axisX >= 0.55,
+      a: button(0),
+      b: button(1),
+      x: button(2),
+      y: button(3),
+      lb: button(4),
+      rb: button(5),
+      lt: button(6),
+      rt: button(7),
+      view: button(8),
+      menu: button(9),
+      l3: button(10),
+    };
+  }
+
+  function wasPressed(current: UiGamepadSnapshot, key: keyof UiGamepadSnapshot): boolean {
+    return current[key] && !previousUiGamepad[key];
+  }
+
+  function populateSettingsInputs(source: typeof settings) {
+    refs.dasInput.value = String(source.dasMs);
+    refs.arrInput.value = String(source.arrMs);
+    refs.lockDelayInput.value = String(source.lockDelayMs);
+    refs.trainingFeedbackInput.value = source.trainingFeedback;
+    refs.sfxEnabledInput.checked = source.sfxEnabled;
+    refs.sfxVolumeInput.value = String(source.sfxVolume);
+    refs.musicEnabledInput.checked = source.musicEnabled;
+    refs.musicVolumeInput.value = String(source.musicVolume);
+  }
+
+  function resetSettingsDraftToDefaults() {
+    populateSettingsInputs(SETTINGS_DEFAULTS);
+  }
+
+  function getSettingsFieldElement(field: SettingsFieldKey): HTMLElement | null {
+    switch (field) {
+      case 'das':
+        return refs.dasInput.closest('label');
+      case 'arr':
+        return refs.arrInput.closest('label');
+      case 'lockDelay':
+        return refs.lockDelayInput.closest('label');
+      case 'trainingFeedback':
+        return refs.trainingFeedbackInput.closest('label');
+      case 'sfxEnabled':
+        return refs.sfxEnabledInput.closest('label');
+      case 'sfxVolume':
+        return refs.sfxVolumeInput.closest('label');
+      case 'musicEnabled':
+        return refs.musicEnabledInput.closest('label');
+      case 'musicVolume':
+        return refs.musicVolumeInput.closest('label');
+      default:
+        return null;
+    }
+  }
+
+  function getSettingsFieldStep(field: SettingsFieldKey): number {
+    switch (field) {
+      case 'lockDelay':
+        return 10;
+      default:
+        return 1;
+    }
+  }
+
+  function adjustSettingsField(field: SettingsFieldKey, direction: 1 | -1) {
+    const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+    switch (field) {
+      case 'das':
+        refs.dasInput.value = String(clamp(Number(refs.dasInput.value || settings.dasMs) + direction * getSettingsFieldStep(field), 0, 300));
+        break;
+      case 'arr':
+        refs.arrInput.value = String(clamp(Number(refs.arrInput.value || settings.arrMs) + direction * getSettingsFieldStep(field), 0, 120));
+        break;
+      case 'lockDelay':
+        refs.lockDelayInput.value = String(clamp(Number(refs.lockDelayInput.value || settings.lockDelayMs) + direction * getSettingsFieldStep(field), 0, 1000));
+        break;
+      case 'trainingFeedback': {
+        const options: Array<typeof settings.trainingFeedback> = ['show', 'redo', 'off'];
+        const currentIndex = Math.max(0, options.indexOf(refs.trainingFeedbackInput.value as typeof settings.trainingFeedback));
+        const nextIndex = (currentIndex + direction + options.length) % options.length;
+        refs.trainingFeedbackInput.value = options[nextIndex];
+        break;
+      }
+      case 'sfxVolume':
+        refs.sfxVolumeInput.value = String(clamp(Number(refs.sfxVolumeInput.value || settings.sfxVolume) + direction, 0, 100));
+        break;
+      case 'musicVolume':
+        refs.musicVolumeInput.value = String(clamp(Number(refs.musicVolumeInput.value || settings.musicVolume) + direction, 0, 100));
+        break;
+      default:
+        break;
+    }
+  }
+
+  function toggleSettingsField(field: SettingsFieldKey) {
+    if (field === 'sfxEnabled') {
+      refs.sfxEnabledInput.checked = !refs.sfxEnabledInput.checked;
+    } else if (field === 'musicEnabled') {
+      refs.musicEnabledInput.checked = !refs.musicEnabledInput.checked;
+    }
+  }
+
+  function getControllerUiSurface(): ControllerUiSurface {
+    if (!recordModal.classList.contains('hidden')) {
+      return 'record';
+    }
+    if (!resumeModal.classList.contains('hidden')) {
+      return 'resume';
+    }
+    if (!settingsModal.classList.contains('hidden')) {
+      return controlsView.classList.contains('hidden') ? 'settings-main' : 'settings-controls';
+    }
+    if (appPhase === 'menu') {
+      return 'home';
+    }
+    if (appPhase === 'paused') {
+      return 'paused';
+    }
+    return 'none';
+  }
+
+  function clearControllerFocusVisuals() {
+    document.querySelectorAll('.controller-focused').forEach((node) => node.classList.remove('controller-focused'));
+    document.querySelectorAll('.controller-editing').forEach((node) => node.classList.remove('controller-editing'));
+  }
+
+  function getHomeFocusElement(target: HomeControllerFocus): HTMLElement | null {
+    switch (target) {
+      case 'arcade':
+        return startArcadeButton;
+      case 'sprint':
+        return startSprintButton;
+      case 'training':
+        return startTrainingButton;
+      case 'quit':
+        return quitGameButtonHome;
+      case 'settings':
+        return openSettingsButtonHome;
+      case 'leaderboardArcade':
+        return homeRefs.leaderboardArcadeButton;
+      case 'leaderboardSprint':
+        return homeRefs.leaderboardSprintButton;
+      case 'preview':
+        return homeRefs.monstosCenter.closest('.preview-slot') as HTMLElement | null;
+      default:
+        return null;
+    }
+  }
+
+  function getPausedFocusElement(target: GameControllerFocus): HTMLElement {
+    switch (target) {
+      case 'settings':
+        return openSettingsButtonGame;
+      case 'quit':
+        return quitGameButtonGame;
+      case 'home':
+      default:
+        return homeButtonGame;
+    }
+  }
+
+  function getControlsFocusElement(): HTMLButtonElement | null {
+    const action = CONTROL_ORDER[controlsFocusIndex] ?? CONTROL_ORDER[0];
+    return controlsList.querySelector(
+      `.controls-binding[data-action="${action}"][data-source="${controlsFocusSource}"]`,
+    ) as HTMLButtonElement | null;
+  }
+
+  function syncControllerFocusVisuals() {
+    clearControllerFocusVisuals();
+    if (!getConnectedGamepad()) {
+      return;
+    }
+
+    const surface = getControllerUiSurface();
+    if (surface === 'home') {
+      getHomeFocusElement(homeControllerFocus)?.classList.add('controller-focused');
+    } else if (surface === 'paused') {
+      getPausedFocusElement(pausedControllerFocus).classList.add('controller-focused');
+    } else if (surface === 'settings-main') {
+      const fieldElement = getSettingsFieldElement(settingsFieldOrder[settingsFieldFocusIndex] ?? settingsFieldOrder[0]);
+      fieldElement?.classList.add('controller-focused');
+      if (settingsEditing) {
+        fieldElement?.classList.add('controller-editing');
+      }
+    } else if (surface === 'settings-controls') {
+      const controlsElement = getControlsFocusElement();
+      controlsElement?.classList.add('controller-focused');
+      if (awaitingBindingTarget) {
+        controlsElement?.classList.add('controller-editing');
+      }
+    } else if (surface === 'resume') {
+      [continueSavedButton, startFreshButton, cancelResumeButton][resumeFocusIndex]?.classList.add('controller-focused');
+    } else if (surface === 'record') {
+      const recordElement = getRecordFocusElement();
+      recordElement.classList.add('controller-focused');
+      if (recordTextEditing && recordElement === nicknameInput) {
+        recordElement.classList.add('controller-editing');
+      }
+    }
+  }
+
+  function moveHomeControllerFocus(direction: 'up' | 'down' | 'left' | 'right') {
+    if (direction === 'up') {
+      if (homeControllerFocus === 'arcade') homeControllerFocus = 'quit';
+      else if (homeControllerFocus === 'quit') homeControllerFocus = 'settings';
+      else if (homeControllerFocus === 'sprint') homeControllerFocus = 'arcade';
+      else if (homeControllerFocus === 'training') homeControllerFocus = 'sprint';
+    } else if (direction === 'down') {
+      if (homeControllerFocus === 'settings') homeControllerFocus = 'quit';
+      else if (homeControllerFocus === 'quit') homeControllerFocus = 'arcade';
+      else if (homeControllerFocus === 'arcade') homeControllerFocus = 'sprint';
+      else if (homeControllerFocus === 'sprint') homeControllerFocus = 'training';
+    } else if (direction === 'left') {
+      if (homeControllerFocus === 'arcade' || homeControllerFocus === 'sprint' || homeControllerFocus === 'training') {
+        homeControllerFocus = 'leaderboardArcade';
+      } else if (homeControllerFocus === 'leaderboardArcade') {
+        homeControllerFocus = 'leaderboardSprint';
+      } else if (homeControllerFocus === 'leaderboardSprint') {
+        homeControllerFocus = 'preview';
+      }
+    } else if (direction === 'right') {
+      if (homeControllerFocus === 'preview') {
+        homeControllerFocus = 'leaderboardSprint';
+      } else if (homeControllerFocus === 'leaderboardSprint') {
+        homeControllerFocus = 'leaderboardArcade';
+      } else if (homeControllerFocus === 'leaderboardArcade') {
+        homeControllerFocus = 'arcade';
+      }
+    }
+  }
+
+  function movePausedControllerFocus(direction: 'up' | 'down') {
+    if (direction === 'up') {
+      if (pausedControllerFocus === 'home') pausedControllerFocus = 'quit';
+      else if (pausedControllerFocus === 'quit') pausedControllerFocus = 'settings';
+    } else {
+      if (pausedControllerFocus === 'settings') pausedControllerFocus = 'quit';
+      else if (pausedControllerFocus === 'quit') pausedControllerFocus = 'home';
+    }
+  }
+
+  function moveSettingsFocus(direction: 'up' | 'down') {
+    if (direction === 'up') {
+      settingsFieldFocusIndex = (settingsFieldFocusIndex - 1 + settingsFieldOrder.length) % settingsFieldOrder.length;
+    } else {
+      settingsFieldFocusIndex = (settingsFieldFocusIndex + 1) % settingsFieldOrder.length;
+    }
+  }
+
+  function moveControlsFocus(direction: 'up' | 'down' | 'left' | 'right') {
+    if (direction === 'up') {
+      controlsFocusIndex = (controlsFocusIndex - 1 + CONTROL_ORDER.length) % CONTROL_ORDER.length;
+    } else if (direction === 'down') {
+      controlsFocusIndex = (controlsFocusIndex + 1) % CONTROL_ORDER.length;
+    } else if (direction === 'left') {
+      controlsFocusSource = 'controls';
+    } else if (direction === 'right') {
+      controlsFocusSource = 'gamepadControls';
+    }
+  }
+
+  function moveResumeFocus(direction: 'left' | 'right') {
+    if (direction === 'left') {
+      resumeFocusIndex = (resumeFocusIndex + 2) % 3;
+    } else {
+      resumeFocusIndex = (resumeFocusIndex + 1) % 3;
+    }
+  }
+
+  function updateRecordInputDisplay() {
+    const displayValue = recordTextEditing
+      ? `${recordNicknameCommitted}${recordNicknamePreview}`
+      : recordNicknameCommitted;
+    nicknameInput.value = displayValue;
+    saveRecordButton.disabled = recordNicknameCommitted.length < MIN_NICKNAME_LENGTH;
+    if (recordTextEditing) {
+      nicknameInput.focus();
+      const previewIndex = recordNicknameCommitted.length;
+      nicknameInput.setSelectionRange(previewIndex, previewIndex + 1);
+    }
+  }
+
+  function resetRecordControllerState() {
+    recordFocusIndex = 0;
+    recordTextEditing = false;
+    recordNicknameCommitted = '';
+    recordNicknamePreview = 'A';
+    updateRecordInputDisplay();
+  }
+
+  function getRecordFocusElement(): HTMLElement {
+    return [nicknameInput, saveRecordButton, skipRecordButton][recordFocusIndex] ?? nicknameInput;
+  }
+
+  function moveRecordFocus(direction: 'up' | 'down' | 'left' | 'right') {
+    if (direction === 'up') {
+      if (recordFocusIndex !== 0) {
+        recordFocusIndex = 0;
+      }
+    } else if (direction === 'down') {
+      if (recordFocusIndex === 0) {
+        recordFocusIndex = 1;
+      }
+    } else if (direction === 'left') {
+      if (recordFocusIndex === 2) {
+        recordFocusIndex = 1;
+      }
+    } else if (direction === 'right') {
+      if (recordFocusIndex === 1) {
+        recordFocusIndex = 2;
+      }
+    }
+  }
+
+  function updateRecordPreviewFromDirection(direction: 'up' | 'down' | 'left' | 'right') {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const digits = '1234567890';
+    const letterIndex = letters.indexOf(recordNicknamePreview);
+    const digitIndex = digits.indexOf(recordNicknamePreview);
+
+    if (direction === 'up') {
+      if (letterIndex >= 0) {
+        recordNicknamePreview = letters[(letterIndex + 1) % letters.length];
+      } else {
+        recordNicknamePreview = 'A';
+      }
+    } else if (direction === 'down') {
+      if (letterIndex >= 0) {
+        recordNicknamePreview = letters[(letterIndex - 1 + letters.length) % letters.length];
+      } else {
+        recordNicknamePreview = 'Z';
+      }
+    } else if (direction === 'right') {
+      if (digitIndex >= 0) {
+        recordNicknamePreview = digits[(digitIndex + 1) % digits.length];
+      } else {
+        recordNicknamePreview = '1';
+      }
+    } else if (direction === 'left') {
+      if (digitIndex >= 0) {
+        recordNicknamePreview = digits[(digitIndex - 1 + digits.length) % digits.length];
+      } else {
+        recordNicknamePreview = '0';
+      }
+    }
+
+    updateRecordInputDisplay();
+  }
+
+  function commitRecordPreview() {
+    if (recordNicknameCommitted.length >= MAX_NICKNAME_LENGTH) {
+      return;
+    }
+
+    recordNicknameCommitted = `${recordNicknameCommitted}${recordNicknamePreview}`;
+    recordNicknamePreview = 'A';
+    updateRecordInputDisplay();
+  }
+
   function showSettingsMainView() {
     settingsMainView.classList.remove('hidden');
     controlsView.classList.add('hidden');
+    settingsEditing = false;
+    syncControllerFocusVisuals();
   }
 
   function showControlsView() {
     settingsMainView.classList.add('hidden');
     controlsView.classList.remove('hidden');
+    controlsFocusSource = 'gamepadControls';
+    controlsFocusIndex = Math.max(0, Math.min(controlsFocusIndex, CONTROL_ORDER.length - 1));
+    syncControllerFocusVisuals();
   }
 
-  function stopBindingCapture(message = 'Click a binding, then press any key or mouse button. Changes save automatically.') {
-    awaitingControlAction = null;
+  function getBindingSet(source: ControlBindingSource) {
+    return source === 'gamepadControls' ? settings.gamepadControls : settings.controls;
+  }
+
+  function setBindingSet(source: ControlBindingSource, bindings: typeof settings.controls) {
+    if (source === 'gamepadControls') {
+      settings.gamepadControls = bindings;
+      return;
+    }
+    settings.controls = bindings;
+  }
+
+  function getBindingCaptureLabel(source: ControlBindingSource): string {
+    return source === 'gamepadControls' ? 'controller input' : 'key or mouse button';
+  }
+
+  function stopBindingCapture(message = 'Click a keyboard, mouse, or controller binding. Changes save automatically.') {
+    awaitingBindingTarget = null;
+    gamepadCaptureReadyAt = 0;
     controlsCaptureHint.textContent = message;
   }
 
   function renderControlsList() {
     controlsList.innerHTML = '';
 
-    for (const { action, label, binding } of CONTROL_ORDER.map((controlAction) => ({
+    const header = document.createElement('div');
+    header.className = 'controls-row controls-row-header';
+
+    const actionHeader = document.createElement('div');
+    actionHeader.className = 'controls-heading';
+    actionHeader.textContent = 'Action';
+
+    const keyboardHeader = document.createElement('div');
+    keyboardHeader.className = 'controls-heading';
+    keyboardHeader.textContent = 'Keyboard / Mouse';
+
+    const gamepadHeader = document.createElement('div');
+    gamepadHeader.className = 'controls-heading';
+    gamepadHeader.textContent = 'Controller';
+
+    header.appendChild(actionHeader);
+    header.appendChild(keyboardHeader);
+    header.appendChild(gamepadHeader);
+    controlsList.appendChild(header);
+
+    for (const { action, label, keyboardBinding, gamepadBinding } of CONTROL_ORDER.map((controlAction) => ({
       action: controlAction,
       label: CONTROL_LABELS[controlAction],
-      binding: settings.controls[controlAction],
+      keyboardBinding: settings.controls[controlAction],
+      gamepadBinding: settings.gamepadControls[controlAction],
     }))) {
       const row = document.createElement('div');
       row.className = 'controls-row';
@@ -274,57 +797,112 @@ function init() {
       labelEl.className = 'controls-label';
       labelEl.textContent = label;
 
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'secondary controls-binding';
-      button.dataset.action = action;
-      if (awaitingControlAction === action) {
-        button.classList.add('is-listening');
-        button.textContent = 'Press input...';
+      const keyboardButton = document.createElement('button');
+      keyboardButton.type = 'button';
+      keyboardButton.className = 'secondary controls-binding';
+      keyboardButton.dataset.action = action;
+      keyboardButton.dataset.source = 'controls';
+      if (awaitingBindingTarget?.action === action && awaitingBindingTarget.source === 'controls') {
+        keyboardButton.classList.add('is-listening');
+        keyboardButton.textContent = 'Press input...';
       } else {
-        button.textContent = formatBindingLabel(binding);
+        keyboardButton.textContent = formatBindingLabel(keyboardBinding);
       }
-      button.addEventListener('click', () => {
-        awaitingControlAction = action;
+      keyboardButton.addEventListener('click', () => {
+        awaitingBindingTarget = { action, source: 'controls' };
         controlsCaptureHint.textContent = `${label}: press a key or mouse button. Press Escape to cancel or Backspace to clear.`;
         renderControlsList();
       });
 
+      const gamepadButton = document.createElement('button');
+      gamepadButton.type = 'button';
+      gamepadButton.className = 'secondary controls-binding';
+      gamepadButton.dataset.action = action;
+      gamepadButton.dataset.source = 'gamepadControls';
+      if (awaitingBindingTarget?.action === action && awaitingBindingTarget.source === 'gamepadControls') {
+        gamepadButton.classList.add('is-listening');
+        gamepadButton.textContent = 'Press input...';
+      } else {
+        gamepadButton.textContent = formatBindingLabel(gamepadBinding);
+      }
+      gamepadButton.addEventListener('click', () => {
+        awaitingBindingTarget = { action, source: 'gamepadControls' };
+        gamepadCaptureReadyAt = performance.now() + 260;
+        controlsCaptureHint.textContent = `${label}: press a controller button or stick direction. Press Escape to cancel or Backspace to clear.`;
+        renderControlsList();
+      });
+
       row.appendChild(labelEl);
-      row.appendChild(button);
+      row.appendChild(keyboardButton);
+      row.appendChild(gamepadButton);
       controlsList.appendChild(row);
     }
+
+    syncControllerFocusVisuals();
   }
 
   function closeSettingsModal() {
     stopBindingCapture();
+    populateSettingsInputs(settings);
     showSettingsMainView();
+    settingsFieldFocusIndex = 0;
+    settingsEditing = false;
+    controlsFocusIndex = 0;
+    controlsFocusSource = 'gamepadControls';
     settingsModal.classList.add('hidden');
+    syncControllerFocusVisuals();
   }
 
   function openSettingsModal() {
     stopBindingCapture();
+    populateSettingsInputs(settings);
     showSettingsMainView();
+    settingsFieldFocusIndex = 0;
+    settingsEditing = false;
+    controlsFocusIndex = 0;
+    controlsFocusSource = 'gamepadControls';
     renderControlsList();
     settingsModal.classList.remove('hidden');
+    syncControllerFocusVisuals();
   }
 
-  function applyControlBinding(action: ControlAction, binding: string) {
-    settings.controls = assignBinding(settings.controls, action, binding);
+  function applyDraftSettings() {
+    settings.dasMs = Math.max(0, Number(refs.dasInput.value || SETTINGS_DEFAULTS.dasMs));
+    settings.arrMs = Math.max(0, Number(refs.arrInput.value || SETTINGS_DEFAULTS.arrMs));
+    settings.lockDelayMs = Math.max(0, Number(refs.lockDelayInput.value || SETTINGS_DEFAULTS.lockDelayMs));
+    settings.trainingFeedback = refs.trainingFeedbackInput.value as typeof settings.trainingFeedback;
+    settings.sfxEnabled = refs.sfxEnabledInput.checked;
+    settings.sfxVolume = Math.max(0, Math.min(100, Number(refs.sfxVolumeInput.value || SETTINGS_DEFAULTS.sfxVolume)));
+    settings.musicEnabled = refs.musicEnabledInput.checked;
+    settings.musicVolume = Math.max(0, Math.min(100, Number(refs.musicVolumeInput.value || SETTINGS_DEFAULTS.musicVolume)));
+    state.trainingFeedback = settings.trainingFeedback;
     saveStorage(storage);
-    stopBindingCapture(`${CONTROL_LABELS[action]} set to ${formatBindingLabel(binding)}.`);
-    renderControlsList();
+    audio.syncSettings(settings);
+    populateSettingsInputs(settings);
+    settingsEditing = false;
+    renderCurrentView();
   }
 
-  function clearControlBinding(action: ControlAction) {
-    settings.controls = assignBinding(settings.controls, action, '');
+  function applyControlBinding(source: ControlBindingSource, action: ControlAction, binding: string) {
+    setBindingSet(source, assignBinding(getBindingSet(source), action, binding));
     saveStorage(storage);
-    stopBindingCapture(`${CONTROL_LABELS[action]} cleared.`);
+    const sourceLabel = source === 'gamepadControls' ? 'Controller' : 'Keyboard / mouse';
+    stopBindingCapture(`${CONTROL_LABELS[action]} set to ${formatBindingLabel(binding)} for ${sourceLabel}.`);
     renderControlsList();
+    syncControllerFocusVisuals();
+  }
+
+  function clearControlBinding(source: ControlBindingSource, action: ControlAction) {
+    setBindingSet(source, assignBinding(getBindingSet(source), action, ''));
+    saveStorage(storage);
+    const sourceLabel = source === 'gamepadControls' ? 'controller' : 'keyboard / mouse';
+    stopBindingCapture(`${CONTROL_LABELS[action]} ${sourceLabel} binding cleared.`);
+    renderControlsList();
+    syncControllerFocusVisuals();
   }
 
   function handleBindingKeyCapture(event: KeyboardEvent) {
-    if (!awaitingControlAction || controlsView.classList.contains('hidden')) {
+    if (!awaitingBindingTarget || controlsView.classList.contains('hidden')) {
       return;
     }
 
@@ -336,25 +914,32 @@ function init() {
       return;
     }
     if (event.code === 'Backspace' || event.code === 'Delete') {
-      clearControlBinding(awaitingControlAction);
+      clearControlBinding(awaitingBindingTarget.source, awaitingBindingTarget.action);
       return;
     }
 
-    applyControlBinding(awaitingControlAction, keyboardToken(event.code));
+    if (awaitingBindingTarget.source !== 'controls') {
+      return;
+    }
+
+    applyControlBinding('controls', awaitingBindingTarget.action, keyboardToken(event.code));
   }
 
   function handleBindingMouseCapture(event: MouseEvent) {
-    if (!awaitingControlAction || controlsView.classList.contains('hidden')) {
+    if (!awaitingBindingTarget || controlsView.classList.contains('hidden')) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    applyControlBinding(awaitingControlAction, mouseToken(event.button));
+    if (awaitingBindingTarget.source !== 'controls') {
+      return;
+    }
+    applyControlBinding('controls', awaitingBindingTarget.action, mouseToken(event.button));
   }
 
   function handleBindingContextMenu(event: MouseEvent) {
-    if (!awaitingControlAction || controlsView.classList.contains('hidden')) {
+    if (!awaitingBindingTarget || controlsView.classList.contains('hidden')) {
       return;
     }
 
@@ -366,11 +951,15 @@ function init() {
     pendingRecord = null;
     recordModal.classList.add('hidden');
     nicknameForm.reset();
+    resetRecordControllerState();
+    syncControllerFocusVisuals();
   }
 
   function closeResumeModal() {
     pendingResumeMode = null;
     resumeModal.classList.add('hidden');
+    resumeFocusIndex = 0;
+    syncControllerFocusVisuals();
   }
 
   function formatSavedRunSummary(mode: GameMode): string {
@@ -393,9 +982,11 @@ function init() {
 
   function openResumeModal(mode: GameMode) {
     pendingResumeMode = mode;
+    resumeFocusIndex = 0;
     resumeTitle.textContent = `${MODE_LABELS[mode]} Save Found`;
     resumeSummary.textContent = formatSavedRunSummary(mode);
     resumeModal.classList.remove('hidden');
+    syncControllerFocusVisuals();
   }
 
   function openRecordModal(record: PendingRecord) {
@@ -403,9 +994,10 @@ function init() {
     recordTitle.textContent = record.mode === 'sprint40' ? 'Sprint Entry' : 'Arcade Entry';
     recordSummary.textContent = record.summary;
     nicknameInput.maxLength = MAX_NICKNAME_LENGTH;
-    nicknameInput.value = '';
+    resetRecordControllerState();
     recordModal.classList.remove('hidden');
     nicknameInput.focus();
+    syncControllerFocusVisuals();
   }
 
   function doRecordCheck() {
@@ -433,7 +1025,7 @@ function init() {
       if (!qualifiesSprintRecord(storage, timeMs)) return;
       openRecordModal({
         mode: 'sprint40',
-        summary: `Top ${MAX_LEADERBOARD_ENTRIES} time! Enter a 5-character nickname for your ${MODE_LABELS.sprint40} record: ${timeMs} ms.`,
+        summary: `Top ${MAX_LEADERBOARD_ENTRIES} time! Enter a ${MIN_NICKNAME_LENGTH}-${MAX_NICKNAME_LENGTH} character nickname for your ${MODE_LABELS.sprint40} record: ${timeMs} ms.`,
         timeMs,
         lines: state.lines,
         pieces: state.pieces,
@@ -444,7 +1036,7 @@ function init() {
     if (!qualifiesScoreRecord(storage, state.score)) return;
     openRecordModal({
       mode: 'arcade',
-      summary: `New high score! Enter a 5-character nickname for your ${state.score}-point ${MODE_LABELS.arcade} run.`,
+      summary: `New high score! Enter a ${MIN_NICKNAME_LENGTH}-${MAX_NICKNAME_LENGTH} character nickname for your ${state.score}-point ${MODE_LABELS.arcade} run.`,
       score: state.score,
       timeMs: elapsed(state),
       lines: state.lines,
@@ -475,6 +1067,7 @@ function init() {
         showHomeScreen();
         lastMenuPreviewFrameAt = 0;
         pausedAt = 0;
+        homeControllerFocus = 'arcade';
         break;
       case 'countdown':
         closeSettingsModal();
@@ -491,6 +1084,7 @@ function init() {
         pausedAt = 0;
         break;
       case 'paused':
+        pausedControllerFocus = 'settings';
         break;
       case 'game-over':
       case 'sprint-clear':
@@ -649,6 +1243,7 @@ function init() {
 
     pausedAt = now;
     appPhase = 'paused';
+    pausedControllerFocus = 'settings';
     renderCurrentView(now);
   }
 
@@ -683,10 +1278,315 @@ function init() {
   }
 
   function isGameplayInputBlocked() {
-    return awaitingControlAction !== null
+    return awaitingBindingTarget !== null
       || !settingsModal.classList.contains('hidden')
       || !recordModal.classList.contains('hidden')
       || !resumeModal.classList.contains('hidden');
+  }
+
+  function beginControlCapture(source: ControlBindingSource, action: ControlAction) {
+    awaitingBindingTarget = { action, source };
+    if (source === 'gamepadControls') {
+      gamepadCaptureReadyAt = performance.now() + 260;
+      controlsCaptureHint.textContent = `${CONTROL_LABELS[action]}: press a controller button or stick direction. Press B to cancel.`;
+    } else {
+      controlsCaptureHint.textContent = `${CONTROL_LABELS[action]}: press a key or mouse button. Press Escape to cancel or Backspace to clear.`;
+    }
+    renderControlsList();
+  }
+
+  function activateHomeControllerFocus() {
+    switch (homeControllerFocus) {
+      case 'arcade':
+        requestModeStart('arcade');
+        break;
+      case 'sprint':
+        requestModeStart('sprint40');
+        break;
+      case 'training':
+        requestModeStart('training');
+        break;
+      case 'quit':
+        void quitGame();
+        break;
+      case 'settings':
+        openSettingsModal();
+        break;
+      case 'leaderboardArcade':
+        homeState.leaderboardMode = 'arcade';
+        renderCurrentView();
+        break;
+      case 'leaderboardSprint':
+        homeState.leaderboardMode = 'sprint40';
+        renderCurrentView();
+        break;
+      case 'preview':
+      default:
+        break;
+    }
+  }
+
+  function activatePausedControllerFocus() {
+    switch (pausedControllerFocus) {
+      case 'settings':
+        openSettingsModal();
+        break;
+      case 'quit':
+        void quitGame();
+        break;
+      case 'home':
+        returnToMenu(true);
+        break;
+      default:
+        break;
+    }
+  }
+
+  function activateSettingsField() {
+    const field = settingsFieldOrder[settingsFieldFocusIndex] ?? settingsFieldOrder[0];
+    if (field === 'sfxEnabled' || field === 'musicEnabled') {
+      toggleSettingsField(field);
+      syncControllerFocusVisuals();
+      return;
+    }
+    settingsEditing = true;
+    syncControllerFocusVisuals();
+  }
+
+  function activateControlsFocus() {
+    const action = CONTROL_ORDER[controlsFocusIndex] ?? CONTROL_ORDER[0];
+    beginControlCapture(controlsFocusSource, action);
+  }
+
+  function handleControllerUiInput(current: UiGamepadSnapshot) {
+    const surface = getControllerUiSurface();
+
+    if (surface === 'record') {
+      if (recordTextEditing) {
+        if (wasPressed(current, 'up')) {
+          updateRecordPreviewFromDirection('up');
+        } else if (wasPressed(current, 'down')) {
+          updateRecordPreviewFromDirection('down');
+        } else if (wasPressed(current, 'left')) {
+          updateRecordPreviewFromDirection('left');
+        } else if (wasPressed(current, 'right')) {
+          updateRecordPreviewFromDirection('right');
+        } else if (wasPressed(current, 'a')) {
+          commitRecordPreview();
+          syncControllerFocusVisuals();
+        } else if (wasPressed(current, 'b')) {
+          recordTextEditing = false;
+          updateRecordInputDisplay();
+          syncControllerFocusVisuals();
+        } else if (wasPressed(current, 'view') && recordNicknameCommitted.length >= MIN_NICKNAME_LENGTH) {
+          nicknameForm.requestSubmit();
+        }
+      } else if (wasPressed(current, 'up')) {
+        moveRecordFocus('up');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'down')) {
+        moveRecordFocus('down');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'left')) {
+        moveRecordFocus('left');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'right')) {
+        moveRecordFocus('right');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'a')) {
+        if (recordFocusIndex === 0) {
+          recordTextEditing = true;
+          recordNicknamePreview = 'A';
+          updateRecordInputDisplay();
+          syncControllerFocusVisuals();
+        } else if (recordFocusIndex === 1) {
+          if (recordNicknameCommitted.length >= MIN_NICKNAME_LENGTH) {
+            nicknameForm.requestSubmit();
+          }
+        } else {
+          skipRecordButton.click();
+        }
+      } else if (wasPressed(current, 'b')) {
+        skipRecordButton.click();
+      } else if (wasPressed(current, 'view') && recordNicknameCommitted.length >= MIN_NICKNAME_LENGTH) {
+        nicknameForm.requestSubmit();
+      }
+      return;
+    }
+
+    if (surface === 'resume') {
+      if (wasPressed(current, 'left')) {
+        moveResumeFocus('left');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'right')) {
+        moveResumeFocus('right');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'a')) {
+        [continueSavedButton, startFreshButton, cancelResumeButton][resumeFocusIndex]?.click();
+      } else if (wasPressed(current, 'b')) {
+        closeResumeModal();
+      }
+      return;
+    }
+
+    if (surface === 'settings-main') {
+      if (settingsEditing) {
+        const field = settingsFieldOrder[settingsFieldFocusIndex] ?? settingsFieldOrder[0];
+        if (wasPressed(current, 'up')) {
+          adjustSettingsField(field, 1);
+        } else if (wasPressed(current, 'down')) {
+          adjustSettingsField(field, -1);
+        } else if (wasPressed(current, 'b')) {
+          settingsEditing = false;
+          syncControllerFocusVisuals();
+        }
+        return;
+      }
+
+      if (wasPressed(current, 'up')) {
+        moveSettingsFocus('up');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'down')) {
+        moveSettingsFocus('down');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'a')) {
+        activateSettingsField();
+      } else if (wasPressed(current, 'b')) {
+        closeSettingsModal();
+      } else if (wasPressed(current, 'x')) {
+        applyDraftSettings();
+      } else if (wasPressed(current, 'y')) {
+        resetSettingsDraftToDefaults();
+      } else if (wasPressed(current, 'rb')) {
+        stopBindingCapture();
+        showControlsView();
+        renderControlsList();
+      }
+      return;
+    }
+
+    if (surface === 'settings-controls') {
+      if (awaitingBindingTarget) {
+        if (wasPressed(current, 'b')) {
+          stopBindingCapture('Binding update canceled.');
+          renderControlsList();
+        }
+        return;
+      }
+
+      if (wasPressed(current, 'up')) {
+        moveControlsFocus('up');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'down')) {
+        moveControlsFocus('down');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'left')) {
+        moveControlsFocus('left');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'right')) {
+        moveControlsFocus('right');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'a')) {
+        activateControlsFocus();
+      } else if (wasPressed(current, 'b')) {
+        stopBindingCapture();
+        showSettingsMainView();
+      } else if (wasPressed(current, 'y')) {
+        settings.controls = { ...DEFAULT_CONTROLS };
+        settings.gamepadControls = { ...DEFAULT_GAMEPAD_CONTROLS };
+        saveStorage(storage);
+        stopBindingCapture('Controls reset to default.');
+        renderControlsList();
+      }
+      return;
+    }
+
+    if (surface === 'paused') {
+      if (wasPressed(current, 'up')) {
+        movePausedControllerFocus('up');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'down')) {
+        movePausedControllerFocus('down');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'a')) {
+        activatePausedControllerFocus();
+      }
+      return;
+    }
+
+    if (surface === 'home') {
+      if (homeControllerFocus === 'preview') {
+        if (wasPressed(current, 'lb')) {
+          monstosPrevButton.click();
+        } else if (wasPressed(current, 'rb')) {
+          monstosNextButton.click();
+        } else if (wasPressed(current, 'lt')) {
+          homeRefs.monstosVoiceButton.click();
+        } else if (wasPressed(current, 'rt')) {
+          homeRefs.monstosLoreButton.click();
+        }
+      }
+
+      if (wasPressed(current, 'up')) {
+        moveHomeControllerFocus('up');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'down')) {
+        moveHomeControllerFocus('down');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'left')) {
+        moveHomeControllerFocus('left');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'right')) {
+        moveHomeControllerFocus('right');
+        syncControllerFocusVisuals();
+      } else if (wasPressed(current, 'a')) {
+        activateHomeControllerFocus();
+      }
+    }
+  }
+
+  function setupControllerUi() {
+    let rafId = 0;
+
+    const loop = () => {
+      const gamepad = getConnectedGamepad();
+      if (!gamepad) {
+        if (document.querySelector('.controller-focused')) {
+          clearControllerFocusVisuals();
+        }
+        previousUiGamepad = {
+          up: false,
+          down: false,
+          left: false,
+          right: false,
+          a: false,
+          b: false,
+          x: false,
+          y: false,
+          lb: false,
+          rb: false,
+          lt: false,
+          rt: false,
+          view: false,
+          menu: false,
+          l3: false,
+        };
+        rafId = window.requestAnimationFrame(loop);
+        return;
+      }
+
+      if (!document.querySelector('.controller-focused') && getControllerUiSurface() !== 'none') {
+        syncControllerFocusVisuals();
+      }
+
+      const current = readUiGamepadSnapshot(gamepad);
+      handleControllerUiInput(current);
+      previousUiGamepad = current;
+      rafId = window.requestAnimationFrame(loop);
+    };
+
+    rafId = window.requestAnimationFrame(loop);
+    return () => window.cancelAnimationFrame(rafId);
   }
 
   applyFixedArtboardLayout();
@@ -698,25 +1598,43 @@ function init() {
     renderCurrentView();
   });
 
-  setupKeyboard(
+  const gameplayInputContext = {
     state,
     input,
     settings,
-    renderCurrentView,
-    () => {
+    onRender: renderCurrentView,
+    onReset: () => {
       clearSavedRun(storage, state.mode);
       transitionTo('countdown', state.mode);
       renderCurrentView();
     },
-    () => appPhase,
-    pauseRun,
-    resumeRun,
-    restartCurrentRun,
-    isGameplayInputBlocked,
-    (cue) => {
+    getAppPhase: () => appPhase,
+    onPause: pauseRun,
+    onResume: resumeRun,
+    onRestartPaused: restartCurrentRun,
+    isInputBlocked: isGameplayInputBlocked,
+    onSound: (cue: SoundCue) => {
       audio.play(cue, settings);
     },
+  };
+
+  setupKeyboard(gameplayInputContext);
+  setupGamepad(
+    gameplayInputContext,
+    () => (
+      awaitingBindingTarget?.source === 'gamepadControls'
+      && performance.now() >= gamepadCaptureReadyAt
+        ? awaitingBindingTarget
+        : null
+    ),
+    (binding) => {
+      if (!awaitingBindingTarget || awaitingBindingTarget.source !== 'gamepadControls') {
+        return;
+      }
+      applyControlBinding('gamepadControls', awaitingBindingTarget.action, binding);
+    },
   );
+  setupControllerUi();
 
   document.getElementById('retryButton')!.addEventListener('click', () => {
     restartCurrentRun();
@@ -735,12 +1653,15 @@ function init() {
   controlsBackButton.addEventListener('click', () => {
     stopBindingCapture();
     showSettingsMainView();
+    syncControllerFocusVisuals();
   });
   controlsDefaultsButton.addEventListener('click', () => {
     settings.controls = { ...DEFAULT_CONTROLS };
+    settings.gamepadControls = { ...DEFAULT_GAMEPAD_CONTROLS };
     saveStorage(storage);
     stopBindingCapture('Controls reset to default.');
     renderControlsList();
+    syncControllerFocusVisuals();
   });
   settingsModal.addEventListener('click', (event) => {
     if (event.target === settingsModal) {
@@ -756,7 +1677,7 @@ function init() {
   document.addEventListener('mousedown', handleBindingMouseCapture, true);
   document.addEventListener('contextmenu', handleBindingContextMenu, true);
 
-  const quitGame = async () => {
+  async function quitGame() {
     closeSettingsModal();
     closeRecordModal();
     closeResumeModal();
@@ -782,7 +1703,7 @@ function init() {
     }
 
     returnToMenu();
-  };
+  }
 
   quitGameButtonHome.addEventListener('click', quitGame);
   quitGameButtonGame.addEventListener('click', quitGame);
@@ -850,39 +1771,30 @@ function init() {
 
   settingsForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    settings.dasMs = Math.max(0, Number(refs.dasInput.value || SETTINGS_DEFAULTS.dasMs));
-    settings.arrMs = Math.max(0, Number(refs.arrInput.value || SETTINGS_DEFAULTS.arrMs));
-    settings.lockDelayMs = Math.max(0, Number(refs.lockDelayInput.value || SETTINGS_DEFAULTS.lockDelayMs));
-    settings.trainingFeedback = refs.trainingFeedbackInput.value as typeof settings.trainingFeedback;
-    settings.sfxEnabled = refs.sfxEnabledInput.checked;
-    settings.sfxVolume = Math.max(0, Math.min(100, Number(refs.sfxVolumeInput.value || SETTINGS_DEFAULTS.sfxVolume)));
-    settings.musicEnabled = refs.musicEnabledInput.checked;
-    settings.musicVolume = Math.max(0, Math.min(100, Number(refs.musicVolumeInput.value || SETTINGS_DEFAULTS.musicVolume)));
-    state.trainingFeedback = settings.trainingFeedback;
-    saveStorage(storage);
-    audio.syncSettings(settings);
-    closeSettingsModal();
-    renderCurrentView();
+    applyDraftSettings();
   });
 
   resetSettingsButton.addEventListener('click', () => {
-    Object.assign(settings, {
-      ...SETTINGS_DEFAULTS,
-      controls: { ...DEFAULT_CONTROLS },
-    });
-    state.trainingFeedback = settings.trainingFeedback;
-    saveStorage(storage);
-    audio.syncSettings(settings);
-    renderControlsList();
-    renderCurrentView();
+    resetSettingsDraftToDefaults();
+    settingsEditing = false;
+    syncControllerFocusVisuals();
+  });
+
+  nicknameInput.addEventListener('input', () => {
+    if (recordTextEditing) {
+      return;
+    }
+    recordNicknameCommitted = normalizeNickname(nicknameInput.value);
+    nicknameInput.value = recordNicknameCommitted;
+    updateRecordInputDisplay();
   });
 
   nicknameForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!pendingRecord) return;
 
-    const nickname = normalizeNickname(nicknameInput.value);
-    if (!nickname) {
+    const nickname = normalizeNickname(recordNicknameCommitted || nicknameInput.value);
+    if (nickname.length < MIN_NICKNAME_LENGTH) {
       nicknameInput.focus();
       return;
     }
