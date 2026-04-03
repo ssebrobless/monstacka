@@ -4,6 +4,7 @@ import { getCells, getGhostCells } from '../engine/pieces';
 import { elapsed, formatTime } from '../engine/state';
 import { populateMonsterBoardFigure, populateMonsterCell, populateMonsterFigure } from './monsterDom';
 import { getVisibleScoreRecords, getVisibleSprintRecords } from '../demoRecords';
+import { isMonsterSkinReady } from '../monsterSkin';
 
 export interface DomRefs {
   boardWrap: HTMLElement;
@@ -248,19 +249,22 @@ export function render(
     }
   }
 
+  const skinReady = isMonsterSkinReady();
   const lockedGroups = buildLockedPieceGroups(skinRows);
   const completeCellKeys = new Set<string>();
-  for (const group of lockedGroups) {
-    if (!group.complete) {
-      continue;
-    }
-    for (const cell of group.cells) {
-      completeCellKeys.add(`${cell.x}:${cell.y}`);
+  if (skinReady) {
+    for (const group of lockedGroups) {
+      if (!group.complete) {
+        continue;
+      }
+      for (const cell of group.cells) {
+        completeCellKeys.add(`${cell.x}:${cell.y}`);
+      }
     }
   }
 
   let activeGroup: BoardPieceGroup | null = null;
-  if (state.active) {
+  if (skinReady && state.active) {
     const definition = DEFINITIONS[state.active.type][state.active.rotation];
     const activeCells = getCells(state.active)
       .filter((cell) => cell.y >= HIDDEN_ROWS)
@@ -373,19 +377,20 @@ export function render(
   };
 
   // Rebuild locked piece overlays only when the board changes (lock/clear)
-  const lockedKey = `${state.lastLockAt}:${state.lastLineClearAt}`;
+  const lockedKey = skinReady ? `${state.lastLockAt}:${state.lastLineClearAt}` : '';
   if (lockedKey !== cachedLockedKey) {
     cachedLockedKey = lockedKey;
-    // Remove all children except the active overlay (will be re-added below)
     refs.boardMonsterLayer.replaceChildren();
     activeOverlayNode = null;
-    lockedGroups.filter((group) => group.complete).forEach((group) => {
-      refs.boardMonsterLayer.appendChild(renderBoardGroup(group));
-    });
+    if (skinReady) {
+      lockedGroups.filter((group) => group.complete).forEach((group) => {
+        refs.boardMonsterLayer.appendChild(renderBoardGroup(group));
+      });
+    }
   }
 
   // Update active piece overlay — only rebuild when active piece state changes
-  const activeKey = state.active ? `${state.active.type}:${state.active.rotation}:${state.active.x}:${state.active.y}` : '';
+  const activeKey = skinReady && state.active ? `${state.active.type}:${state.active.rotation}:${state.active.x}:${state.active.y}` : '';
   if (activeKey !== cachedActiveKey) {
     cachedActiveKey = activeKey;
     if (activeOverlayNode) {

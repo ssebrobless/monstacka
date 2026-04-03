@@ -813,8 +813,12 @@ async function buildMonsterTiles(): Promise<void> {
     });
 
     for (let rotation = 0; rotation < 4; rotation += 1) {
-      const turns = ((rotation - spec.baseRotation) % 4 + 4) % 4;
       const definition = DEFINITIONS[pieceType][rotation];
+      const baseDefinition = DEFINITIONS[pieceType][spec.baseRotation];
+      // Skip rotation when the definition is identical to base (e.g. O-piece)
+      const definitionsMatch = definition.length === baseDefinition.length &&
+        definition.every((cell, i) => cell.x === baseDefinition[i].x && cell.y === baseDefinition[i].y);
+      const turns = definitionsMatch ? 0 : ((rotation - spec.baseRotation) % 4 + 4) % 4;
       const rawRotatedCanvases = baseCanvases.map((canvas) =>
         retainConnectedPiece(rotateCanvas(canvas, turns), definition));
       const eyePlacements = buildEyePlacements(pieceType, rotation);
@@ -869,6 +873,10 @@ async function buildMonsterTiles(): Promise<void> {
       });
     }
   }
+}
+
+export function isMonsterSkinReady(): boolean {
+  return tiles.size > 0 && figures.size > 0;
 }
 
 export function prepareMonsterSkin(onReady?: () => void): Promise<void> {

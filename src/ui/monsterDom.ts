@@ -660,7 +660,7 @@ export function populateMonsterBoardFigure(
   container.replaceChildren();
 
   if (!figureArt) {
-    // Sprites not loaded yet — board cells show colored fallback via piece-* class
+    // Sprites not loaded yet â€” board cells show colored fallback via piece-* class
     return;
   }
 
