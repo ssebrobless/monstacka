@@ -315,7 +315,7 @@ export function render(
 
     if (occupied) {
       if (isWholePieceCell) {
-        cell.className = 'cell';
+        cell.className = `cell piece-${skinKey.split(':')[0].toLowerCase()}`;
         cell.replaceChildren();
         cell.style.removeProperty('--squish-scale-x');
         cell.style.removeProperty('--squish-scale-y');

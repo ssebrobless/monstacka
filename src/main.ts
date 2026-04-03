@@ -1621,6 +1621,7 @@ function init() {
   installDebugApi();
   void prepareMonsterSkin(() => {
     monsterSkinReady = true;
+    resetRenderCache();
     renderCurrentView();
   });
   void audio.loadMonsterSounds();
