@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MonStacka!</title>
+  <script src="./app.js"></script>
+</head>
+<body>
+    <svg class="filter-defs" aria-hidden="true" focusable="false">
+        <defs>
+            <filter id="monster-edge-ripple" x="-16%" y="-16%" width="132%" height="132%" color-interpolation-filters="sRGB">
+                <feMorphology in="SourceGraphic" operator="dilate" radius="0.35" result="edgeBase" />
+                <feTurbulence type="fractalNoise" baseFrequency="0.22 0.56" numOctaves="2" seed="7" result="noiseA">
+                    <animate attributeName="baseFrequency" dur="0.48s" repeatCount="indefinite" values="0.22 0.56;0.245 0.62;0.228 0.58;0.252 0.66;0.22 0.56" />
+                </feTurbulence>
+                <feTurbulence type="fractalNoise" baseFrequency="0.38 0.92" numOctaves="1" seed="19" result="noiseB">
+                    <animate attributeName="baseFrequency" dur="0.31s" repeatCount="indefinite" values="0.38 0.92;0.42 1.0;0.39 0.94;0.44 1.06;0.38 0.92" />
+                </feTurbulence>
+                <feDisplacementMap in="edgeBase" in2="noiseA" scale="0.58" xChannelSelector="R" yChannelSelector="G" result="warpA">
+                    <animate attributeName="scale" dur="0.38s" repeatCount="indefinite" values="0.34;0.72;0.46;0.68;0.34" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpA" in2="noiseB" scale="0.32" xChannelSelector="G" yChannelSelector="B" result="warpB">
+                    <animate attributeName="scale" dur="0.26s" repeatCount="indefinite" values="0.12;0.42;0.21;0.45;0.12" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpB" in2="noiseA" scale="0.14" xChannelSelector="B" yChannelSelector="R">
+                    <animate attributeName="scale" dur="0.21s" repeatCount="indefinite" values="0.05;0.18;0.1;0.2;0.05" />
+                </feDisplacementMap>
+            </filter>
+            <filter id="monster-edge-ripple-preview" x="-18%" y="-18%" width="136%" height="136%" color-interpolation-filters="sRGB">
+                <feMorphology in="SourceGraphic" operator="dilate" radius="0.45" result="edgeBase" />
+                <feTurbulence type="fractalNoise" baseFrequency="0.25 0.62" numOctaves="2" seed="11" result="noiseA">
+                    <animate attributeName="baseFrequency" dur="0.44s" repeatCount="indefinite" values="0.25 0.62;0.278 0.7;0.258 0.65;0.286 0.74;0.25 0.62" />
+                </feTurbulence>
+                <feTurbulence type="fractalNoise" baseFrequency="0.42 1.0" numOctaves="1" seed="23" result="noiseB">
+                    <animate attributeName="baseFrequency" dur="0.28s" repeatCount="indefinite" values="0.42 1.0;0.46 1.1;0.43 1.03;0.48 1.16;0.42 1.0" />
+                </feTurbulence>
+                <feDisplacementMap in="edgeBase" in2="noiseA" scale="0.74" xChannelSelector="R" yChannelSelector="G" result="warpA">
+                    <animate attributeName="scale" dur="0.34s" repeatCount="indefinite" values="0.42;0.92;0.58;0.88;0.42" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpA" in2="noiseB" scale="0.4" xChannelSelector="G" yChannelSelector="B" result="warpB">
+                    <animate attributeName="scale" dur="0.22s" repeatCount="indefinite" values="0.16;0.52;0.26;0.56;0.16" />
+                </feDisplacementMap>
+                <feDisplacementMap in="warpB" in2="noiseA" scale="0.18" xChannelSelector="B" yChannelSelector="R">
+                    <animate attributeName="scale" dur="0.18s" repeatCount="indefinite" values="0.06;0.24;0.12;0.26;0.06" />
+                </feDisplacementMap>
+            </filter>
+        </defs>
+    </svg>
+    <main class="app-shell">
+        <section id="homeScreen" class="screen-stage">
+            <div class="artboard-frame">
+            <div id="homeArtboard" class="artboard home-artboard">
+                <button id="openSettingsButtonHome" type="button" class="art-hit hit-home-settings" data-region="home-settings" aria-label="Open settings"></button>
+                <button id="quitGameButtonHome" type="button" class="art-hit hit-home-quit" data-region="home-quit" aria-label="Quit MonStacka!"></button>
+
+                <div class="home-name-fill" data-region="home-name-fill">
+                    <span id="monstosName" class="home-name-text">BLYNDOOLIE</span>
+                </div>
+
+                <div id="monstosLoreBubble" class="home-lore-fill is-collapsed" data-region="home-lore-fill" aria-hidden="true">
+                    <svg id="monstosLoreTail" class="home-lore-tail" viewBox="0 0 612 212" preserveAspectRatio="none" aria-hidden="true">
+                        <path id="monstosLoreTailOutline" class="home-lore-tail-outline"></path>
+                        <path id="monstosLoreTailFill" class="home-lore-tail-fill"></path>
+                    </svg>
+                    <div id="monstosLoreSurface" class="home-lore-surface">
+                        <div id="monstosLoreText" class="home-lore-text"></div>
+                    </div>
+                </div>
+                <div id="monstosLoreMeasure" class="home-lore-measure" aria-hidden="true"></div>
+
+                <button id="monstosVoiceButton" type="button" class="art-hit hit-home-voice" data-region="home-voice" aria-label="Play Monstos sound preview"></button>
+                <button id="monstosLoreButton" type="button" class="art-hit hit-home-lore" data-region="home-lore" aria-label="Toggle Monstos lore"></button>
+
+                <div class="preview-slot preview-slot-left" data-region="home-preview-left">
+                    <div id="monstosLeft" class="preview-stage"></div>
+                </div>
+                <div class="preview-slot preview-slot-center" data-region="home-preview-center">
+                    <div id="monstosCenter" class="preview-stage preview-stage-active"></div>
+                </div>
+                <div class="preview-slot preview-slot-right" data-region="home-preview-right">
+                    <div id="monstosRight" class="preview-stage"></div>
+                </div>
+
+                <button id="monstosPrevButton" type="button" class="art-hit hit-home-prev" data-region="home-prev" aria-label="Previous Monstos"></button>
+                <button id="monstosNextButton" type="button" class="art-hit hit-home-next" data-region="home-next" aria-label="Next Monstos"></button>
+
+                <button id="leaderboardSprintButton" type="button" class="art-hit hit-home-score-sprint" data-region="home-score-sprint" aria-label="Show X(4)-LINES leaderboard"></button>
+                <button id="leaderboardArcadeButton" type="button" class="art-hit hit-home-score-arcade" data-region="home-score-arcade" aria-label="Show OGBM leaderboard"></button>
+                <ol id="homeLeaderboard" class="home-score-grid" data-region="home-score-grid"></ol>
+
+                <button id="startArcadeButton" type="button" class="art-hit hit-home-play-arcade" data-region="home-play-arcade" aria-label="Start OG Bubba Mode"></button>
+                <button id="startSprintButton" type="button" class="art-hit hit-home-play-sprint" data-region="home-play-sprint" aria-label="Start X(4)-LINES mode"></button>
+                <button id="startTrainingButton" type="button" class="art-hit hit-home-play-training" data-region="home-play-training" aria-label="Start Training mode"></button>
+            </div>
+            </div>
+        </section>
+
+        <section id="gameShell" class="screen-stage hidden">
+            <div class="artboard-frame">
+            <div id="gameArtboard" class="artboard game-artboard">
+                <button id="openSettingsButtonGame" type="button" class="art-hit hit-game-settings" data-region="game-settings" aria-label="Open settings"></button>
+                <button id="quitGameButtonGame" type="button" class="art-hit hit-game-quit" data-region="game-quit" aria-label="Quit MonStacka!"></button>
+                <button id="homeButtonGame" type="button" class="art-hit hit-game-home" data-region="game-home" aria-label="Return to home menu"></button>
+
+                <div class="game-ui">
+                    <div id="gameBoardZone" class="board-column game-zone" data-region="game-board-zone">
+                        <div id="boardWrap" class="board-wrap">
+                            <div id="overlay" class="overlay hidden"></div>
+                            <div id="faultToast" class="fault-toast hidden"></div>
+                            <div id="board" class="board"></div>
+                            <div id="boardMonsterLayer" class="board-monster-layer"></div>
+                        </div>
+                    </div>
+
+                    <aside id="gamePrimaryZone" class="game-sidebar game-zone" data-region="game-primary-zone">
+                        <div id="countdownPanel" class="panel countdown-panel hidden">
+                            <p class="eyebrow">Drop In</p>
+                            <p id="countdownValue" class="countdown-value">3</p>
+                        </div>
+
+                        <div class="panel">
+                            <h2>Mode</h2>
+                            <p id="modeDescription" class="status-text">Play until you top out. Chase the highest score you can post.</p>
+                        </div>
+
+                        <div class="panel triple">
+                            <div><h2 id="scoreLabel">Score</h2><p id="score" class="metric">0</p></div>
+                            <div><h2 id="goalLabel">Goal</h2><p id="goalValue" class="metric">ENDLESS</p></div>
+                            <div><h2 id="linesLabel">Lines</h2><p id="lines" class="metric">0</p></div>
+                        </div>
+
+                        <div class="panel split">
+                            <div><h2>Time</h2><p id="timer" class="metric">00:00.000</p></div>
+                            <div class="run-actions">
+                                <button id="retryButton" type="button">Retry</button>
+                            </div>
+                        </div>
+
+                        <div class="panel split preview-panels">
+                            <div>
+                                <h2>Hold</h2>
+                                <div id="hold" class="piece-preview empty">-</div>
+                            </div>
+                            <div>
+                                <h2>Next</h2>
+                                <ul id="nextQueue" class="queue-list"></ul>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <section id="gameSecondaryZone" class="game-sidebar game-sidebar-secondary game-zone" data-region="game-secondary-zone">
+                        <div id="endStatePanel" class="panel end-state-panel hidden">
+                            <p id="endStateEyebrow" class="eyebrow">Run Status</p>
+                            <p id="endStateTitle" class="end-state-title">TOP OUT</p>
+                            <p id="endStateSummary" class="status-text">Arcade run ended.</p>
+                        </div>
+                        <div class="panel">
+                            <h2 id="leaderboardTitle">Top 3 Scores</h2>
+                            <ol id="leaderboard" class="leaderboard"></ol>
+                        </div>
+                        <div class="panel">
+                            <h2>Status</h2>
+                            <p id="statusText" class="status-text">MonStacka game status will appear here.</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-card">
+            <div class="modal-title-row">
+                <div>
+                    <p class="eyebrow">Settings</p>
+                    <h2>Handling And Audio</h2>
+                </div>
+                <button id="closeSettingsButton" type="button" class="modal-close secondary" aria-label="Close settings">Close</button>
+            </div>
+            <div id="settingsMainView">
+                <form id="settingsForm" class="settings-form">
+                    <label>DAS (ms)<input id="dasInput" type="number" min="0" max="300" step="1"></label>
+                    <label>ARR (ms)<input id="arrInput" type="number" min="0" max="120" step="1"></label>
+                    <label>Lock Delay (ms)<input id="lockDelayInput" type="number" min="0" max="1000" step="10"></label>
+                    <label>Training Feedback
+                        <select id="trainingFeedbackInput">
+                            <option value="show">Show</option>
+                            <option value="redo">Redo</option>
+                            <option value="off">Off</option>
+                        </select>
+                    </label>
+                    <label class="toggle-row"><input id="sfxEnabledInput" type="checkbox">Sound Effects On</label>
+                    <label>SFX Volume<input id="sfxVolumeInput" type="range" min="0" max="100" step="1"></label>
+                    <label class="toggle-row"><input id="musicEnabledInput" type="checkbox">Music On</label>
+                    <label>Music Volume<input id="musicVolumeInput" type="range" min="0" max="100" step="1"></label>
+                    <label class="toggle-row"><input id="ditherEnabledInput" type="checkbox">Dithering Effect</label>
+                    <div class="button-row">
+                        <button id="applySettingsButton" type="submit">Apply</button>
+                        <button id="resetSettingsButton" type="button" class="secondary">Defaults</button>
+                        <button id="openControlsButton" type="button" class="secondary">Controls</button>
+                    </div>
+                </form>
+            </div>
+            <div id="controlsView" class="hidden">
+                <div class="controls-toolbar">
+                    <div>
+                        <p class="eyebrow">Controls</p>
+                        <h2>Bindings</h2>
+                    </div>
+                    <div class="button-row">
+                        <button id="controlsDefaultsButton" type="button" class="secondary">Default</button>
+                        <button id="controlsBackButton" type="button" class="secondary">Back</button>
+                    </div>
+                </div>
+                <p id="controlsCaptureHint" class="status-text">Click a keyboard, mouse, or controller binding. Changes save automatically.</p>
+                <div id="controlsList" class="controls-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="recordModal" class="modal hidden">
+        <div class="modal-card">
+            <p class="eyebrow">New Record</p>
+            <h2>Arcade Entry</h2>
+            <p id="recordSummary" class="status-text">Enter a 5-character nickname for the local leaderboard.</p>
+            <form id="nicknameForm" class="settings-form">
+                <label>Nickname
+                    <input id="nicknameInput" type="text" maxlength="5" autocomplete="nickname" spellcheck="false">
+                </label>
+                <div class="button-row">
+                    <button type="submit">Save</button>
+                    <button id="skipRecordButton" type="button" class="secondary">Skip</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="resumeModal" class="modal hidden">
+        <div class="modal-card">
+            <p class="eyebrow">Saved Run</p>
+            <h2 id="resumeTitle">Continue Run?</h2>
+            <p id="resumeSummary" class="status-text">A saved run is available for this mode.</p>
+            <div class="button-row">
+                <button id="continueSavedButton" type="button">Continue</button>
+                <button id="startFreshButton" type="button" class="secondary">Start New</button>
+                <button id="cancelResumeButton" type="button" class="secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ditherOverlay" class="dither-overlay hidden"></div>
+</body>
+</html>
