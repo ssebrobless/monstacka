@@ -1809,6 +1809,23 @@ function init() {
     applyDraftSettings();
   });
 
+  refs.sfxVolumeInput.addEventListener('input', () => {
+    settings.sfxVolume = Math.max(0, Math.min(100, Number(refs.sfxVolumeInput.value || settings.sfxVolume)));
+    audio.syncSettings(settings);
+  });
+  refs.musicVolumeInput.addEventListener('input', () => {
+    settings.musicVolume = Math.max(0, Math.min(100, Number(refs.musicVolumeInput.value || settings.musicVolume)));
+    audio.syncSettings(settings);
+  });
+  refs.sfxEnabledInput.addEventListener('change', () => {
+    settings.sfxEnabled = refs.sfxEnabledInput.checked;
+    audio.syncSettings(settings);
+  });
+  refs.musicEnabledInput.addEventListener('change', () => {
+    settings.musicEnabled = refs.musicEnabledInput.checked;
+    audio.syncSettings(settings);
+  });
+
   resetSettingsButton.addEventListener('click', () => {
     resetSettingsDraftToDefaults();
     settingsEditing = false;

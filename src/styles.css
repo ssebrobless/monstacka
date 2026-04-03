@@ -805,6 +805,7 @@ select {
 .monster-body.is-animated .monster-ripple-layer {
     animation: monster-ripple-twitch 0.3s linear infinite;
     will-change: transform;
+    filter: url('#monster-edge-ripple');
 }
 
 .monster-ripple-layer .ripple-frame-0,
@@ -840,7 +841,7 @@ select {
     height: 100%;
     display: block;
     pointer-events: none;
-    transform: scale(1.01);
+    transform: scale(1.04);
     transform-origin: center;
 }
 
@@ -884,6 +885,9 @@ select {
 .ghost {
     opacity: 0.28;
 }
+
+.trail-1 { opacity: 0.32; }
+.trail-2 { opacity: 0.16; }
 
 .modal {
     position: fixed;
@@ -1255,8 +1259,10 @@ button.secondary {
 }
 
 @keyframes ripple-cycle {
-    0%, 5% { opacity: 1; }
-    20%, 100% { opacity: 0; }
+    0% { opacity: 0.9; }
+    12% { opacity: 1; }
+    35% { opacity: 0.6; }
+    55%, 100% { opacity: 0; }
 }
 
 @keyframes monster-tongue-wag {

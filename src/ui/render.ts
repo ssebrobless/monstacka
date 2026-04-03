@@ -230,12 +230,27 @@ export function render(
       }
     });
 
-    getCells(state.active).forEach((cell, index) => {
+    const activeCellPositions = getCells(state.active);
+    activeCellPositions.forEach((cell, index) => {
       if (cell.y >= HIDDEN_ROWS) {
         rows[cell.y - HIDDEN_ROWS][cell.x] = state.active!.type;
         skinRows[cell.y - HIDDEN_ROWS][cell.x] = `${state.active!.type}:${state.active!.rotation}:${index}`;
       }
     });
+
+    // Comet trail: fading cells above the active piece
+    const activeXSet = new Set(activeCellPositions.map((c) => c.x));
+    for (const col of activeXSet) {
+      // Find the topmost active cell in this column
+      const topY = Math.min(...activeCellPositions.filter((c) => c.x === col).map((c) => c.y));
+      for (let trail = 1; trail <= 2; trail += 1) {
+        const ty = topY - trail;
+        if (ty < HIDDEN_ROWS || ty - HIDDEN_ROWS < 0) continue;
+        const row = ty - HIDDEN_ROWS;
+        if (rows[row][col]) continue; // don't overwrite occupied cells
+        rows[row][col] = `trail-${trail}-${state.active!.type}`;
+      }
+    }
   }
 
   const total = rows.length * COLS;
@@ -307,6 +322,15 @@ export function render(
       cell.className = 'cell';
       cell.replaceChildren();
       cell.classList.add('ghost', `piece-${value.replace('ghost-', '').toLowerCase()}`);
+      return;
+    }
+
+    if (value.startsWith('trail-')) {
+      const parts = value.split('-');
+      const trailLevel = parts[1];
+      const trailPiece = parts[2].toLowerCase();
+      cell.className = `cell trail-${trailLevel} piece-${trailPiece}`;
+      cell.replaceChildren();
       return;
     }
 

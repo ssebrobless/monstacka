@@ -60,8 +60,10 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 const RIPPLE_FRAME_COUNT = 4;
-const RIPPLE_AMPLITUDE = 1.5;
-const RIPPLE_FREQUENCY = 0.12;
+const RIPPLE_AMPLITUDE = 3.5;
+const RIPPLE_FREQUENCY = 0.10;
+const RIPPLE_SPREAD_RADIUS = 4;
+const RIPPLE_FALLOFF_DISTANCE = 6;
 
 interface EdgeData {
   imageData: ImageData;
@@ -124,13 +126,14 @@ function getEdgeData(source: HTMLCanvasElement): EdgeData {
   for (let y = 0; y < h; y += 1) {
     for (let x = 0; x < w; x += 1) {
       if (!edge[y * w + x]) continue;
-      for (let oy = -1; oy <= 1; oy += 1) {
-        for (let ox = -1; ox <= 1; ox += 1) {
+      for (let oy = -2; oy <= 2; oy += 1) {
+        for (let ox = -2; ox <= 2; ox += 1) {
           const sx = x + ox;
           const sy = y + oy;
           if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+          if (ox * ox + oy * oy > 5) continue;
           const si = sy * w + sx;
-          if (alpha[si]) expanded[si] = 1;
+          expanded[si] = 1;
         }
       }
     }
@@ -202,9 +205,9 @@ function createRippleFrameCanvas(
     const idx = p.y * w + p.x;
     dispX[idx] = p.nx * displacement;
     dispY[idx] = p.ny * displacement;
-    // Spread displacement to nearby expanded pixels with falloff
-    for (let oy = -2; oy <= 2; oy += 1) {
-      for (let ox = -2; ox <= 2; ox += 1) {
+    // Spread displacement to nearby expanded pixels with smooth cosine falloff
+    for (let oy = -RIPPLE_SPREAD_RADIUS; oy <= RIPPLE_SPREAD_RADIUS; oy += 1) {
+      for (let ox = -RIPPLE_SPREAD_RADIUS; ox <= RIPPLE_SPREAD_RADIUS; ox += 1) {
         if (!ox && !oy) continue;
         const sx = p.x + ox;
         const sy = p.y + oy;
@@ -212,9 +215,10 @@ function createRippleFrameCanvas(
         const si = sy * w + sx;
         if (!expanded[si]) continue;
         const dist = Math.sqrt(ox * ox + oy * oy);
-        const falloff = Math.max(0, 1 - dist / 3);
-        dispX[si] += p.nx * displacement * falloff * 0.5;
-        dispY[si] += p.ny * displacement * falloff * 0.5;
+        if (dist > RIPPLE_FALLOFF_DISTANCE) continue;
+        const falloff = 0.5 * (1 + Math.cos(Math.PI * dist / RIPPLE_FALLOFF_DISTANCE));
+        dispX[si] += p.nx * displacement * falloff * 0.6;
+        dispY[si] += p.ny * displacement * falloff * 0.6;
       }
     }
   }
@@ -388,8 +392,8 @@ function createMonsterBodyNode(
   artLayer.className = 'monster-art-layer';
   const rippleLayer = document.createElement('div');
   rippleLayer.className = 'monster-ripple-layer';
-  motion.appendChild(artLayer);
   motion.appendChild(rippleLayer);
+  motion.appendChild(artLayer);
   body.appendChild(motion);
 
   return { body, motion, artLayer, rippleLayer };

@@ -230,11 +230,30 @@ function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
+    image.decoding = 'async';
+    image.onload = () => {
+      if (typeof image.decode === 'function') {
+        image.decode().then(() => resolve(image)).catch(() => resolve(image));
+      } else {
+        resolve(image);
+      }
+    };
     image.onerror = reject;
     image.src = url;
   });
 }
+
+// Start preloading sprite sheets immediately on module load
+const preloadPromises = MONSTER_SHEET_URLS.map((url) => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'image';
+  link.href = url;
+  document.head.appendChild(link);
+  return loadImage(url);
+});
+let preloadedImages: HTMLImageElement[] | null = null;
+void Promise.all(preloadPromises).then((images) => { preloadedImages = images; }).catch(() => {});
 
 function isNearBlack(data: Uint8ClampedArray, offset: number): boolean {
   return data[offset + 3] > 0 && data[offset] < 12 && data[offset + 1] < 12 && data[offset + 2] < 12;
@@ -773,7 +792,7 @@ async function buildMonsterTiles(): Promise<void> {
   figures.clear();
   figureEyes.clear();
 
-  const images = await Promise.all(MONSTER_SHEET_URLS.map((url) => loadImage(url)));
+  const images = preloadedImages ?? await Promise.all(MONSTER_SHEET_URLS.map((url) => loadImage(url)));
   const frames = images.map((image) => createSourceFrame(image));
   const silhouetteMasks = new Map<PieceType, SilhouetteMask>();
 
