@@ -18,6 +18,7 @@ import {
   loadStorage,
   saveStorage,
   normalizeNickname,
+  clearLeaderboards,
   clearSavedRun,
   getSavedRun,
   qualifiesScoreRecord,
@@ -83,7 +84,8 @@ type SettingsFieldKey =
   | 'sfxVolume'
   | 'musicEnabled'
   | 'musicVolume'
-  | 'ditherEnabled';
+  | 'ditherEnabled'
+  | 'cleanLabels';
 
 type ControllerUiSurface =
   | 'none'
@@ -145,6 +147,22 @@ function init() {
   const audio = new AudioManager();
   audio.boot(settings);
   applyDitherOverlay(refs.ditherOverlay, settings.ditherEnabled);
+
+  function applyCleanLabels(enabled: boolean) {
+    const arcadeBtn = document.getElementById('startArcadeButton') as HTMLButtonElement;
+    const arcadeScoreBtn = homeRefs.leaderboardArcadeButton;
+    if (enabled) {
+      arcadeBtn.textContent = 'Standard';
+      arcadeBtn.classList.add('clean-label-overlay');
+      arcadeScoreBtn.textContent = 'STD';
+      arcadeScoreBtn.classList.add('clean-label-overlay');
+    } else {
+      arcadeBtn.textContent = '';
+      arcadeBtn.classList.remove('clean-label-overlay');
+      arcadeScoreBtn.textContent = '';
+      arcadeScoreBtn.classList.remove('clean-label-overlay');
+    }
+  }
 
   const homeScreen = document.getElementById('homeScreen')!;
   const gameShell = document.getElementById('gameShell')!;
@@ -347,6 +365,7 @@ function init() {
     'musicEnabled',
     'musicVolume',
     'ditherEnabled',
+    'cleanLabels',
   ];
 
   function getConnectedGamepad(): Gamepad | null {
@@ -396,6 +415,7 @@ function init() {
     refs.musicEnabledInput.checked = source.musicEnabled;
     refs.musicVolumeInput.value = String(source.musicVolume);
     refs.ditherEnabledInput.checked = source.ditherEnabled;
+    refs.cleanLabelsInput.checked = source.cleanLabels;
   }
 
   function resetSettingsDraftToDefaults() {
@@ -422,6 +442,8 @@ function init() {
         return refs.musicVolumeInput.closest('label');
       case 'ditherEnabled':
         return refs.ditherEnabledInput.closest('label');
+      case 'cleanLabels':
+        return refs.cleanLabelsInput.closest('label');
       default:
         return null;
     }
@@ -473,6 +495,8 @@ function init() {
       refs.musicEnabledInput.checked = !refs.musicEnabledInput.checked;
     } else if (field === 'ditherEnabled') {
       refs.ditherEnabledInput.checked = !refs.ditherEnabledInput.checked;
+    } else if (field === 'cleanLabels') {
+      refs.cleanLabelsInput.checked = !refs.cleanLabelsInput.checked;
     }
   }
 
@@ -865,6 +889,9 @@ function init() {
   }
 
   function openSettingsModal() {
+    if (appPhase === 'playing') {
+      pauseRun();
+    }
     stopBindingCapture();
     populateSettingsInputs(settings);
     showSettingsMainView();
@@ -887,7 +914,9 @@ function init() {
     settings.musicEnabled = refs.musicEnabledInput.checked;
     settings.musicVolume = Math.max(0, Math.min(100, Number(refs.musicVolumeInput.value || SETTINGS_DEFAULTS.musicVolume)));
     settings.ditherEnabled = refs.ditherEnabledInput.checked;
+    settings.cleanLabels = refs.cleanLabelsInput.checked;
     applyDitherOverlay(refs.ditherOverlay, settings.ditherEnabled);
+    applyCleanLabels(settings.cleanLabels);
     state.trainingFeedback = settings.trainingFeedback;
     saveStorage(storage);
     audio.syncSettings(settings);
@@ -1616,6 +1645,7 @@ function init() {
   }
 
   applyFixedArtboardLayout();
+  applyCleanLabels(settings.cleanLabels);
   handleWindowResize();
   window.addEventListener('resize', handleWindowResize);
   installDebugApi();
@@ -1830,6 +1860,12 @@ function init() {
     resetSettingsDraftToDefaults();
     settingsEditing = false;
     syncControllerFocusVisuals();
+  });
+
+  const clearScoresButton = document.getElementById('clearScoresButton') as HTMLButtonElement;
+  clearScoresButton.addEventListener('click', () => {
+    clearLeaderboards(storage);
+    renderCurrentView();
   });
 
   nicknameInput.addEventListener('input', () => {

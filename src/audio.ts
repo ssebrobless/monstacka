@@ -49,9 +49,6 @@ export class AudioManager {
 
     this.syncSettings(settings);
 
-    if (!this.monsterBuffersLoaded && !this.monsterSoundsLoading) {
-      void this.loadMonsterSounds();
-    }
   }
 
   syncSettings(settings: Settings): void {
@@ -234,17 +231,20 @@ export class AudioManager {
     this.ensureReady(settings);
     if (!this.context || !this.sfxGain || !settings.sfxEnabled) return;
 
-    // Use full neutral sound for preview (no time limit)
+    // Play a short segment (~3s max) of the neutral sound, cycling halves
     const buffer = this.monsterBuffers.get(`${pieceType}:neutral:${this.neutralIndex[pieceType] % MONSTER_AUDIO_URLS[pieceType].neutral.length}`);
     if (buffer) {
       this.stopMonsterNeutral();
       const source = this.context.createBufferSource();
       source.buffer = buffer;
+      const segmentDuration = Math.min(3, buffer.duration / 2);
+      const segmentIndex = this.neutralIndex[pieceType] % 2;
+      const offset = segmentIndex * segmentDuration;
       const gain = this.context.createGain();
       gain.gain.value = 1;
       source.connect(gain);
       gain.connect(this.sfxGain);
-      source.start(0);
+      source.start(0, offset, segmentDuration);
       source.onended = () => {
         if (this.activeNeutralSource === source) {
           this.activeNeutralSource = null;

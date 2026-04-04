@@ -75,6 +75,7 @@ export interface Settings {
   musicVolume: number;
   trainingFeedback: TrainingFeedbackMode;
   ditherEnabled: boolean;
+  cleanLabels: boolean;
   controls: ControlBindings;
   gamepadControls: ControlBindings;
 }

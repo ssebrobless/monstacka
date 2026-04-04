@@ -41,6 +41,7 @@ export interface DomRefs {
   musicEnabledInput: HTMLInputElement;
   musicVolumeInput: HTMLInputElement;
   ditherEnabledInput: HTMLInputElement;
+  cleanLabelsInput: HTMLInputElement;
   ditherOverlay: HTMLDivElement;
 }
 
@@ -103,6 +104,7 @@ export function getDomRefs(): DomRefs {
     musicEnabledInput: document.getElementById('musicEnabledInput') as HTMLInputElement,
     musicVolumeInput: document.getElementById('musicVolumeInput') as HTMLInputElement,
     ditherEnabledInput: document.getElementById('ditherEnabledInput') as HTMLInputElement,
+    cleanLabelsInput: document.getElementById('cleanLabelsInput') as HTMLInputElement,
     ditherOverlay: document.getElementById('ditherOverlay') as HTMLDivElement,
   };
 }

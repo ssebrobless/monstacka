@@ -93,7 +93,8 @@ export const SETTINGS_DEFAULTS: Settings = {
   musicEnabled: true,
   musicVolume: 35,
   trainingFeedback: 'show',
-  ditherEnabled: false,
+  ditherEnabled: true,
+  cleanLabels: true,
   controls: { ...DEFAULT_CONTROLS },
   gamepadControls: { ...DEFAULT_GAMEPAD_CONTROLS },
 };
