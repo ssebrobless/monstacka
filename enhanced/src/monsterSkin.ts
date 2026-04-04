@@ -230,11 +230,30 @@ function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
+    image.decoding = 'async';
+    image.onload = () => {
+      if (typeof image.decode === 'function') {
+        image.decode().then(() => resolve(image)).catch(() => resolve(image));
+      } else {
+        resolve(image);
+      }
+    };
     image.onerror = reject;
     image.src = url;
   });
 }
+
+// Start preloading sprite sheets immediately on module load
+const preloadPromises = MONSTER_SHEET_URLS.map((url) => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'image';
+  link.href = url;
+  document.head.appendChild(link);
+  return loadImage(url);
+});
+let preloadedImages: HTMLImageElement[] | null = null;
+void Promise.all(preloadPromises).then((images) => { preloadedImages = images; }).catch(() => {});
 
 function isNearBlack(data: Uint8ClampedArray, offset: number): boolean {
   return data[offset + 3] > 0 && data[offset] < 12 && data[offset + 1] < 12 && data[offset + 2] < 12;
@@ -724,17 +743,11 @@ function neutralizeEyeRegions(
     const neutralized = cloneCanvas(frameCanvas);
     const ctx = neutralized.getContext('2d')!;
     for (const eye of eyePlacements) {
-      ctx.drawImage(
-        reference,
-        eye.x,
-        eye.y,
-        eye.width,
-        eye.height,
-        eye.x,
-        eye.y,
-        eye.width,
-        eye.height,
-      );
+      const mx = Math.max(0, eye.x - 1);
+      const my = Math.max(0, eye.y - 1);
+      const mw = Math.min(reference.width - mx, eye.width + 2);
+      const mh = Math.min(reference.height - my, eye.height + 2);
+      ctx.drawImage(reference, mx, my, mw, mh, mx, my, mw, mh);
     }
     return neutralized;
   });
@@ -773,7 +786,7 @@ async function buildMonsterTiles(): Promise<void> {
   figures.clear();
   figureEyes.clear();
 
-  const images = await Promise.all(MONSTER_SHEET_URLS.map((url) => loadImage(url)));
+  const images = preloadedImages ?? await Promise.all(MONSTER_SHEET_URLS.map((url) => loadImage(url)));
   const frames = images.map((image) => createSourceFrame(image));
   const silhouetteMasks = new Map<PieceType, SilhouetteMask>();
 
@@ -813,14 +826,17 @@ async function buildMonsterTiles(): Promise<void> {
     });
 
     for (let rotation = 0; rotation < 4; rotation += 1) {
-      const turns = ((rotation - spec.baseRotation) % 4 + 4) % 4;
       const definition = DEFINITIONS[pieceType][rotation];
+      const baseDefinition = DEFINITIONS[pieceType][spec.baseRotation];
+      // Skip rotation when the definition is identical to base (e.g. O-piece)
+      const definitionsMatch = definition.length === baseDefinition.length &&
+        definition.every((cell, i) => cell.x === baseDefinition[i].x && cell.y === baseDefinition[i].y);
+      const turns = definitionsMatch ? 0 : ((rotation - spec.baseRotation) % 4 + 4) % 4;
       const rawRotatedCanvases = baseCanvases.map((canvas) =>
         retainConnectedPiece(rotateCanvas(canvas, turns), definition));
       const eyePlacements = buildEyePlacements(pieceType, rotation);
       const bodyCanvases = eyePlacements.length
-        ? neutralizeEyeRegions(rawRotatedCanvases, eyePlacements).map((canvas) =>
-          retainConnectedPiece(canvas, definition))
+        ? neutralizeEyeRegions(rawRotatedCanvases, eyePlacements)
         : rawRotatedCanvases;
       const figureKey = `${pieceType}:${rotation}`;
 
@@ -869,6 +885,10 @@ async function buildMonsterTiles(): Promise<void> {
       });
     }
   }
+}
+
+export function isMonsterSkinReady(): boolean {
+  return tiles.size > 0 && figures.size > 0;
 }
 
 export function prepareMonsterSkin(onReady?: () => void): Promise<void> {

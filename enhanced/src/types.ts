@@ -52,6 +52,7 @@ export interface GameState {
   countdownUntil: number;
   lastGravity: number;
   lockDeadline: number;
+  lockResets: number;
   lastLockAt: number;
   lastLineClearAt: number;
   trainingFeedback: TrainingFeedbackMode;
@@ -74,6 +75,8 @@ export interface Settings {
   musicEnabled: boolean;
   musicVolume: number;
   trainingFeedback: TrainingFeedbackMode;
+  ditherEnabled: boolean;
+  cleanLabels: boolean;
   controls: ControlBindings;
   gamepadControls: ControlBindings;
 }
@@ -107,6 +110,7 @@ export interface SavedRunState {
   score: number;
   pieces: number;
   trainingFeedback: TrainingFeedbackMode;
+  lockResets: number;
   currentPieceInputs: number;
   trainingFaults: number;
   trainingPerfectStreak: number;

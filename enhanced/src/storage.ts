@@ -218,3 +218,9 @@ export function clearSavedRun(data: StorageData, mode: GameMode): void {
   data.savedRuns[mode] = null;
   saveStorage(data);
 }
+
+export function clearLeaderboards(data: StorageData): void {
+  data.sprint = [];
+  data.score = [];
+  saveStorage(data);
+}

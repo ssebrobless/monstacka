@@ -89,7 +89,7 @@ const MONSTOS_PROFILES: Record<PieceType, MonstosProfile> = {
   L: {
     pieceType: 'L',
     name: 'GALIFFAMBOS',
-    lore: 'thee who listens. not a step is taken without being a announced first.the oldest of the refined ones. we considered replacing the eye once it went blind. but the when the additional ears came in we were amazed at how innate its ability to use echolocation was. so the eye remained... i- ... we though it was... funny.',
+    lore: "It will definitely hear you before it sees you... the larger of its eyes developed an infection; Antibiotics proved effective, but irreperable damage had already been done. Lower eyelid had to be surgically removed and the eye has lost all function, but I did not see reason to remove it. I'd rather not risk having to make another.",
     previewRotation: 1,
     voiceHint: 'A twitchy ear wiggle.',
   },

@@ -1,4 +1,4 @@
-import { DEFINITIONS } from '../constants';
+import { DEFINITIONS, PIECE_COLORS } from '../constants';
 import {
   getMonsterEyeFrame,
   getMonsterFigureBoxSize,
@@ -59,113 +59,303 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
-function createMonsterEdgeOutlineNode(source: HTMLCanvasElement): HTMLCanvasElement | null {
+const RIPPLE_FRAME_COUNT = 4;
+const RIPPLE_AMPLITUDE = 8;
+const RIPPLE_FREQUENCY = 0.04;
+const RIPPLE_TUCK_DEPTH = 2;
+const RIPPLE_EDGE_FEATHER = 1.8;
+const RIPPLE_SHADOW_WIDTH = 1.4;
+const RIPPLE_SHADOW_OPACITY = 0.35;
+const RIPPLE_PAD = 10;
+
+interface EdgeData {
+  imageData: ImageData;
+  alpha: Uint8Array;
+  edge: Uint8Array;
+  expanded: Uint8Array;
+  edgePixels: Array<{ x: number; y: number; nx: number; ny: number; arc: number }>;
+  width: number;
+  height: number;
+  empty: boolean;
+}
+
+const edgeDataCache = new WeakMap<HTMLCanvasElement, EdgeData>();
+
+function getEdgeData(source: HTMLCanvasElement): EdgeData {
+  const cached = edgeDataCache.get(source);
+  if (cached) return cached;
+
+  const w = source.width;
+  const h = source.height;
   const sourceCtx = source.getContext('2d', { willReadFrequently: true });
   if (!sourceCtx) {
-    return null;
+    const empty: EdgeData = { imageData: new ImageData(1, 1), alpha: new Uint8Array(0), edge: new Uint8Array(0), expanded: new Uint8Array(0), edgePixels: [], width: w, height: h, empty: true };
+    edgeDataCache.set(source, empty);
+    return empty;
   }
 
-  const imageData = sourceCtx.getImageData(0, 0, source.width, source.height);
-  const alpha = new Uint8Array(source.width * source.height);
-  const edge = new Uint8Array(source.width * source.height);
-  const expanded = new Uint8Array(source.width * source.height);
+  const imageData = sourceCtx.getImageData(0, 0, w, h);
+  const total = w * h;
+  const alpha = new Uint8Array(total);
+  const edge = new Uint8Array(total);
+  const expanded = new Uint8Array(total);
 
-  for (let y = 0; y < source.height; y += 1) {
-    for (let x = 0; x < source.width; x += 1) {
-      const index = y * source.width + x;
-      alpha[index] = imageData.data[index * 4 + 3] > 8 ? 1 : 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      alpha[y * w + x] = imageData.data[(y * w + x) * 4 + 3] > 8 ? 1 : 0;
     }
   }
 
-  for (let y = 0; y < source.height; y += 1) {
-    for (let x = 0; x < source.width; x += 1) {
-      const index = y * source.width + x;
-      if (!alpha[index]) {
-        continue;
-      }
-
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const idx = y * w + x;
+      if (!alpha[idx]) continue;
       let isEdge = false;
-      for (let offsetY = -1; offsetY <= 1 && !isEdge; offsetY += 1) {
-        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
-          if (!offsetX && !offsetY) {
-            continue;
-          }
-          const sampleX = x + offsetX;
-          const sampleY = y + offsetY;
-          if (
-            sampleX < 0 ||
-            sampleY < 0 ||
-            sampleX >= source.width ||
-            sampleY >= source.height ||
-            !alpha[sampleY * source.width + sampleX]
-          ) {
+      for (let oy = -1; oy <= 1 && !isEdge; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          if (!ox && !oy) continue;
+          const sx = x + ox;
+          const sy = y + oy;
+          if (sx < 0 || sy < 0 || sx >= w || sy >= h || !alpha[sy * w + sx]) {
             isEdge = true;
             break;
           }
         }
       }
-
-      if (isEdge) {
-        edge[index] = 1;
-      }
+      if (isEdge) edge[idx] = 1;
     }
   }
 
-  for (let y = 0; y < source.height; y += 1) {
-    for (let x = 0; x < source.width; x += 1) {
-      const index = y * source.width + x;
-      if (!edge[index]) {
-        continue;
-      }
-
-      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
-        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
-          const sampleX = x + offsetX;
-          const sampleY = y + offsetY;
-          if (
-            sampleX < 0 ||
-            sampleY < 0 ||
-            sampleX >= source.width ||
-            sampleY >= source.height
-          ) {
-            continue;
-          }
-
-          const sampleIndex = sampleY * source.width + sampleX;
-          if (alpha[sampleIndex]) {
-            expanded[sampleIndex] = 1;
-          }
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (!edge[y * w + x]) continue;
+      for (let oy = -2; oy <= 2; oy += 1) {
+        for (let ox = -2; ox <= 2; ox += 1) {
+          const sx = x + ox;
+          const sy = y + oy;
+          if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+          if (ox * ox + oy * oy > 5) continue;
+          const si = sy * w + sx;
+          expanded[si] = 1;
         }
       }
     }
   }
 
-  const canvas = document.createElement('canvas');
-  canvas.className = 'monster-ripple-art';
-  canvas.width = source.width;
-  canvas.height = source.height;
-  const ctx = canvas.getContext('2d')!;
-  const output = ctx.createImageData(source.width, source.height);
-  let visiblePixels = 0;
-
-  for (let index = 0; index < expanded.length; index += 1) {
-    if (!expanded[index]) {
-      continue;
+  // Compute edge pixel normals (pointing outward from interior)
+  const edgePixels: EdgeData['edgePixels'] = [];
+  let arcLen = 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (!edge[y * w + x]) continue;
+      // Normal = direction away from alpha interior, computed from gradient of alpha
+      let gx = 0;
+      let gy = 0;
+      for (let oy = -1; oy <= 1; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          if (!ox && !oy) continue;
+          const sx = x + ox;
+          const sy = y + oy;
+          const a = (sx >= 0 && sy >= 0 && sx < w && sy < h) ? alpha[sy * w + sx] : 0;
+          gx -= ox * a;
+          gy -= oy * a;
+        }
+      }
+      const len = Math.sqrt(gx * gx + gy * gy) || 1;
+      edgePixels.push({ x, y, nx: gx / len, ny: gy / len, arc: arcLen });
+      arcLen += 1;
     }
-    visiblePixels += 1;
-    const sourceOffset = index * 4;
-    output.data[sourceOffset] = imageData.data[sourceOffset];
-    output.data[sourceOffset + 1] = imageData.data[sourceOffset + 1];
-    output.data[sourceOffset + 2] = imageData.data[sourceOffset + 2];
-    output.data[sourceOffset + 3] = imageData.data[sourceOffset + 3];
   }
 
-  if (!visiblePixels) {
-    return null;
+  // Normalize arc to 0..2π for sinusoidal displacement
+  if (edgePixels.length > 1) {
+    const maxArc = edgePixels[edgePixels.length - 1].arc;
+    for (const p of edgePixels) {
+      p.arc = (p.arc / maxArc) * Math.PI * 2;
+    }
+  }
+
+  let hasVisible = false;
+  for (let i = 0; i < expanded.length; i += 1) {
+    if (expanded[i]) { hasVisible = true; break; }
+  }
+
+  const data: EdgeData = { imageData, alpha, edge, expanded, edgePixels, width: w, height: h, empty: !hasVisible };
+  edgeDataCache.set(source, data);
+  return data;
+}
+
+/** Simple deterministic hash → [0,1) for per-pixel phase randomization */
+function hashFloat(n: number): number {
+  let x = ((n + 1) * 2654435761) | 0;
+  x = ((x >>> 16) ^ x) * 0x45d9f3b | 0;
+  x = ((x >>> 16) ^ x) * 0x45d9f3b | 0;
+  return (((x >>> 16) ^ x) >>> 0) / 0xffffffff;
+}
+
+function parseHexColor(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [
+    parseInt(h.substring(0, 2), 16),
+    parseInt(h.substring(2, 4), 16),
+    parseInt(h.substring(4, 6), 16),
+  ];
+}
+
+function createRippleFrameCanvas(
+  data: EdgeData,
+  frameIndex: number,
+  pieceColor: [number, number, number],
+): HTMLCanvasElement {
+  const { imageData, alpha, edgePixels, width: w, height: h } = data;
+  const pw = w + RIPPLE_PAD * 2;
+  const ph = h + RIPPLE_PAD * 2;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'monster-ripple-art';
+  canvas.classList.add(`ripple-frame-${frameIndex}`);
+  canvas.width = pw;
+  canvas.height = ph;
+  canvas.style.left = `${-RIPPLE_PAD}px`;
+  canvas.style.top = `${-RIPPLE_PAD}px`;
+  canvas.style.width = `${pw}px`;
+  canvas.style.height = `${ph}px`;
+  const ctx = canvas.getContext('2d')!;
+  const output = ctx.createImageData(pw, ph);
+
+  const phaseOffset = (frameIndex / RIPPLE_FRAME_COUNT) * Math.PI * 2;
+  const [cr, cg, cb] = pieceColor;
+
+  // Step 1: Compute protrusion envelope for each edge pixel (positive half only = bumps)
+  // Each edge pixel gets a position-based random phase so bubbles fire independently
+  const protrusions = new Float32Array(edgePixels.length);
+  for (let i = 0; i < edgePixels.length; i += 1) {
+    const p = edgePixels[i];
+    const localPhase = hashFloat(p.x * 31 + p.y * 97) * Math.PI * 2;
+    const raw = Math.sin(p.arc * RIPPLE_FREQUENCY * w + phaseOffset + localPhase);
+    protrusions[i] = Math.max(0, raw) * RIPPLE_AMPLITUDE;
+  }
+
+  // Step 2: Build nearest-edge lookup for pixels in the padded canvas
+  // For efficiency, only process pixels within max range of any edge pixel
+  const maxRange = RIPPLE_AMPLITUDE + RIPPLE_TUCK_DEPTH + 2;
+  const nearestIdx = new Int32Array(pw * ph).fill(-1);
+  const nearestDist = new Float32Array(pw * ph).fill(1e9);
+
+  for (let ei = 0; ei < edgePixels.length; ei += 1) {
+    const ep = edgePixels[ei];
+    const epx = ep.x + RIPPLE_PAD;
+    const epy = ep.y + RIPPLE_PAD;
+    const r = Math.ceil(maxRange);
+    for (let oy = -r; oy <= r; oy += 1) {
+      for (let ox = -r; ox <= r; ox += 1) {
+        const px = epx + ox;
+        const py = epy + oy;
+        if (px < 0 || py < 0 || px >= pw || py >= ph) continue;
+        const d = Math.sqrt(ox * ox + oy * oy);
+        if (d > maxRange) continue;
+        const pi = py * pw + px;
+        if (d < nearestDist[pi]) {
+          nearestDist[pi] = d;
+          nearestIdx[pi] = ei;
+        }
+      }
+    }
+  }
+
+  // Step 3: Render filled protrusions
+  for (let py = 0; py < ph; py += 1) {
+    for (let px = 0; px < pw; px += 1) {
+      const pi = py * pw + px;
+      const ei = nearestIdx[pi];
+      if (ei < 0) continue;
+
+      const ep = edgePixels[ei];
+      const protrusionMax = protrusions[ei];
+      if (protrusionMax < 0.5) continue; // Skip negligible bumps
+
+      // Compute signed distance along normal (positive = outward from sprite)
+      const dx = (px - RIPPLE_PAD) - ep.x;
+      const dy = (py - RIPPLE_PAD) - ep.y;
+      const signedDist = dx * ep.nx + dy * ep.ny;
+
+      // Skip if outside the protrusion range
+      if (signedDist > protrusionMax) continue;
+      if (signedDist < -RIPPLE_TUCK_DEPTH) continue;
+
+      // Skip pixels that are deep inside the sprite (don't paint over core art)
+      const srcX = px - RIPPLE_PAD;
+      const srcY = py - RIPPLE_PAD;
+      if (srcX >= 0 && srcY >= 0 && srcX < w && srcY < h && alpha[srcY * w + srcX]) {
+        // Only allow tuck zone pixels that are right at the edge
+        if (signedDist < -0.5) continue;
+      }
+
+      // Compute perpendicular distance from the normal line for width falloff
+      const perpDist = Math.abs(dx * (-ep.ny) + dy * ep.nx);
+      // Bubble width tapers: widest at base, narrows at tip
+      const normalizedDist = signedDist / Math.max(protrusionMax, 0.1);
+      const bubbleHalfWidth = 4.0 * (1 - normalizedDist * normalizedDist); // Parabolic taper
+      if (perpDist > bubbleHalfWidth) continue;
+
+      // Compute alpha
+      let pixelAlpha = 220;
+
+      // Smooth feathered edge at the protrusion tip
+      const distFromTip = protrusionMax - signedDist;
+      if (distFromTip < RIPPLE_EDGE_FEATHER) {
+        pixelAlpha *= 0.5 * (1 + Math.cos(Math.PI * (1 - distFromTip / RIPPLE_EDGE_FEATHER)));
+      }
+
+      // Width-based feathering (smooth lateral edges)
+      if (perpDist > bubbleHalfWidth - 0.8) {
+        const edgeFade = (bubbleHalfWidth - perpDist) / 0.8;
+        pixelAlpha *= Math.max(0, edgeFade);
+      }
+
+      // Tuck zone fade
+      if (signedDist < 0) {
+        pixelAlpha *= 1 - (-signedDist / RIPPLE_TUCK_DEPTH);
+      }
+
+      if (pixelAlpha < 1) continue;
+
+      const oi = pi * 4;
+
+      // Shadow along outer edge of protrusion
+      const isShadowZone = distFromTip < RIPPLE_SHADOW_WIDTH && signedDist > 0;
+      const isDitherPixel = (px + py) % 2 === 0;
+
+      if (isShadowZone && isDitherPixel) {
+        // Dithered shadow line
+        const shadowStrength = RIPPLE_SHADOW_OPACITY * (1 - distFromTip / RIPPLE_SHADOW_WIDTH);
+        output.data[oi] = cr * (1 - shadowStrength) * 0.3;
+        output.data[oi + 1] = cg * (1 - shadowStrength) * 0.3;
+        output.data[oi + 2] = cb * (1 - shadowStrength) * 0.3;
+        output.data[oi + 3] = Math.min(255, pixelAlpha * 1.2);
+      } else {
+        output.data[oi] = cr;
+        output.data[oi + 1] = cg;
+        output.data[oi + 2] = cb;
+        output.data[oi + 3] = Math.min(255, pixelAlpha);
+      }
+    }
   }
 
   ctx.putImageData(output, 0, 0);
   return canvas;
+}
+
+function createMonsterRippleFrames(source: HTMLCanvasElement, pieceType: string): HTMLCanvasElement[] {
+  const data = getEdgeData(source);
+  if (data.empty) return [];
+
+  const colorHex = PIECE_COLORS[pieceType as PieceType] || '#ffffff';
+  const color = parseHexColor(colorHex);
+  const frames: HTMLCanvasElement[] = [];
+  for (let f = 0; f < RIPPLE_FRAME_COUNT; f += 1) {
+    frames.push(createRippleFrameCanvas(data, f, color));
+  }
+  return frames;
 }
 
 function createMonsterOverlayNode(
@@ -285,8 +475,8 @@ function createMonsterBodyNode(
   artLayer.className = 'monster-art-layer';
   const rippleLayer = document.createElement('div');
   rippleLayer.className = 'monster-ripple-layer';
-  motion.appendChild(artLayer);
   motion.appendChild(rippleLayer);
+  motion.appendChild(artLayer);
   body.appendChild(motion);
 
   return { body, motion, artLayer, rippleLayer };
@@ -334,9 +524,8 @@ export function populateMonsterCell(
     motionSeed,
   );
   artLayer.appendChild(createMonsterArtNode(tile.canvas));
-  const outlineNode = createMonsterEdgeOutlineNode(tile.canvas);
-  if (outlineNode) {
-    rippleLayer.appendChild(outlineNode);
+  for (const frame of createMonsterRippleFrames(tile.canvas, pieceType)) {
+    rippleLayer.appendChild(frame);
   }
   for (const eye of tile.eyes) {
     const eyeFrame = getMonsterEyeFrame(eye, options.now, animate);
@@ -409,9 +598,8 @@ export function populateMonsterFigure(
       );
       body.classList.add('monster-figure-body');
       artLayer.appendChild(createMonsterArtNode(figureArt));
-      const outlineNode = createMonsterEdgeOutlineNode(figureArt);
-      if (outlineNode) {
-        rippleLayer.appendChild(outlineNode);
+      for (const frame of createMonsterRippleFrames(figureArt, pieceType)) {
+        rippleLayer.appendChild(frame);
       }
       const cellPx = figureArt.width / widthCells;
       const cropOffsetX = minX * cellPx;
@@ -559,6 +747,7 @@ export function populateMonsterBoardFigure(
   container.replaceChildren();
 
   if (!figureArt) {
+    // Sprites not loaded yet — board cells show colored fallback via piece-* class
     return;
   }
 
@@ -574,9 +763,8 @@ export function populateMonsterBoardFigure(
   );
   body.classList.add('monster-figure-body');
   artLayer.appendChild(createMonsterArtNode(figureArt));
-  const outlineNode = createMonsterEdgeOutlineNode(figureArt);
-  if (outlineNode) {
-    rippleLayer.appendChild(outlineNode);
+  for (const frame of createMonsterRippleFrames(figureArt, pieceType)) {
+    rippleLayer.appendChild(frame);
   }
 
   const cellPx = figureArt.width / widthCells;

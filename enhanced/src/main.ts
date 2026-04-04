@@ -18,6 +18,7 @@ import {
   loadStorage,
   saveStorage,
   normalizeNickname,
+  clearLeaderboards,
   clearSavedRun,
   getSavedRun,
   qualifiesScoreRecord,
@@ -38,7 +39,7 @@ import {
   type BindingCaptureTarget,
 } from './input/keyboard';
 import { assignBinding, formatBindingLabel, keyboardToken, mouseToken } from './input/bindings';
-import { getDomRefs, render } from './ui/render';
+import { getDomRefs, render, resetRenderCache } from './ui/render';
 import {
   createHomeMenuState,
   cycleHomeMonstos,
@@ -50,7 +51,8 @@ import {
 import { applyRegionMap, GAME_REGIONS, HOME_REGIONS } from './ui/regionMap';
 import { prepareMonsterSkin } from './monsterSkin';
 import { computeArtboardScale, computeBoardFit } from './layout';
-import type { AppPhase, ControlAction, ControlBindingSource, GameMode } from './types';
+import { applyDitherOverlay } from './ui/dither';
+import type { AppPhase, ControlAction, ControlBindingSource, GameMode, PieceType } from './types';
 
 interface PendingRecord {
   mode: GameMode;
@@ -81,7 +83,9 @@ type SettingsFieldKey =
   | 'sfxEnabled'
   | 'sfxVolume'
   | 'musicEnabled'
-  | 'musicVolume';
+  | 'musicVolume'
+  | 'ditherEnabled'
+  | 'cleanLabels';
 
 type ControllerUiSurface =
   | 'none'
@@ -130,7 +134,7 @@ declare global {
     }
   }
 
-function init() {
+async function init() {
   const storage = loadStorage();
   const settings = storage.settings;
   const state = createGameState(DEFAULT_MODE);
@@ -142,6 +146,27 @@ function init() {
   const homeState = createHomeMenuState();
   const audio = new AudioManager();
   audio.boot(settings);
+  applyDitherOverlay(refs.ditherOverlay, settings.ditherEnabled);
+
+  function applyCleanLabels(enabled: boolean) {
+    const arcadeBtn = document.getElementById('startArcadeButton') as HTMLButtonElement;
+    const arcadeScoreBtn = homeRefs.leaderboardArcadeButton;
+    if (enabled) {
+      arcadeBtn.textContent = 'Standard';
+      arcadeBtn.classList.add('clean-label-overlay');
+      arcadeBtn.setAttribute('aria-label', 'Start Standard mode');
+      arcadeScoreBtn.textContent = 'Standard';
+      arcadeScoreBtn.classList.add('clean-label-overlay', 'clean-label-score');
+      arcadeScoreBtn.setAttribute('aria-label', 'Show Standard leaderboard');
+    } else {
+      arcadeBtn.textContent = '';
+      arcadeBtn.classList.remove('clean-label-overlay');
+      arcadeBtn.setAttribute('aria-label', 'Start OG Bubba Mode');
+      arcadeScoreBtn.textContent = '';
+      arcadeScoreBtn.classList.remove('clean-label-overlay', 'clean-label-score');
+      arcadeScoreBtn.setAttribute('aria-label', 'Show OGBM leaderboard');
+    }
+  }
 
   const homeScreen = document.getElementById('homeScreen')!;
   const gameShell = document.getElementById('gameShell')!;
@@ -195,6 +220,7 @@ function init() {
   let lastLockSoundAt = 0;
   let lastLineClearSoundAt = 0;
   let gameOverSounded = false;
+  let lastActiveType: string = '';
   let lastCountdownMarker = -1;
   let monsterSkinReady = false;
   let lastMenuPreviewFrameAt = 0;
@@ -342,6 +368,8 @@ function init() {
     'sfxVolume',
     'musicEnabled',
     'musicVolume',
+    'ditherEnabled',
+    'cleanLabels',
   ];
 
   function getConnectedGamepad(): Gamepad | null {
@@ -390,6 +418,8 @@ function init() {
     refs.sfxVolumeInput.value = String(source.sfxVolume);
     refs.musicEnabledInput.checked = source.musicEnabled;
     refs.musicVolumeInput.value = String(source.musicVolume);
+    refs.ditherEnabledInput.checked = source.ditherEnabled;
+    refs.cleanLabelsInput.checked = source.cleanLabels;
   }
 
   function resetSettingsDraftToDefaults() {
@@ -414,6 +444,10 @@ function init() {
         return refs.musicEnabledInput.closest('label');
       case 'musicVolume':
         return refs.musicVolumeInput.closest('label');
+      case 'ditherEnabled':
+        return refs.ditherEnabledInput.closest('label');
+      case 'cleanLabels':
+        return refs.cleanLabelsInput.closest('label');
       default:
         return null;
     }
@@ -463,6 +497,10 @@ function init() {
       refs.sfxEnabledInput.checked = !refs.sfxEnabledInput.checked;
     } else if (field === 'musicEnabled') {
       refs.musicEnabledInput.checked = !refs.musicEnabledInput.checked;
+    } else if (field === 'ditherEnabled') {
+      refs.ditherEnabledInput.checked = !refs.ditherEnabledInput.checked;
+    } else if (field === 'cleanLabels') {
+      refs.cleanLabelsInput.checked = !refs.cleanLabelsInput.checked;
     }
   }
 
@@ -855,6 +893,9 @@ function init() {
   }
 
   function openSettingsModal() {
+    if (appPhase === 'playing') {
+      pauseRun();
+    }
     stopBindingCapture();
     populateSettingsInputs(settings);
     showSettingsMainView();
@@ -876,6 +917,10 @@ function init() {
     settings.sfxVolume = Math.max(0, Math.min(100, Number(refs.sfxVolumeInput.value || SETTINGS_DEFAULTS.sfxVolume)));
     settings.musicEnabled = refs.musicEnabledInput.checked;
     settings.musicVolume = Math.max(0, Math.min(100, Number(refs.musicVolumeInput.value || SETTINGS_DEFAULTS.musicVolume)));
+    settings.ditherEnabled = refs.ditherEnabledInput.checked;
+    settings.cleanLabels = refs.cleanLabelsInput.checked;
+    applyDitherOverlay(refs.ditherOverlay, settings.ditherEnabled);
+    applyCleanLabels(settings.cleanLabels);
     state.trainingFeedback = settings.trainingFeedback;
     saveStorage(storage);
     audio.syncSettings(settings);
@@ -1058,16 +1103,19 @@ function init() {
   }
 
   function transitionTo(nextPhase: AppPhase, nextMode?: GameMode) {
+    resetRenderCache();
     switch (nextPhase) {
       case 'menu':
         clearHorizontalRepeat(input);
         closeRecordModal();
         closeResumeModal();
         closeSettingsModal();
+        audio.stopMonsterNeutral();
         doReset(state.mode);
         showHomeScreen();
         lastMenuPreviewFrameAt = 0;
         pausedAt = 0;
+        lastActiveType = '';
         homeControllerFocus = 'arcade';
         break;
       case 'countdown':
@@ -1083,6 +1131,10 @@ function init() {
         state.startTime = state.countdownUntil;
         state.lastGravity = state.startTime;
         pausedAt = 0;
+        lastActiveType = state.active?.type ?? '';
+        if (lastActiveType) {
+          audio.playMonsterNeutral(lastActiveType as PieceType, settings);
+        }
         break;
       case 'paused':
         pausedControllerFocus = 'settings';
@@ -1243,6 +1295,8 @@ function init() {
     }
 
     pausedAt = now;
+    state.completedTime = now;
+    audio.stopMonsterNeutral();
     appPhase = 'paused';
     pausedControllerFocus = 'settings';
     renderCurrentView(now);
@@ -1263,7 +1317,11 @@ function init() {
     if (state.lockDeadline) {
       state.lockDeadline += pausedDuration;
     }
+    state.completedTime = 0;
     pausedAt = 0;
+    if (state.active) {
+      audio.playMonsterNeutral(state.active.type, settings);
+    }
     appPhase = 'playing';
     renderCurrentView(now);
   }
@@ -1591,13 +1649,14 @@ function init() {
   }
 
   applyFixedArtboardLayout();
+  applyCleanLabels(settings.cleanLabels);
   handleWindowResize();
   window.addEventListener('resize', handleWindowResize);
   installDebugApi();
-  void prepareMonsterSkin(() => {
-    monsterSkinReady = true;
-    renderCurrentView();
-  });
+  await prepareMonsterSkin();
+  monsterSkinReady = true;
+  resetRenderCache();
+  void audio.loadMonsterSounds();
 
   const gameplayInputContext = {
     state,
@@ -1710,6 +1769,7 @@ function init() {
   quitGameButtonGame.addEventListener('click', quitGame);
 
   monstosPrevButton.addEventListener('click', () => {
+    audio.stopMonsterNeutral();
     cycleHomeMonstos(homeState, -1);
     homeState.loreTypingPiece = null;
     homeState.loreBubbleOpenedAt = performance.now();
@@ -1717,6 +1777,7 @@ function init() {
   });
 
   monstosNextButton.addEventListener('click', () => {
+    audio.stopMonsterNeutral();
     cycleHomeMonstos(homeState, 1);
     homeState.loreTypingPiece = null;
     homeState.loreBubbleOpenedAt = performance.now();
@@ -1736,8 +1797,12 @@ function init() {
   homeRefs.monstosVoiceButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const active = getActiveMonstos(homeState);
-    audio.playMonstosPreview(active.pieceType, settings);
+    if (audio.isNeutralPlaying) {
+      audio.stopMonsterNeutral();
+    } else {
+      const active = getActiveMonstos(homeState);
+      audio.playMonstosPreview(active.pieceType, settings);
+    }
   });
 
   homeRefs.leaderboardArcadeButton.addEventListener('click', () => {
@@ -1776,10 +1841,33 @@ function init() {
     applyDraftSettings();
   });
 
+  refs.sfxVolumeInput.addEventListener('input', () => {
+    settings.sfxVolume = Math.max(0, Math.min(100, Number(refs.sfxVolumeInput.value || settings.sfxVolume)));
+    audio.syncSettings(settings);
+  });
+  refs.musicVolumeInput.addEventListener('input', () => {
+    settings.musicVolume = Math.max(0, Math.min(100, Number(refs.musicVolumeInput.value || settings.musicVolume)));
+    audio.syncSettings(settings);
+  });
+  refs.sfxEnabledInput.addEventListener('change', () => {
+    settings.sfxEnabled = refs.sfxEnabledInput.checked;
+    audio.syncSettings(settings);
+  });
+  refs.musicEnabledInput.addEventListener('change', () => {
+    settings.musicEnabled = refs.musicEnabledInput.checked;
+    audio.syncSettings(settings);
+  });
+
   resetSettingsButton.addEventListener('click', () => {
     resetSettingsDraftToDefaults();
     settingsEditing = false;
     syncControllerFocusVisuals();
+  });
+
+  const clearScoresButton = document.getElementById('clearScoresButton') as HTMLButtonElement;
+  clearScoresButton.addEventListener('click', () => {
+    clearLeaderboards(storage);
+    renderCurrentView();
   });
 
   nicknameInput.addEventListener('input', () => {
@@ -1857,7 +1945,7 @@ function init() {
         }
 
         if (state.lastLockAt > lastLockSoundAt) {
-          audio.play('lock', settings);
+          audio.playMonsterImpact((lastActiveType || 'I') as PieceType, settings);
           lastLockSoundAt = state.lastLockAt;
         }
 
@@ -1866,7 +1954,15 @@ function init() {
           lastLineClearSoundAt = state.lastLineClearAt;
         }
 
+        // Detect new piece spawn (active type changed after lock or first piece)
+        const currentActiveType = state.active?.type ?? '';
+        if (currentActiveType && currentActiveType !== lastActiveType) {
+          lastActiveType = currentActiveType;
+          audio.playMonsterNeutral(currentActiveType as PieceType, settings);
+        }
+
         if (state.gameOver) {
+          audio.stopMonsterNeutral();
           transitionTo(state.sprintComplete ? 'sprint-clear' : 'game-over');
         }
 

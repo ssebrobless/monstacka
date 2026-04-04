@@ -38,6 +38,7 @@ export const HOME_REGIONS: readonly HitRegion[] = [
   { id: 'home-play-arcade', x: 1386, y: 617, width: 407, height: 121 },
   { id: 'home-play-sprint', x: 1386, y: 763, width: 407, height: 121 },
   { id: 'home-play-training', x: 1386, y: 907, width: 407, height: 121 },
+  { id: 'home-play-story', x: 1386, y: 1040, width: 407, height: 36 },
 ] as const;
 
 export const GAME_REGIONS: readonly HitRegion[] = [

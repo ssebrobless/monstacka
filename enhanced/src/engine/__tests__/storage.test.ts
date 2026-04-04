@@ -52,6 +52,7 @@ function createSavedRun(mode: SavedRun['mode']): SavedRun {
       score: 1200,
       pieces: 15,
       trainingFeedback: 'show',
+      lockResets: 0,
       currentPieceInputs: 0,
       trainingFaults: 1,
       trainingPerfectStreak: 2,

@@ -1,4 +1,5 @@
 import monstackaBgmUrl from './assets/audio/monstacka-bgm.wav';
+import { MONSTER_AUDIO_URLS } from './assets/audio/monstos';
 import type { PieceType, Settings } from './types';
 
 export type SoundCue =
@@ -19,6 +20,12 @@ export class AudioManager {
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private musicElement: HTMLAudioElement | null = null;
+  private monsterBuffers = new Map<string, AudioBuffer>();
+  private monsterBuffersLoaded = false;
+  private activeNeutralSource: AudioBufferSourceNode | null = null;
+  private activeNeutralGain: GainNode | null = null;
+  private impactIndex: Record<PieceType, number> = { I: 0, O: 0, T: 0, S: 0, Z: 0, J: 0, L: 0 };
+  private neutralIndex: Record<PieceType, number> = { I: 0, O: 0, T: 0, S: 0, Z: 0, J: 0, L: 0 };
 
   boot(settings: Settings): void {
     this.ensureMusicElement();
@@ -41,6 +48,7 @@ export class AudioManager {
     }
 
     this.syncSettings(settings);
+
   }
 
   syncSettings(settings: Settings): void {
@@ -108,10 +116,148 @@ export class AudioManager {
     }
   }
 
+  private monsterSoundsLoading = false;
+
+  async loadMonsterSounds(): Promise<void> {
+    if (this.monsterBuffersLoaded || this.monsterSoundsLoading) return;
+    this.monsterSoundsLoading = true;
+
+    // Ensure AudioContext exists — caller should have triggered ensureReady() first
+    if (!this.context) {
+      this.context = new AudioContext();
+      this.masterGain = this.context.createGain();
+      this.sfxGain = this.context.createGain();
+      this.sfxGain.connect(this.masterGain);
+      this.masterGain.connect(this.context.destination);
+    }
+
+    if (this.context.state === 'suspended') {
+      await this.context.resume().catch(() => {});
+    }
+
+    const ctx = this.context;
+    const entries: Array<{ key: string; url: string }> = [];
+    for (const [piece, urls] of Object.entries(MONSTER_AUDIO_URLS)) {
+      urls.impact.forEach((url, i) => entries.push({ key: `${piece}:impact:${i}`, url }));
+      urls.neutral.forEach((url, i) => entries.push({ key: `${piece}:neutral:${i}`, url }));
+    }
+
+    await Promise.all(
+      entries.map(async ({ key, url }) => {
+        try {
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          this.monsterBuffers.set(key, audioBuffer);
+        } catch {
+          // Silently skip failed loads — game still works with oscillator fallback
+        }
+      }),
+    );
+
+    this.monsterBuffersLoaded = true;
+    this.monsterSoundsLoading = false;
+  }
+
+  playMonsterNeutral(pieceType: PieceType, settings: Settings, maxDurationSec = 5): void {
+    this.ensureReady(settings);
+    if (!this.context || !this.sfxGain || !settings.sfxEnabled) return;
+
+    this.stopMonsterNeutral();
+
+    const urls = MONSTER_AUDIO_URLS[pieceType].neutral;
+    const idx = this.neutralIndex[pieceType] % urls.length;
+    this.neutralIndex[pieceType] = idx + 1;
+
+    const buffer = this.monsterBuffers.get(`${pieceType}:neutral:${idx}`);
+    if (!buffer) return;
+
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    const gain = this.context.createGain();
+    gain.gain.value = 1;
+    source.connect(gain);
+    gain.connect(this.sfxGain);
+    source.start(0);
+    if (maxDurationSec < Infinity) {
+      source.stop(this.context.currentTime + maxDurationSec);
+    }
+    source.onended = () => {
+      if (this.activeNeutralSource === source) {
+        this.activeNeutralSource = null;
+        this.activeNeutralGain = null;
+      }
+    };
+    this.activeNeutralSource = source;
+    this.activeNeutralGain = gain;
+  }
+
+  get isNeutralPlaying(): boolean {
+    return this.activeNeutralSource !== null;
+  }
+
+  stopMonsterNeutral(): void {
+    if (this.activeNeutralSource) {
+      try {
+        this.activeNeutralSource.stop();
+      } catch {
+        // Already stopped
+      }
+      this.activeNeutralSource = null;
+      this.activeNeutralGain = null;
+    }
+  }
+
+  playMonsterImpact(pieceType: PieceType, settings: Settings): void {
+    this.ensureReady(settings);
+    if (!this.context || !this.sfxGain || !settings.sfxEnabled) return;
+
+    this.stopMonsterNeutral();
+
+    const urls = MONSTER_AUDIO_URLS[pieceType].impact;
+    const idx = this.impactIndex[pieceType] % urls.length;
+    this.impactIndex[pieceType] = idx + 1;
+
+    const buffer = this.monsterBuffers.get(`${pieceType}:impact:${idx}`);
+    if (!buffer) return;
+
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.sfxGain);
+    source.start(0);
+  }
+
   playMonstosPreview(pieceType: PieceType, settings: Settings): void {
     this.ensureReady(settings);
     if (!this.context || !this.sfxGain || !settings.sfxEnabled) return;
 
+    // Play a short segment (~3s max) of the neutral sound, cycling halves
+    const buffer = this.monsterBuffers.get(`${pieceType}:neutral:${this.neutralIndex[pieceType] % MONSTER_AUDIO_URLS[pieceType].neutral.length}`);
+    if (buffer) {
+      this.stopMonsterNeutral();
+      const source = this.context.createBufferSource();
+      source.buffer = buffer;
+      const segmentDuration = Math.min(3, buffer.duration / 2);
+      const segmentIndex = this.neutralIndex[pieceType] % 2;
+      const offset = segmentIndex * segmentDuration;
+      const gain = this.context.createGain();
+      gain.gain.value = 1;
+      source.connect(gain);
+      gain.connect(this.sfxGain);
+      source.start(0, offset, segmentDuration);
+      source.onended = () => {
+        if (this.activeNeutralSource === source) {
+          this.activeNeutralSource = null;
+          this.activeNeutralGain = null;
+        }
+      };
+      this.activeNeutralSource = source;
+      this.activeNeutralGain = gain;
+      this.neutralIndex[pieceType] += 1;
+      return;
+    }
+
+    // Fallback to oscillator tones if buffers not loaded
     const now = this.context.currentTime;
     const patterns: Record<PieceType, Array<{ type: OscillatorType; frequency: number; delay: number; duration: number; amplitude: number }>> = {
       I: [
