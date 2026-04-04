@@ -126,6 +126,16 @@ select {
     border: 2px solid rgba(255, 255, 255, 0.25);
 }
 
+.art-hit.clean-label-overlay:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+}
+
+.hit-home-play-story {
+    font-size: 0.7rem;
+}
+
 .art-hit:hover,
 .art-hit:focus-visible {
     outline: none;

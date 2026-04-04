@@ -154,13 +154,17 @@ function init() {
     if (enabled) {
       arcadeBtn.textContent = 'Standard';
       arcadeBtn.classList.add('clean-label-overlay');
+      arcadeBtn.setAttribute('aria-label', 'Start Standard mode');
       arcadeScoreBtn.textContent = 'STD';
       arcadeScoreBtn.classList.add('clean-label-overlay');
+      arcadeScoreBtn.setAttribute('aria-label', 'Show Standard leaderboard');
     } else {
       arcadeBtn.textContent = '';
       arcadeBtn.classList.remove('clean-label-overlay');
+      arcadeBtn.setAttribute('aria-label', 'Start OG Bubba Mode');
       arcadeScoreBtn.textContent = '';
       arcadeScoreBtn.classList.remove('clean-label-overlay');
+      arcadeScoreBtn.setAttribute('aria-label', 'Show OGBM leaderboard');
     }
   }
 
