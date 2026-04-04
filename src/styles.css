@@ -865,13 +865,8 @@ select {
 
 .monster-ripple-art {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
     display: block;
     pointer-events: none;
-    transform: scale(1.04);
-    transform-origin: center;
 }
 
 .monster-eye-overlay {
