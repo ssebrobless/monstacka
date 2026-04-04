@@ -132,6 +132,11 @@ select {
     pointer-events: none;
 }
 
+.clean-label-score {
+    font-size: 0.65rem;
+    letter-spacing: 0.02em;
+}
+
 .hit-home-play-story {
     font-size: 0.7rem;
 }
