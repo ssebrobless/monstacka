@@ -1,7 +1,7 @@
 import type {
   GameState, Piece, PieceType, GameMode, ResumableAppPhase, SavedRun, SavedRunState, TrainingSnapshot,
 } from '../types';
-import { COUNTDOWN_MS, DEFAULT_MODE, SCORE_TABLE, SETTINGS_DEFAULTS, TARGET_LINES } from '../constants';
+import { COUNTDOWN_MS, DEFAULT_MODE, MAX_LOCK_RESETS, SCORE_TABLE, SETTINGS_DEFAULTS, TARGET_LINES } from '../constants';
 import { getGravityMs } from './gravity';
 import { clearLines, collapseRows, createBoard } from './board';
 import { ensureQueue } from './bag';
@@ -40,6 +40,7 @@ function restoreTrainingSnapshot(state: GameState): void {
   state.lines = 0;
   state.score = 0;
   state.lockDeadline = 0;
+  state.lockResets = 0;
   state.lastLockAt = 0;
   state.lastLineClearAt = 0;
   state.sprintComplete = false;
@@ -81,6 +82,7 @@ function createSavedRunState(state: GameState): SavedRunState {
     trainingFaults: state.trainingFaults,
     trainingPerfectStreak: state.trainingPerfectStreak,
     lastTrainingFaultMessage: state.lastTrainingFaultMessage,
+    lockResets: state.lockResets,
     trainingSnapshot: cloneTrainingSnapshot(state.trainingSnapshot),
   };
 }
@@ -103,6 +105,7 @@ export function createGameState(mode: GameMode = DEFAULT_MODE): GameState {
     countdownUntil: performance.now() + COUNTDOWN_MS,
     lastGravity: 0,
     lockDeadline: 0,
+    lockResets: 0,
     lastLockAt: 0,
     lastLineClearAt: 0,
     trainingFeedback: SETTINGS_DEFAULTS.trainingFeedback,
@@ -133,6 +136,7 @@ export function spawn(state: GameState, forceType?: PieceType): boolean {
   state.holdUsed = false;
   state.hasSpawned = true;
   state.lockDeadline = 0;
+  state.lockResets = 0;
   ensureQueue(state.queue, state.hasSpawned);
   captureTrainingSnapshot(state);
   return true;
@@ -155,6 +159,7 @@ export function reset(state: GameState, mode: GameMode = state.mode): void {
   state.countdownUntil = performance.now() + COUNTDOWN_MS;
   state.lastGravity = 0;
   state.lockDeadline = 0;
+  state.lockResets = 0;
   state.lastLockAt = 0;
   state.lastLineClearAt = 0;
   state.currentPieceInputs = 0;
@@ -200,6 +205,7 @@ export function restoreSavedRun(state: GameState, savedRun: SavedRun, now: numbe
   state.trainingPerfectStreak = saved.trainingPerfectStreak;
   state.lastTrainingFaultMessage = saved.lastTrainingFaultMessage;
   state.trainingSnapshot = cloneTrainingSnapshot(saved.trainingSnapshot);
+  state.lockResets = (saved as unknown as Record<string, unknown>).lockResets as number ?? 0;
   state.completedTime = 0;
   state.lastLockAt = 0;
   state.lastLineClearAt = 0;
@@ -231,9 +237,14 @@ export function move(state: GameState, dx: number, dy: number, lockDelayMs: numb
   if (!isValid(state.board, next)) return false;
 
   state.active = next;
-  state.lockDeadline = isGrounded(state.board, state.active)
-    ? performance.now() + lockDelayMs
-    : 0;
+  if (isGrounded(state.board, state.active)) {
+    if (state.lockResets < MAX_LOCK_RESETS) {
+      state.lockDeadline = performance.now() + lockDelayMs;
+      state.lockResets += 1;
+    }
+  } else {
+    state.lockDeadline = 0;
+  }
   return true;
 }
 
@@ -244,9 +255,14 @@ export function rotate(state: GameState, step: number, useKicks: boolean, lockDe
   if (!result) return false;
 
   state.active = result;
-  state.lockDeadline = isGrounded(state.board, state.active)
-    ? performance.now() + lockDelayMs
-    : 0;
+  if (isGrounded(state.board, state.active)) {
+    if (state.lockResets < MAX_LOCK_RESETS) {
+      state.lockDeadline = performance.now() + lockDelayMs;
+      state.lockResets += 1;
+    }
+  } else {
+    state.lockDeadline = 0;
+  }
   return true;
 }
 
@@ -369,9 +385,14 @@ export function hold(state: GameState, lockDelayMs: number): boolean {
 
   state.holdUsed = true;
   if (state.active) {
-    state.lockDeadline = isGrounded(state.board, state.active)
-      ? performance.now() + lockDelayMs
-      : 0;
+    if (isGrounded(state.board, state.active)) {
+      if (state.lockResets < MAX_LOCK_RESETS) {
+        state.lockDeadline = performance.now() + lockDelayMs;
+        state.lockResets += 1;
+      }
+    } else {
+      state.lockDeadline = 0;
+    }
   }
   captureTrainingSnapshot(state);
   return true;

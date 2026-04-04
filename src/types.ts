@@ -52,6 +52,7 @@ export interface GameState {
   countdownUntil: number;
   lastGravity: number;
   lockDeadline: number;
+  lockResets: number;
   lastLockAt: number;
   lastLineClearAt: number;
   trainingFeedback: TrainingFeedbackMode;
@@ -109,6 +110,7 @@ export interface SavedRunState {
   score: number;
   pieces: number;
   trainingFeedback: TrainingFeedbackMode;
+  lockResets: number;
   currentPieceInputs: number;
   trainingFaults: number;
   trainingPerfectStreak: number;

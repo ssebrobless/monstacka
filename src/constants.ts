@@ -7,6 +7,7 @@ export const TOTAL_ROWS = VISIBLE_ROWS + HIDDEN_ROWS;
 export const TARGET_LINES = 40;
 export const GRAVITY_MS = 650;
 export const COUNTDOWN_MS = 1000;
+export const MAX_LOCK_RESETS = 15;
 export const STORAGE_KEY = 'monstacka_local_v1';
 export const LEGACY_STORAGE_KEYS = ['eris_preview_tetris_v2'];
 export const MAX_NICKNAME_LENGTH = 5;
