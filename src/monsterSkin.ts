@@ -743,17 +743,11 @@ function neutralizeEyeRegions(
     const neutralized = cloneCanvas(frameCanvas);
     const ctx = neutralized.getContext('2d')!;
     for (const eye of eyePlacements) {
-      ctx.drawImage(
-        reference,
-        eye.x,
-        eye.y,
-        eye.width,
-        eye.height,
-        eye.x,
-        eye.y,
-        eye.width,
-        eye.height,
-      );
+      const mx = Math.max(0, eye.x - 1);
+      const my = Math.max(0, eye.y - 1);
+      const mw = Math.min(reference.width - mx, eye.width + 2);
+      const mh = Math.min(reference.height - my, eye.height + 2);
+      ctx.drawImage(reference, mx, my, mw, mh, mx, my, mw, mh);
     }
     return neutralized;
   });
@@ -842,8 +836,7 @@ async function buildMonsterTiles(): Promise<void> {
         retainConnectedPiece(rotateCanvas(canvas, turns), definition));
       const eyePlacements = buildEyePlacements(pieceType, rotation);
       const bodyCanvases = eyePlacements.length
-        ? neutralizeEyeRegions(rawRotatedCanvases, eyePlacements).map((canvas) =>
-          retainConnectedPiece(canvas, definition))
+        ? neutralizeEyeRegions(rawRotatedCanvases, eyePlacements)
         : rawRotatedCanvases;
       const figureKey = `${pieceType}:${rotation}`;
 

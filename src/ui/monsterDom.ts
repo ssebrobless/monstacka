@@ -60,13 +60,13 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 const RIPPLE_FRAME_COUNT = 4;
-const RIPPLE_AMPLITUDE = 5;
-const RIPPLE_FREQUENCY = 0.06;
+const RIPPLE_AMPLITUDE = 8;
+const RIPPLE_FREQUENCY = 0.04;
 const RIPPLE_TUCK_DEPTH = 2;
-const RIPPLE_EDGE_FEATHER = 1.5;
-const RIPPLE_SHADOW_WIDTH = 1.2;
+const RIPPLE_EDGE_FEATHER = 1.8;
+const RIPPLE_SHADOW_WIDTH = 1.4;
 const RIPPLE_SHADOW_OPACITY = 0.35;
-const RIPPLE_PAD = 7;
+const RIPPLE_PAD = 10;
 
 interface EdgeData {
   imageData: ImageData;
@@ -185,6 +185,14 @@ function getEdgeData(source: HTMLCanvasElement): EdgeData {
   return data;
 }
 
+/** Simple deterministic hash → [0,1) for per-pixel phase randomization */
+function hashFloat(n: number): number {
+  let x = ((n + 1) * 2654435761) | 0;
+  x = ((x >>> 16) ^ x) * 0x45d9f3b | 0;
+  x = ((x >>> 16) ^ x) * 0x45d9f3b | 0;
+  return (((x >>> 16) ^ x) >>> 0) / 0xffffffff;
+}
+
 function parseHexColor(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
   return [
@@ -207,7 +215,10 @@ function createRippleFrameCanvas(
   canvas.classList.add(`ripple-frame-${frameIndex}`);
   canvas.width = pw;
   canvas.height = ph;
-  canvas.style.margin = `${-RIPPLE_PAD}px`;
+  canvas.style.left = `${-RIPPLE_PAD}px`;
+  canvas.style.top = `${-RIPPLE_PAD}px`;
+  canvas.style.width = `${pw}px`;
+  canvas.style.height = `${ph}px`;
   const ctx = canvas.getContext('2d')!;
   const output = ctx.createImageData(pw, ph);
 
@@ -215,10 +226,12 @@ function createRippleFrameCanvas(
   const [cr, cg, cb] = pieceColor;
 
   // Step 1: Compute protrusion envelope for each edge pixel (positive half only = bumps)
+  // Each edge pixel gets a position-based random phase so bubbles fire independently
   const protrusions = new Float32Array(edgePixels.length);
   for (let i = 0; i < edgePixels.length; i += 1) {
     const p = edgePixels[i];
-    const raw = Math.sin(p.arc * RIPPLE_FREQUENCY * w + phaseOffset);
+    const localPhase = hashFloat(p.x * 31 + p.y * 97) * Math.PI * 2;
+    const raw = Math.sin(p.arc * RIPPLE_FREQUENCY * w + phaseOffset + localPhase);
     protrusions[i] = Math.max(0, raw) * RIPPLE_AMPLITUDE;
   }
 
@@ -281,7 +294,7 @@ function createRippleFrameCanvas(
       const perpDist = Math.abs(dx * (-ep.ny) + dy * ep.nx);
       // Bubble width tapers: widest at base, narrows at tip
       const normalizedDist = signedDist / Math.max(protrusionMax, 0.1);
-      const bubbleHalfWidth = 2.5 * (1 - normalizedDist * normalizedDist); // Parabolic taper
+      const bubbleHalfWidth = 4.0 * (1 - normalizedDist * normalizedDist); // Parabolic taper
       if (perpDist > bubbleHalfWidth) continue;
 
       // Compute alpha
