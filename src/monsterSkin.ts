@@ -743,10 +743,10 @@ function neutralizeEyeRegions(
     const neutralized = cloneCanvas(frameCanvas);
     const ctx = neutralized.getContext('2d')!;
     for (const eye of eyePlacements) {
-      const mx = Math.max(0, eye.x - 2);
-      const my = Math.max(0, eye.y - 2);
-      const mw = Math.min(reference.width - mx, eye.width + 4);
-      const mh = Math.min(reference.height - my, eye.height + 4);
+      const mx = Math.max(0, eye.x - 4);
+      const my = Math.max(0, eye.y - 4);
+      const mw = Math.min(reference.width - mx, eye.width + 8);
+      const mh = Math.min(reference.height - my, eye.height + 8);
       ctx.drawImage(reference, mx, my, mw, mh, mx, my, mw, mh);
     }
     return neutralized;

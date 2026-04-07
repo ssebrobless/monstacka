@@ -62,6 +62,7 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
 const RIPPLE_FRAME_COUNT = 4;
 const RIPPLE_AMPLITUDE = 20;
 const RIPPLES_PER_SIDE = 5;
+const RIPPLE_PAD = 22; // extra canvas margin so protrusions aren't clipped
 const RIPPLE_TUCK_DEPTH = 4;
 const RIPPLE_EDGE_FEATHER = 4.0;
 const RIPPLE_SHADOW_WIDTH = 3.0;
@@ -212,13 +213,15 @@ function createRippleFrameCanvas(
   pieceColor: [number, number, number],
 ): HTMLCanvasElement {
   const { alpha, edgePixels, width: w, height: h } = data;
+  const pw = w + RIPPLE_PAD * 2;
+  const ph = h + RIPPLE_PAD * 2;
   const canvas = document.createElement('canvas');
   canvas.className = 'monster-ripple-art';
   canvas.classList.add(`ripple-frame-${frameIndex}`);
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = pw;
+  canvas.height = ph;
   const ctx = canvas.getContext('2d')!;
-  const output = ctx.createImageData(w, h);
+  const output = ctx.createImageData(pw, ph);
 
   const phaseOffset = (frameIndex / RIPPLE_FRAME_COUNT) * Math.PI * 2;
   const [cr, cg, cb] = pieceColor;
@@ -262,22 +265,24 @@ function createRippleFrameCanvas(
     }
   }
 
-  // Step 2: Build nearest-edge lookup for pixels in the canvas
+  // Step 2: Build nearest-edge lookup for pixels in the padded canvas
   const maxRange = RIPPLE_AMPLITUDE + RIPPLE_TUCK_DEPTH + 2;
-  const nearestIdx = new Int32Array(w * h).fill(-1);
-  const nearestDist = new Float32Array(w * h).fill(1e9);
+  const nearestIdx = new Int32Array(pw * ph).fill(-1);
+  const nearestDist = new Float32Array(pw * ph).fill(1e9);
 
   for (let ei = 0; ei < edgePixels.length; ei += 1) {
     const ep = edgePixels[ei];
+    const epx = ep.x + RIPPLE_PAD;
+    const epy = ep.y + RIPPLE_PAD;
     const r = Math.ceil(maxRange);
     for (let oy = -r; oy <= r; oy += 1) {
       for (let ox = -r; ox <= r; ox += 1) {
-        const px = ep.x + ox;
-        const py = ep.y + oy;
-        if (px < 0 || py < 0 || px >= w || py >= h) continue;
+        const px = epx + ox;
+        const py = epy + oy;
+        if (px < 0 || py < 0 || px >= pw || py >= ph) continue;
         const d = Math.sqrt(ox * ox + oy * oy);
         if (d > maxRange) continue;
-        const pi = py * w + px;
+        const pi = py * pw + px;
         if (d < nearestDist[pi]) {
           nearestDist[pi] = d;
           nearestIdx[pi] = ei;
@@ -287,9 +292,9 @@ function createRippleFrameCanvas(
   }
 
   // Step 3: Render filled bubble protrusions
-  for (let py = 0; py < h; py += 1) {
-    for (let px = 0; px < w; px += 1) {
-      const pi = py * w + px;
+  for (let py = 0; py < ph; py += 1) {
+    for (let px = 0; px < pw; px += 1) {
+      const pi = py * pw + px;
       const ei = nearestIdx[pi];
       if (ei < 0) continue;
 
@@ -297,16 +302,18 @@ function createRippleFrameCanvas(
       const protrusionMax = protrusions[ei];
       if (protrusionMax < 0.5) continue;
 
-      // Signed distance along outward normal
-      const dx = px - ep.x;
-      const dy = py - ep.y;
+      // Signed distance along outward normal (convert back from padded coords)
+      const dx = (px - RIPPLE_PAD) - ep.x;
+      const dy = (py - RIPPLE_PAD) - ep.y;
       const signedDist = dx * ep.nx + dy * ep.ny;
 
       if (signedDist > protrusionMax) continue;
       if (signedDist < -RIPPLE_TUCK_DEPTH) continue;
 
       // Don't paint over interior sprite pixels
-      if (alpha[py * w + px]) {
+      const srcX = px - RIPPLE_PAD;
+      const srcY = py - RIPPLE_PAD;
+      if (srcX >= 0 && srcY >= 0 && srcX < w && srcY < h && alpha[srcY * w + srcX]) {
         if (signedDist < -0.5) continue;
       }
 
