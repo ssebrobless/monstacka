@@ -134,7 +134,7 @@ declare global {
     }
   }
 
-function init() {
+async function init() {
   const storage = loadStorage();
   const settings = storage.settings;
   const state = createGameState(DEFAULT_MODE);
@@ -1653,11 +1653,9 @@ function init() {
   handleWindowResize();
   window.addEventListener('resize', handleWindowResize);
   installDebugApi();
-  void prepareMonsterSkin(() => {
-    monsterSkinReady = true;
-    resetRenderCache();
-    renderCurrentView();
-  });
+  await prepareMonsterSkin();
+  monsterSkinReady = true;
+  resetRenderCache();
   void audio.loadMonsterSounds();
 
   const gameplayInputContext = {
