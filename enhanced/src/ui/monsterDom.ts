@@ -60,13 +60,12 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 const RIPPLE_FRAME_COUNT = 4;
-const RIPPLE_AMPLITUDE = 8;
-const RIPPLE_FREQUENCY = 0.04;
+const RIPPLE_AMPLITUDE = 10;
+const RIPPLE_BUBBLE_SEGMENT = 20; // edge pixels per bubble group
 const RIPPLE_TUCK_DEPTH = 2;
-const RIPPLE_EDGE_FEATHER = 1.8;
-const RIPPLE_SHADOW_WIDTH = 1.4;
+const RIPPLE_EDGE_FEATHER = 2.2;
+const RIPPLE_SHADOW_WIDTH = 1.6;
 const RIPPLE_SHADOW_OPACITY = 0.35;
-const RIPPLE_PAD = 10;
 
 interface EdgeData {
   imageData: ImageData;
@@ -207,53 +206,68 @@ function createRippleFrameCanvas(
   frameIndex: number,
   pieceColor: [number, number, number],
 ): HTMLCanvasElement {
-  const { imageData, alpha, edgePixels, width: w, height: h } = data;
-  const pw = w + RIPPLE_PAD * 2;
-  const ph = h + RIPPLE_PAD * 2;
+  const { alpha, edgePixels, width: w, height: h } = data;
   const canvas = document.createElement('canvas');
   canvas.className = 'monster-ripple-art';
   canvas.classList.add(`ripple-frame-${frameIndex}`);
-  canvas.width = pw;
-  canvas.height = ph;
-  canvas.style.left = `${-RIPPLE_PAD}px`;
-  canvas.style.top = `${-RIPPLE_PAD}px`;
-  canvas.style.width = `${pw}px`;
-  canvas.style.height = `${ph}px`;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext('2d')!;
-  const output = ctx.createImageData(pw, ph);
+  const output = ctx.createImageData(w, h);
 
   const phaseOffset = (frameIndex / RIPPLE_FRAME_COUNT) * Math.PI * 2;
   const [cr, cg, cb] = pieceColor;
 
-  // Step 1: Compute protrusion envelope for each edge pixel (positive half only = bumps)
-  // Each edge pixel gets a position-based random phase so bubbles fire independently
+  // Step 1: Assign each edge pixel to a segment and give each segment a random phase.
+  // Adjacent edge pixels share a segment so they bulge together as a smooth bubble.
+  const segmentCount = Math.max(1, Math.ceil(edgePixels.length / RIPPLE_BUBBLE_SEGMENT));
+  const segmentPhases = new Float32Array(segmentCount);
+  for (let s = 0; s < segmentCount; s += 1) {
+    segmentPhases[s] = hashFloat(s * 137 + 53) * Math.PI * 2;
+  }
+
+  // Compute protrusion per edge pixel using its segment's phase.
+  // Use full sine (-1..1 mapped to amplitude) so some bubbles inflate while others deflate.
   const protrusions = new Float32Array(edgePixels.length);
   for (let i = 0; i < edgePixels.length; i += 1) {
-    const p = edgePixels[i];
-    const localPhase = hashFloat(p.x * 31 + p.y * 97) * Math.PI * 2;
-    const raw = Math.sin(p.arc * RIPPLE_FREQUENCY * w + phaseOffset + localPhase);
+    const segIdx = Math.floor(i / RIPPLE_BUBBLE_SEGMENT) % segmentCount;
+    const raw = Math.sin(phaseOffset + segmentPhases[segIdx]);
+    // Map to 0..AMPLITUDE: half the segments are up, half are down per frame
     protrusions[i] = Math.max(0, raw) * RIPPLE_AMPLITUDE;
   }
 
-  // Step 2: Build nearest-edge lookup for pixels in the padded canvas
-  // For efficiency, only process pixels within max range of any edge pixel
+  // Smooth protrusions between segments so bubble edges aren't sharp
+  const smoothed = new Float32Array(protrusions);
+  const smoothRadius = Math.floor(RIPPLE_BUBBLE_SEGMENT / 3);
+  for (let i = 0; i < edgePixels.length; i += 1) {
+    let sum = 0;
+    let count = 0;
+    for (let j = -smoothRadius; j <= smoothRadius; j += 1) {
+      const idx = i + j;
+      if (idx >= 0 && idx < edgePixels.length) {
+        sum += protrusions[idx];
+        count += 1;
+      }
+    }
+    smoothed[i] = sum / count;
+  }
+
+  // Step 2: Build nearest-edge lookup for pixels in the canvas
   const maxRange = RIPPLE_AMPLITUDE + RIPPLE_TUCK_DEPTH + 2;
-  const nearestIdx = new Int32Array(pw * ph).fill(-1);
-  const nearestDist = new Float32Array(pw * ph).fill(1e9);
+  const nearestIdx = new Int32Array(w * h).fill(-1);
+  const nearestDist = new Float32Array(w * h).fill(1e9);
 
   for (let ei = 0; ei < edgePixels.length; ei += 1) {
     const ep = edgePixels[ei];
-    const epx = ep.x + RIPPLE_PAD;
-    const epy = ep.y + RIPPLE_PAD;
     const r = Math.ceil(maxRange);
     for (let oy = -r; oy <= r; oy += 1) {
       for (let ox = -r; ox <= r; ox += 1) {
-        const px = epx + ox;
-        const py = epy + oy;
-        if (px < 0 || py < 0 || px >= pw || py >= ph) continue;
+        const px = ep.x + ox;
+        const py = ep.y + oy;
+        if (px < 0 || py < 0 || px >= w || py >= h) continue;
         const d = Math.sqrt(ox * ox + oy * oy);
         if (d > maxRange) continue;
-        const pi = py * pw + px;
+        const pi = py * w + px;
         if (d < nearestDist[pi]) {
           nearestDist[pi] = d;
           nearestIdx[pi] = ei;
@@ -262,53 +276,48 @@ function createRippleFrameCanvas(
     }
   }
 
-  // Step 3: Render filled protrusions
-  for (let py = 0; py < ph; py += 1) {
-    for (let px = 0; px < pw; px += 1) {
-      const pi = py * pw + px;
+  // Step 3: Render filled bubble protrusions
+  for (let py = 0; py < h; py += 1) {
+    for (let px = 0; px < w; px += 1) {
+      const pi = py * w + px;
       const ei = nearestIdx[pi];
       if (ei < 0) continue;
 
       const ep = edgePixels[ei];
-      const protrusionMax = protrusions[ei];
-      if (protrusionMax < 0.5) continue; // Skip negligible bumps
+      const protrusionMax = smoothed[ei];
+      if (protrusionMax < 0.5) continue;
 
-      // Compute signed distance along normal (positive = outward from sprite)
-      const dx = (px - RIPPLE_PAD) - ep.x;
-      const dy = (py - RIPPLE_PAD) - ep.y;
+      // Signed distance along outward normal
+      const dx = px - ep.x;
+      const dy = py - ep.y;
       const signedDist = dx * ep.nx + dy * ep.ny;
 
-      // Skip if outside the protrusion range
       if (signedDist > protrusionMax) continue;
       if (signedDist < -RIPPLE_TUCK_DEPTH) continue;
 
-      // Skip pixels that are deep inside the sprite (don't paint over core art)
-      const srcX = px - RIPPLE_PAD;
-      const srcY = py - RIPPLE_PAD;
-      if (srcX >= 0 && srcY >= 0 && srcX < w && srcY < h && alpha[srcY * w + srcX]) {
-        // Only allow tuck zone pixels that are right at the edge
+      // Don't paint over interior sprite pixels
+      if (alpha[py * w + px]) {
         if (signedDist < -0.5) continue;
       }
 
-      // Compute perpendicular distance from the normal line for width falloff
+      // Perpendicular distance for bubble width falloff
       const perpDist = Math.abs(dx * (-ep.ny) + dy * ep.nx);
-      // Bubble width tapers: widest at base, narrows at tip
       const normalizedDist = signedDist / Math.max(protrusionMax, 0.1);
-      const bubbleHalfWidth = 4.0 * (1 - normalizedDist * normalizedDist); // Parabolic taper
+      // Wide rounded bubble shape: widest at base, narrows at tip
+      const bubbleHalfWidth = 6.0 * (1 - normalizedDist * normalizedDist);
       if (perpDist > bubbleHalfWidth) continue;
 
-      // Compute alpha
       let pixelAlpha = 220;
 
-      // Smooth feathered edge at the protrusion tip
+      // Feathered tip
       const distFromTip = protrusionMax - signedDist;
       if (distFromTip < RIPPLE_EDGE_FEATHER) {
         pixelAlpha *= 0.5 * (1 + Math.cos(Math.PI * (1 - distFromTip / RIPPLE_EDGE_FEATHER)));
       }
 
-      // Width-based feathering (smooth lateral edges)
-      if (perpDist > bubbleHalfWidth - 0.8) {
-        const edgeFade = (bubbleHalfWidth - perpDist) / 0.8;
+      // Feathered lateral edges
+      if (perpDist > bubbleHalfWidth - 1.0) {
+        const edgeFade = (bubbleHalfWidth - perpDist) / 1.0;
         pixelAlpha *= Math.max(0, edgeFade);
       }
 
@@ -321,12 +330,11 @@ function createRippleFrameCanvas(
 
       const oi = pi * 4;
 
-      // Shadow along outer edge of protrusion
+      // Dithered shadow near the tip
       const isShadowZone = distFromTip < RIPPLE_SHADOW_WIDTH && signedDist > 0;
       const isDitherPixel = (px + py) % 2 === 0;
 
       if (isShadowZone && isDitherPixel) {
-        // Dithered shadow line
         const shadowStrength = RIPPLE_SHADOW_OPACITY * (1 - distFromTip / RIPPLE_SHADOW_WIDTH);
         output.data[oi] = cr * (1 - shadowStrength) * 0.3;
         output.data[oi + 1] = cg * (1 - shadowStrength) * 0.3;
