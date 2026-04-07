@@ -872,10 +872,6 @@ select {
     position: absolute;
     display: block;
     pointer-events: none;
-    /* Padded canvas extends beyond art bounds; negative inset scales it to align */
-    inset: -8%;
-    width: 116%;
-    height: 116%;
 }
 
 .monster-eye-overlay {

@@ -61,7 +61,6 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
 
 const RIPPLE_FRAME_COUNT = 4;
 const RIPPLE_AMPLITUDE = 20;
-const RIPPLES_PER_SIDE = 5;
 const RIPPLE_PAD = 22; // extra canvas margin so protrusions aren't clipped
 const RIPPLE_TUCK_DEPTH = 4;
 const RIPPLE_EDGE_FEATHER = 4.0;
@@ -220,6 +219,13 @@ function createRippleFrameCanvas(
   canvas.classList.add(`ripple-frame-${frameIndex}`);
   canvas.width = pw;
   canvas.height = ph;
+  // Position the padded canvas so its center aligns with the art canvas
+  const padXPct = (RIPPLE_PAD / w) * 100;
+  const padYPct = (RIPPLE_PAD / h) * 100;
+  canvas.style.left = `${-padXPct}%`;
+  canvas.style.top = `${-padYPct}%`;
+  canvas.style.width = `${100 + padXPct * 2}%`;
+  canvas.style.height = `${100 + padYPct * 2}%`;
   const ctx = canvas.getContext('2d')!;
   const output = ctx.createImageData(pw, ph);
 
@@ -253,14 +259,19 @@ function createRippleFrameCanvas(
     }
   }
 
-  // Compute protrusion using abs(sin) traveling wave — 5 ripples per side, no gaps
+  // Compute protrusion using abs(sin) traveling wave — ripple count adapts to side length
   const protrusions = new Float32Array(edgePixels.length);
   for (let s = 0; s < 4; s += 1) {
     const group = sideGroups[s];
     if (!group.length) continue;
+    // Compute side pixel extent to derive ripple count
+    const tangentKey = (s === 0 || s === 2) ? 'x' : 'y';
+    const coords = group.map((i) => edgePixels[i][tangentKey as 'x' | 'y']);
+    const sideLength = Math.max(1, Math.max(...coords) - Math.min(...coords));
+    const ripplesForSide = Math.max(3, Math.round(sideLength / 65));
     for (let gi = 0; gi < group.length; gi += 1) {
       const t = group.length > 1 ? gi / (group.length - 1) : 0.5;
-      const wave = Math.sin(t * RIPPLES_PER_SIDE * Math.PI * 2 + phaseOffset);
+      const wave = Math.sin(t * ripplesForSide * Math.PI * 2 + phaseOffset);
       protrusions[group[gi]] = Math.abs(wave) * RIPPLE_AMPLITUDE;
     }
   }
