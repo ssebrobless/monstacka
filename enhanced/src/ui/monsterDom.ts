@@ -1,4 +1,4 @@
-import { DEFINITIONS, PIECE_COLORS } from '../constants';
+import { DEFINITIONS } from '../constants';
 import {
   getMonsterEyeFrame,
   getMonsterFigureBoxSize,
@@ -60,11 +60,11 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 const RIPPLE_FRAME_COUNT = 4;
-const RIPPLE_AMPLITUDE = 10;
-const RIPPLE_BUBBLE_SEGMENT = 20; // edge pixels per bubble group
-const RIPPLE_TUCK_DEPTH = 2;
-const RIPPLE_EDGE_FEATHER = 2.2;
-const RIPPLE_SHADOW_WIDTH = 1.6;
+const RIPPLE_AMPLITUDE = 20;
+const RIPPLE_BUBBLE_SEGMENT = 35;
+const RIPPLE_TUCK_DEPTH = 4;
+const RIPPLE_EDGE_FEATHER = 4.0;
+const RIPPLE_SHADOW_WIDTH = 3.0;
 const RIPPLE_SHADOW_OPACITY = 0.35;
 
 interface EdgeData {
@@ -192,12 +192,25 @@ function hashFloat(n: number): number {
   return (((x >>> 16) ^ x) >>> 0) / 0xffffffff;
 }
 
-function parseHexColor(hex: string): [number, number, number] {
-  const h = hex.replace('#', '');
+function sampleEdgeColor(data: EdgeData): [number, number, number] {
+  const { imageData, edgePixels, width } = data;
+  let rSum = 0;
+  let gSum = 0;
+  let bSum = 0;
+  let count = 0;
+  for (const p of edgePixels) {
+    const idx = (p.y * width + p.x) * 4;
+    if (imageData.data[idx + 3] < 128) continue;
+    rSum += imageData.data[idx];
+    gSum += imageData.data[idx + 1];
+    bSum += imageData.data[idx + 2];
+    count += 1;
+  }
+  if (count === 0) return [200, 200, 200];
   return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
+    Math.round(rSum / count),
+    Math.round(gSum / count),
+    Math.round(bSum / count),
   ];
 }
 
@@ -304,7 +317,7 @@ function createRippleFrameCanvas(
       const perpDist = Math.abs(dx * (-ep.ny) + dy * ep.nx);
       const normalizedDist = signedDist / Math.max(protrusionMax, 0.1);
       // Wide rounded bubble shape: widest at base, narrows at tip
-      const bubbleHalfWidth = 6.0 * (1 - normalizedDist * normalizedDist);
+      const bubbleHalfWidth = 24.0 * (1 - normalizedDist * normalizedDist);
       if (perpDist > bubbleHalfWidth) continue;
 
       let pixelAlpha = 220;
@@ -316,8 +329,8 @@ function createRippleFrameCanvas(
       }
 
       // Feathered lateral edges
-      if (perpDist > bubbleHalfWidth - 1.0) {
-        const edgeFade = (bubbleHalfWidth - perpDist) / 1.0;
+      if (perpDist > bubbleHalfWidth - 2.5) {
+        const edgeFade = (bubbleHalfWidth - perpDist) / 2.5;
         pixelAlpha *= Math.max(0, edgeFade);
       }
 
@@ -353,12 +366,11 @@ function createRippleFrameCanvas(
   return canvas;
 }
 
-function createMonsterRippleFrames(source: HTMLCanvasElement, pieceType: string): HTMLCanvasElement[] {
+function createMonsterRippleFrames(source: HTMLCanvasElement): HTMLCanvasElement[] {
   const data = getEdgeData(source);
   if (data.empty) return [];
 
-  const colorHex = PIECE_COLORS[pieceType as PieceType] || '#ffffff';
-  const color = parseHexColor(colorHex);
+  const color = sampleEdgeColor(data);
   const frames: HTMLCanvasElement[] = [];
   for (let f = 0; f < RIPPLE_FRAME_COUNT; f += 1) {
     frames.push(createRippleFrameCanvas(data, f, color));
@@ -532,7 +544,7 @@ export function populateMonsterCell(
     motionSeed,
   );
   artLayer.appendChild(createMonsterArtNode(tile.canvas));
-  for (const frame of createMonsterRippleFrames(tile.canvas, pieceType)) {
+  for (const frame of createMonsterRippleFrames(tile.canvas)) {
     rippleLayer.appendChild(frame);
   }
   for (const eye of tile.eyes) {
@@ -606,7 +618,7 @@ export function populateMonsterFigure(
       );
       body.classList.add('monster-figure-body');
       artLayer.appendChild(createMonsterArtNode(figureArt));
-      for (const frame of createMonsterRippleFrames(figureArt, pieceType)) {
+      for (const frame of createMonsterRippleFrames(figureArt)) {
         rippleLayer.appendChild(frame);
       }
       const cellPx = figureArt.width / widthCells;
@@ -771,7 +783,7 @@ export function populateMonsterBoardFigure(
   );
   body.classList.add('monster-figure-body');
   artLayer.appendChild(createMonsterArtNode(figureArt));
-  for (const frame of createMonsterRippleFrames(figureArt, pieceType)) {
+  for (const frame of createMonsterRippleFrames(figureArt)) {
     rippleLayer.appendChild(frame);
   }
 
