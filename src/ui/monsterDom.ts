@@ -61,7 +61,7 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
 
 const RIPPLE_FRAME_COUNT = 4;
 const RIPPLE_AMPLITUDE = 20;
-const RIPPLE_BUBBLE_SEGMENT = 35;
+const RIPPLES_PER_SIDE = 5;
 const RIPPLE_TUCK_DEPTH = 4;
 const RIPPLE_EDGE_FEATHER = 4.0;
 const RIPPLE_SHADOW_WIDTH = 3.0;
@@ -184,14 +184,6 @@ function getEdgeData(source: HTMLCanvasElement): EdgeData {
   return data;
 }
 
-/** Simple deterministic hash → [0,1) for per-pixel phase randomization */
-function hashFloat(n: number): number {
-  let x = ((n + 1) * 2654435761) | 0;
-  x = ((x >>> 16) ^ x) * 0x45d9f3b | 0;
-  x = ((x >>> 16) ^ x) * 0x45d9f3b | 0;
-  return (((x >>> 16) ^ x) >>> 0) / 0xffffffff;
-}
-
 function sampleEdgeColor(data: EdgeData): [number, number, number] {
   const { imageData, edgePixels, width } = data;
   let rSum = 0;
@@ -231,38 +223,43 @@ function createRippleFrameCanvas(
   const phaseOffset = (frameIndex / RIPPLE_FRAME_COUNT) * Math.PI * 2;
   const [cr, cg, cb] = pieceColor;
 
-  // Step 1: Assign each edge pixel to a segment and give each segment a random phase.
-  // Adjacent edge pixels share a segment so they bulge together as a smooth bubble.
-  const segmentCount = Math.max(1, Math.ceil(edgePixels.length / RIPPLE_BUBBLE_SEGMENT));
-  const segmentPhases = new Float32Array(segmentCount);
-  for (let s = 0; s < segmentCount; s += 1) {
-    segmentPhases[s] = hashFloat(s * 137 + 53) * Math.PI * 2;
-  }
+  // Step 1: Classify edge pixels by side (normal direction) and compute wave protrusion.
+  // Each side gets exactly RIPPLES_PER_SIDE evenly-spaced traveling-wave bubbles.
+  const sideGroups: number[][] = [[], [], [], []]; // 0=top, 1=right, 2=bottom, 3=left
 
-  // Compute protrusion per edge pixel using its segment's phase.
-  // Use full sine (-1..1 mapped to amplitude) so some bubbles inflate while others deflate.
-  const protrusions = new Float32Array(edgePixels.length);
   for (let i = 0; i < edgePixels.length; i += 1) {
-    const segIdx = Math.floor(i / RIPPLE_BUBBLE_SEGMENT) % segmentCount;
-    const raw = Math.sin(phaseOffset + segmentPhases[segIdx]);
-    // Map to 0..AMPLITUDE: half the segments are up, half are down per frame
-    protrusions[i] = Math.max(0, raw) * RIPPLE_AMPLITUDE;
-  }
-
-  // Smooth protrusions between segments so bubble edges aren't sharp
-  const smoothed = new Float32Array(protrusions);
-  const smoothRadius = Math.floor(RIPPLE_BUBBLE_SEGMENT / 3);
-  for (let i = 0; i < edgePixels.length; i += 1) {
-    let sum = 0;
-    let count = 0;
-    for (let j = -smoothRadius; j <= smoothRadius; j += 1) {
-      const idx = i + j;
-      if (idx >= 0 && idx < edgePixels.length) {
-        sum += protrusions[idx];
-        count += 1;
-      }
+    const p = edgePixels[i];
+    const absNx = Math.abs(p.nx);
+    const absNy = Math.abs(p.ny);
+    let side: number;
+    if (absNy >= absNx) {
+      side = p.ny < 0 ? 0 : 2;
+    } else {
+      side = p.nx > 0 ? 1 : 3;
     }
-    smoothed[i] = sum / count;
+    sideGroups[side].push(i);
+  }
+
+  // Sort each side's pixels along the tangent direction
+  for (let s = 0; s < 4; s += 1) {
+    const group = sideGroups[s];
+    if (s === 0 || s === 2) {
+      group.sort((a, b) => edgePixels[a].x - edgePixels[b].x);
+    } else {
+      group.sort((a, b) => edgePixels[a].y - edgePixels[b].y);
+    }
+  }
+
+  // Compute protrusion using abs(sin) traveling wave — 5 ripples per side, no gaps
+  const protrusions = new Float32Array(edgePixels.length);
+  for (let s = 0; s < 4; s += 1) {
+    const group = sideGroups[s];
+    if (!group.length) continue;
+    for (let gi = 0; gi < group.length; gi += 1) {
+      const t = group.length > 1 ? gi / (group.length - 1) : 0.5;
+      const wave = Math.sin(t * RIPPLES_PER_SIDE * Math.PI * 2 + phaseOffset);
+      protrusions[group[gi]] = Math.abs(wave) * RIPPLE_AMPLITUDE;
+    }
   }
 
   // Step 2: Build nearest-edge lookup for pixels in the canvas
@@ -297,7 +294,7 @@ function createRippleFrameCanvas(
       if (ei < 0) continue;
 
       const ep = edgePixels[ei];
-      const protrusionMax = smoothed[ei];
+      const protrusionMax = protrusions[ei];
       if (protrusionMax < 0.5) continue;
 
       // Signed distance along outward normal
