@@ -484,7 +484,7 @@ select {
     position: absolute;
     inset: 10px;
     pointer-events: none;
-    overflow: hidden;
+    overflow: visible;
     z-index: 1;
 }
 
@@ -837,27 +837,32 @@ select {
     filter: url('#monster-edge-ripple');
 }
 
-.monster-ripple-layer .ripple-frame-0,
-.monster-ripple-layer .ripple-frame-1,
-.monster-ripple-layer .ripple-frame-2,
-.monster-ripple-layer .ripple-frame-3 {
+.monster-ripple-layer .monster-ripple-art {
     opacity: 0;
 }
 
-.monster-body.is-animated .ripple-frame-0 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0s; }
-.monster-body.is-animated .ripple-frame-1 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0.3s; }
-.monster-body.is-animated .ripple-frame-2 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0.6s; }
-.monster-body.is-animated .ripple-frame-3 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0.9s; }
+.monster-body.is-animated .ripple-frame-0 { animation: ripple-step 2s step-start infinite; animation-delay: 0s; }
+.monster-body.is-animated .ripple-frame-1 { animation: ripple-step 2s step-start infinite; animation-delay: -0.25s; }
+.monster-body.is-animated .ripple-frame-2 { animation: ripple-step 2s step-start infinite; animation-delay: -0.5s; }
+.monster-body.is-animated .ripple-frame-3 { animation: ripple-step 2s step-start infinite; animation-delay: -0.75s; }
+.monster-body.is-animated .ripple-frame-4 { animation: ripple-step 2s step-start infinite; animation-delay: -1.0s; }
+.monster-body.is-animated .ripple-frame-5 { animation: ripple-step 2s step-start infinite; animation-delay: -1.25s; }
+.monster-body.is-animated .ripple-frame-6 { animation: ripple-step 2s step-start infinite; animation-delay: -1.5s; }
+.monster-body.is-animated .ripple-frame-7 { animation: ripple-step 2s step-start infinite; animation-delay: -1.75s; }
 
 .preview-stage.is-active .monster-ripple-layer {
     filter: url('#monster-edge-ripple-preview');
     animation-name: monster-ripple-twitch-preview;
 }
 
-.preview-stage.is-active .ripple-frame-0 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0s; }
-.preview-stage.is-active .ripple-frame-1 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0.3s; }
-.preview-stage.is-active .ripple-frame-2 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0.6s; }
-.preview-stage.is-active .ripple-frame-3 { animation: ripple-cycle 1.2s linear infinite; animation-delay: 0.9s; }
+.preview-stage.is-active .ripple-frame-0 { animation: ripple-step 2s step-start infinite; animation-delay: 0s; }
+.preview-stage.is-active .ripple-frame-1 { animation: ripple-step 2s step-start infinite; animation-delay: -0.25s; }
+.preview-stage.is-active .ripple-frame-2 { animation: ripple-step 2s step-start infinite; animation-delay: -0.5s; }
+.preview-stage.is-active .ripple-frame-3 { animation: ripple-step 2s step-start infinite; animation-delay: -0.75s; }
+.preview-stage.is-active .ripple-frame-4 { animation: ripple-step 2s step-start infinite; animation-delay: -1.0s; }
+.preview-stage.is-active .ripple-frame-5 { animation: ripple-step 2s step-start infinite; animation-delay: -1.25s; }
+.preview-stage.is-active .ripple-frame-6 { animation: ripple-step 2s step-start infinite; animation-delay: -1.5s; }
+.preview-stage.is-active .ripple-frame-7 { animation: ripple-step 2s step-start infinite; animation-delay: -1.75s; }
 
 .monster-art {
     position: absolute;
@@ -1287,11 +1292,10 @@ button.secondary {
     }
 }
 
-@keyframes ripple-cycle {
-    0% { opacity: 0.9; }
-    12% { opacity: 1; }
-    35% { opacity: 0.6; }
-    55%, 100% { opacity: 0; }
+@keyframes ripple-step {
+    0% { opacity: 1; }
+    12.5% { opacity: 0; }
+    100% { opacity: 0; }
 }
 
 @keyframes monster-tongue-wag {

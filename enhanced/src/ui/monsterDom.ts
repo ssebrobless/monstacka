@@ -59,13 +59,21 @@ function createMonsterArtNode(source: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
-const RIPPLE_FRAME_COUNT = 4;
-const RIPPLE_AMPLITUDE = 20;
-const RIPPLE_PAD = 22; // extra canvas margin so protrusions aren't clipped
-const RIPPLE_TUCK_DEPTH = 4;
+const RIPPLE_FRAME_COUNT = 8;
+const RIPPLE_AMPLITUDE = 40;
+const RIPPLE_PAD = 44; // extra canvas margin so protrusions aren't clipped
+const RIPPLE_TUCK_DEPTH = 8;
 const RIPPLE_EDGE_FEATHER = 4.0;
 const RIPPLE_SHADOW_WIDTH = 3.0;
 const RIPPLE_SHADOW_OPACITY = 0.35;
+
+const RIPPLE_AMP_SCALE: Record<string, number> = {
+  I: 0.7, // cyan — long thin shape makes ripples overly prominent
+  O: 1.0, S: 1.0, Z: 1.0, T: 1.0, J: 1.0, L: 1.0,
+};
+
+const rippleFrameCache = new WeakMap<HTMLCanvasElement, HTMLCanvasElement[]>();
+const rippleStringCache = new Map<string, HTMLCanvasElement[]>();
 
 interface EdgeData {
   imageData: ImageData;
@@ -210,6 +218,7 @@ function createRippleFrameCanvas(
   data: EdgeData,
   frameIndex: number,
   pieceColor: [number, number, number],
+  ampScale = 1.0,
 ): HTMLCanvasElement {
   const { alpha, edgePixels, width: w, height: h } = data;
   const pw = w + RIPPLE_PAD * 2;
@@ -229,7 +238,6 @@ function createRippleFrameCanvas(
   const ctx = canvas.getContext('2d')!;
   const output = ctx.createImageData(pw, ph);
 
-  const phaseOffset = (frameIndex / RIPPLE_FRAME_COUNT) * Math.PI * 2;
   const [cr, cg, cb] = pieceColor;
 
   // Step 1: Classify edge pixels by side (normal direction) and compute wave protrusion.
@@ -260,6 +268,8 @@ function createRippleFrameCanvas(
   }
 
   // Compute protrusion using abs(sin) traveling wave — ripple count adapts to side length
+  // Each bubble gets an independent phase offset so they fire at different times
+  const frameT = frameIndex / RIPPLE_FRAME_COUNT; // 0..0.875 across 8 frames
   const protrusions = new Float32Array(edgePixels.length);
   for (let s = 0; s < 4; s += 1) {
     const group = sideGroups[s];
@@ -271,8 +281,24 @@ function createRippleFrameCanvas(
     const ripplesForSide = Math.max(3, Math.round(sideLength / 65));
     for (let gi = 0; gi < group.length; gi += 1) {
       const t = group.length > 1 ? gi / (group.length - 1) : 0.5;
-      const wave = Math.sin(t * ripplesForSide * Math.PI * 2 + phaseOffset);
-      protrusions[group[gi]] = Math.abs(wave) * RIPPLE_AMPLITUDE;
+      const wave = Math.sin(t * ripplesForSide * Math.PI * 2);
+
+      // Per-bubble independent phase — alternate even/odd so adjacent bubbles don't peak together
+      const bubbleIndex = Math.round(t * (ripplesForSide - 1));
+      const bubblePhase = (bubbleIndex % 2 === 0) ? 0.0 : 0.5;
+      const jitter = ((bubbleIndex * 7 + s * 13) % 11) / 11 * 0.25;
+      const totalPhase = (frameT + bubblePhase + jitter) % 1.0;
+
+      // Triangle wave envelope: 0→1→0 over one cycle
+      const envelope = totalPhase <= 0.5
+        ? totalPhase * 2
+        : (1 - totalPhase) * 2;
+      const clampedEnvelope = 0.45 + 0.55 * envelope;
+
+      // Per-bubble size variation: 50-100% of max amplitude
+      const sizeVar = 0.5 + ((bubbleIndex * 31 + s * 17) % 23) / 23 * 0.5;
+
+      protrusions[group[gi]] = Math.abs(wave) * RIPPLE_AMPLITUDE * clampedEnvelope * sizeVar * ampScale;
     }
   }
 
@@ -332,7 +358,7 @@ function createRippleFrameCanvas(
       const perpDist = Math.abs(dx * (-ep.ny) + dy * ep.nx);
       const normalizedDist = signedDist / Math.max(protrusionMax, 0.1);
       // Wide rounded bubble shape: widest at base, narrows at tip
-      const bubbleHalfWidth = 24.0 * (1 - normalizedDist * normalizedDist);
+      const bubbleHalfWidth = 26.0 * Math.sqrt(Math.max(0, 1 - normalizedDist * normalizedDist));
       if (perpDist > bubbleHalfWidth) continue;
 
       let pixelAlpha = 220;
@@ -381,16 +407,44 @@ function createRippleFrameCanvas(
   return canvas;
 }
 
-function createMonsterRippleFrames(source: HTMLCanvasElement): HTMLCanvasElement[] {
+// Cache: ripple canvas → data URL (computed once, reused for all img clones)
+const rippleDataUrlCache = new WeakMap<HTMLCanvasElement, string>();
+
+function createRippleImgElement(src: HTMLCanvasElement): HTMLImageElement {
+  let url = rippleDataUrlCache.get(src);
+  if (!url) {
+    url = src.toDataURL();
+    rippleDataUrlCache.set(src, url);
+  }
+  const img = new Image();
+  img.className = src.className;
+  img.style.cssText = src.style.cssText;
+  img.width = src.width;
+  img.height = src.height;
+  img.src = url;
+  return img;
+}
+
+function createMonsterRippleFrames(source: HTMLCanvasElement, cacheKey?: string, ampScale = 1.0): HTMLElement[] {
+  if (cacheKey) {
+    const cached = rippleStringCache.get(cacheKey);
+    if (cached) return cached.map(createRippleImgElement);
+  }
+
+  const cached = rippleFrameCache.get(source);
+  if (cached) return cached.map(createRippleImgElement);
+
   const data = getEdgeData(source);
   if (data.empty) return [];
 
   const color = sampleEdgeColor(data);
   const frames: HTMLCanvasElement[] = [];
   for (let f = 0; f < RIPPLE_FRAME_COUNT; f += 1) {
-    frames.push(createRippleFrameCanvas(data, f, color));
+    frames.push(createRippleFrameCanvas(data, f, color, ampScale));
   }
-  return frames;
+  rippleFrameCache.set(source, frames);
+  if (cacheKey) rippleStringCache.set(cacheKey, frames);
+  return frames.map(createRippleImgElement);
 }
 
 function createMonsterOverlayNode(
@@ -528,59 +582,88 @@ export function populateMonsterCell(
   const allowSquish = options.allowSquish ?? animate;
   const baseClassName = options.baseClassName || 'cell';
 
-  cell.replaceChildren();
-  cell.className = baseClassName;
-  cell.style.removeProperty('--squish-scale-x');
-  cell.style.removeProperty('--squish-scale-y');
-  cell.style.removeProperty('--squish-shift-x');
-  cell.style.removeProperty('--squish-shift-y');
-
   if (!tile) {
+    cell.replaceChildren();
+    cell.className = baseClassName;
+    cell.style.removeProperty('--squish-scale-x');
+    cell.style.removeProperty('--squish-scale-y');
+    cell.style.removeProperty('--squish-shift-x');
+    cell.style.removeProperty('--squish-shift-y');
     const [pieceType] = skinKey.split(':');
     cell.classList.add(`piece-${pieceType.toLowerCase()}`);
     return;
   }
 
-  const [pieceType] = skinKey.split(':');
-  const scaleX = allowSquish && (occupiedNeighbors.left || occupiedNeighbors.right) ? 0.016 : 0;
-  const scaleY = allowSquish && (occupiedNeighbors.up || occupiedNeighbors.down) ? 0.012 : 0;
-  const shiftX = 0;
-  const shiftY = 0;
+  // Two-layer cache: body/ripple DOM is stable across eye blinks
+  const bodyCacheKey = `${skinKey}:${tile.canvas === (cell as any).__mscTileCanvas ? 'same' : 'new'}`;
+  const needsBodyRebuild = (cell as any).__mscBodyKey !== bodyCacheKey || cell.childElementCount === 0;
 
-  cell.classList.add('monster-cell', `piece-${pieceType.toLowerCase()}`);
-  const motionSeed = [...skinKey].reduce((total, char) => total + char.charCodeAt(0), 0);
-  const { body, artLayer, rippleLayer } = createMonsterBodyNode(
-    pieceType,
-    animate,
-    scaleX,
-    scaleY,
-    shiftX,
-    shiftY,
-    motionSeed,
-  );
-  artLayer.appendChild(createMonsterArtNode(tile.canvas));
-  for (const frame of createMonsterRippleFrames(tile.canvas)) {
-    rippleLayer.appendChild(frame);
-  }
-  for (const eye of tile.eyes) {
-    const eyeFrame = getMonsterEyeFrame(eye, options.now, animate);
-    if (!eyeFrame) {
-      continue;
-    }
-    artLayer.appendChild(
-      createMonsterOverlayNode(
-        eyeFrame,
-        eye.x,
-        eye.y,
-        eye.width,
-        eye.height,
-        tile.canvas.width,
-        tile.canvas.height,
-      ),
+  if (needsBodyRebuild) {
+    (cell as any).__mscBodyKey = bodyCacheKey;
+    (cell as any).__mscTileCanvas = tile.canvas;
+
+    cell.replaceChildren();
+    cell.className = baseClassName;
+    cell.style.removeProperty('--squish-scale-x');
+    cell.style.removeProperty('--squish-scale-y');
+    cell.style.removeProperty('--squish-shift-x');
+    cell.style.removeProperty('--squish-shift-y');
+
+    const [pieceType] = skinKey.split(':');
+    const scaleX = allowSquish && (occupiedNeighbors.left || occupiedNeighbors.right) ? 0.016 : 0;
+    const scaleY = allowSquish && (occupiedNeighbors.up || occupiedNeighbors.down) ? 0.012 : 0;
+    const shiftX = 0;
+    const shiftY = 0;
+
+    cell.classList.add('monster-cell', `piece-${pieceType.toLowerCase()}`);
+    const motionSeed = [...skinKey].reduce((total, char) => total + char.charCodeAt(0), 0);
+    const { body, artLayer, rippleLayer } = createMonsterBodyNode(
+      pieceType,
+      animate,
+      scaleX,
+      scaleY,
+      shiftX,
+      shiftY,
+      motionSeed,
     );
+    artLayer.appendChild(createMonsterArtNode(tile.canvas));
+    for (const frame of createMonsterRippleFrames(tile.canvas, undefined, RIPPLE_AMP_SCALE[pieceType] ?? 1.0)) {
+      rippleLayer.appendChild(frame);
+    }
+
+    cell.appendChild(body);
+    (cell as any).__mscArtLayer = artLayer;
+    (cell as any).__mscEyeKey = ''; // force eye rebuild below
   }
 
-  cell.appendChild(body);
+  // Eye overlay: lightweight update without touching body/ripple DOM
+  const eyeFrameIds = tile.eyes.map((eye) => {
+    const frame = getMonsterEyeFrame(eye, options.now, animate);
+    return frame ? tile.eyes.indexOf(eye) + ':' + (eye.frames.indexOf(frame)) : 'x';
+  }).join(',');
+
+  if ((cell as any).__mscEyeKey !== eyeFrameIds) {
+    (cell as any).__mscEyeKey = eyeFrameIds;
+    const artLayer = (cell as any).__mscArtLayer as HTMLElement | undefined;
+    if (artLayer) {
+      artLayer.querySelectorAll('.monster-eye-overlay').forEach((el) => el.remove());
+      for (const eye of tile.eyes) {
+        const eyeFrame = getMonsterEyeFrame(eye, options.now, animate);
+        if (!eyeFrame) continue;
+        artLayer.appendChild(
+          createMonsterOverlayNode(
+            eyeFrame,
+            eye.x,
+            eye.y,
+            eye.width,
+            eye.height,
+            tile.canvas.width,
+            tile.canvas.height,
+          ),
+        );
+      }
+    }
+  }
 }
 
 export function populateMonsterFigure(
@@ -598,17 +681,7 @@ export function populateMonsterFigure(
   const widthCells = maxX - minX + 1;
   const heightCells = maxY - minY + 1;
 
-  container.replaceChildren();
-  container.classList.toggle('monster-figure-absolute', layout === 'absolute');
-
   if (layout === 'absolute') {
-    const frame = document.createElement('div');
-    frame.className = 'monster-figure-frame';
-    frame.style.width = `${(widthCells / 4) * 100}%`;
-    frame.style.height = `${(heightCells / 4) * 100}%`;
-    const dominantSpan = Math.max(widthCells / 4, heightCells / 4);
-    const fillRatio = options.fillRatio ?? 0.82;
-    frame.style.setProperty('--figure-scale', `${(fillRatio / dominantSpan).toFixed(3)}`);
     const figureArt = cropMonsterFigureCanvas(
       pieceType,
       rotation,
@@ -620,94 +693,141 @@ export function populateMonsterFigure(
       options.animate ?? false,
     );
 
-    if (figureArt) {
-      const motionSeed = pieceType.charCodeAt(0) + rotation * 37;
-      const { body, artLayer, rippleLayer } = createMonsterBodyNode(
-        pieceType,
-        options.animate ?? false,
-        0,
-        0,
-        0,
-        0,
-        motionSeed,
-      );
-      body.classList.add('monster-figure-body');
-      artLayer.appendChild(createMonsterArtNode(figureArt));
-      for (const frame of createMonsterRippleFrames(figureArt)) {
-        rippleLayer.appendChild(frame);
-      }
-      const cellPx = figureArt.width / widthCells;
-      const cropOffsetX = minX * cellPx;
-      const cropOffsetY = minY * cellPx;
-      for (const eye of getMonsterFigureEyes(pieceType, rotation)) {
-        const eyeFrame = getMonsterEyeFrame(eye, options.now, options.animate ?? false);
-        if (!eyeFrame) {
-          continue;
-        }
-        const localX = eye.x - cropOffsetX;
-        const localY = eye.y - cropOffsetY;
-        if (
-          localX + eye.width <= 0 ||
-          localY + eye.height <= 0 ||
-          localX >= figureArt.width ||
-          localY >= figureArt.height
-        ) {
-          continue;
-        }
-        artLayer.appendChild(
-          createMonsterOverlayNode(
-            eyeFrame,
-            localX,
-            localY,
-            eye.width,
-            eye.height,
-            figureArt.width,
-            figureArt.height,
-          ),
+    // Separate cache: body/ripple structure vs. eye overlays
+    // Body cache key does NOT include eye frames — prevents ripple animation reset on blink
+    const animate = options.animate ?? false;
+    const bodyCacheKey = `${pieceType}:${rotation}:${animate}`;
+    const needsBodyRebuild = (container as any).__mfcBodyKey !== bodyCacheKey || container.childElementCount === 0;
+
+    if (needsBodyRebuild) {
+      (container as any).__mfcBodyKey = bodyCacheKey;
+      container.replaceChildren();
+      container.classList.toggle('monster-figure-absolute', layout === 'absolute');
+
+      const frame = document.createElement('div');
+      frame.className = 'monster-figure-frame';
+      frame.style.width = `${(widthCells / 4) * 100}%`;
+      frame.style.height = `${(heightCells / 4) * 100}%`;
+      const dominantSpan = Math.max(widthCells / 4, heightCells / 4);
+      const fillRatio = options.fillRatio ?? 0.82;
+      frame.style.setProperty('--figure-scale', `${(fillRatio / dominantSpan).toFixed(3)}`);
+
+      if (figureArt) {
+        const motionSeed = pieceType.charCodeAt(0) + rotation * 37;
+        const { body, artLayer, rippleLayer } = createMonsterBodyNode(
+          pieceType,
+          animate,
+          0, 0, 0, 0,
+          motionSeed,
         );
+        body.classList.add('monster-figure-body');
+        const artNode = createMonsterArtNode(figureArt);
+        artLayer.appendChild(artNode);
+        for (const rf of createMonsterRippleFrames(figureArt, `fig:${pieceType}:${rotation}`, RIPPLE_AMP_SCALE[pieceType] ?? 1.0)) {
+          rippleLayer.appendChild(rf);
+        }
+        frame.appendChild(body);
+        // Store refs for incremental updates
+        (container as any).__mfcArtLayer = artLayer;
+        (container as any).__mfcArtCanvas = artNode;
+        (container as any).__mfcFigureArt = figureArt;
+      } else {
+        // Sprites not loaded — fall back to cell-based rendering
+        for (const [index, cellDef] of definition.entries()) {
+          const cell = document.createElement('div');
+          cell.className = options.cellClassName || 'preview-cell';
+          addClassNames(cell, options.filledClassName || 'filled');
+          cell.style.position = 'absolute';
+          cell.style.left = `${((cellDef.x - minX) / widthCells) * 100}%`;
+          cell.style.top = `${((cellDef.y - minY) / heightCells) * 100}%`;
+          cell.style.width = `${100 / widthCells}%`;
+          cell.style.height = `${100 / heightCells}%`;
+
+          const occupiedNeighbors = {
+            left: definition.some(({ x, y }) => x === cellDef.x - 1 && y === cellDef.y),
+            right: definition.some(({ x, y }) => x === cellDef.x + 1 && y === cellDef.y),
+            up: definition.some(({ x, y }) => x === cellDef.x && y === cellDef.y - 1),
+            down: definition.some(({ x, y }) => x === cellDef.x && y === cellDef.y + 1),
+          };
+
+          populateMonsterCell(
+            cell,
+            `${pieceType}:${rotation}:${index}`,
+            occupiedNeighbors,
+            {
+              now: options.now,
+              lookX: options.lookX,
+              lookY: options.lookY,
+              animate: options.animate,
+              allowSquish: options.animate,
+              baseClassName: cell.className,
+            },
+          );
+
+          frame.appendChild(cell);
+        }
       }
 
-      frame.appendChild(body);
-    } else {
-      for (const [index, cellDef] of definition.entries()) {
-        const cell = document.createElement('div');
-        cell.className = options.cellClassName || 'preview-cell';
-        addClassNames(cell, options.filledClassName || 'filled');
-        cell.style.position = 'absolute';
-        cell.style.left = `${((cellDef.x - minX) / widthCells) * 100}%`;
-        cell.style.top = `${((cellDef.y - minY) / heightCells) * 100}%`;
-        cell.style.width = `${100 / widthCells}%`;
-        cell.style.height = `${100 / heightCells}%`;
+      container.appendChild(frame);
+    }
 
-        const occupiedNeighbors = {
-          left: definition.some(({ x, y }) => x === cellDef.x - 1 && y === cellDef.y),
-          right: definition.some(({ x, y }) => x === cellDef.x + 1 && y === cellDef.y),
-          up: definition.some(({ x, y }) => x === cellDef.x && y === cellDef.y - 1),
-          down: definition.some(({ x, y }) => x === cellDef.x && y === cellDef.y + 1),
-        };
-
-        populateMonsterCell(
-          cell,
-          `${pieceType}:${rotation}:${index}`,
-          occupiedNeighbors,
-          {
-            now: options.now,
-            lookX: options.lookX,
-            lookY: options.lookY,
-            animate: options.animate,
-            allowSquish: options.animate,
-            baseClassName: cell.className,
-          },
-        );
-
-        frame.appendChild(cell);
+    // Refresh body art canvas every call (enables O/L body-frame blinks without DOM rebuild)
+    if (figureArt && !needsBodyRebuild) {
+      const artNode = (container as any).__mfcArtCanvas as HTMLCanvasElement | undefined;
+      if (artNode) {
+        if (artNode.width !== figureArt.width) artNode.width = figureArt.width;
+        if (artNode.height !== figureArt.height) artNode.height = figureArt.height;
+        const ctx = artNode.getContext('2d')!;
+        ctx.clearRect(0, 0, artNode.width, artNode.height);
+        ctx.drawImage(figureArt, 0, 0);
+        (container as any).__mfcFigureArt = figureArt;
       }
     }
 
-    container.appendChild(frame);
+    // Update eye overlays without touching body/ripple DOM
+    const eyes = getMonsterFigureEyes(pieceType, rotation);
+    const eyeFrameIds = eyes.map((eye) => {
+      const ef = getMonsterEyeFrame(eye, options.now, animate);
+      return ef ? eye.frames.indexOf(ef) : -1;
+    }).join(',');
+
+    if ((container as any).__mfcEyeKey !== eyeFrameIds) {
+      (container as any).__mfcEyeKey = eyeFrameIds;
+      const artLayer = (container as any).__mfcArtLayer as HTMLElement | undefined;
+      const cachedFigureArt = (container as any).__mfcFigureArt as HTMLCanvasElement | undefined;
+      if (artLayer && cachedFigureArt) {
+        // Remove old eye overlays
+        artLayer.querySelectorAll('.monster-eye-overlay').forEach((el) => el.remove());
+        const cellPx = cachedFigureArt.width / widthCells;
+        const cropOffsetX = minX * cellPx;
+        const cropOffsetY = minY * cellPx;
+        for (const eye of eyes) {
+          const eyeFrame = getMonsterEyeFrame(eye, options.now, animate);
+          if (!eyeFrame) continue;
+          const localX = eye.x - cropOffsetX;
+          const localY = eye.y - cropOffsetY;
+          if (
+            localX + eye.width <= 0 ||
+            localY + eye.height <= 0 ||
+            localX >= cachedFigureArt.width ||
+            localY >= cachedFigureArt.height
+          ) continue;
+          artLayer.appendChild(
+            createMonsterOverlayNode(
+              eyeFrame, localX, localY,
+              eye.width, eye.height,
+              cachedFigureArt.width, cachedFigureArt.height,
+            ),
+          );
+        }
+      }
+    }
 
     return;
   }
+
+  container.replaceChildren();
+  container.classList.toggle('monster-figure-absolute', false);
 
   for (let row = 0; row < 4; row += 1) {
     for (let col = 0; col < 4; col += 1) {
@@ -779,12 +899,18 @@ export function populateMonsterBoardFigure(
     options.animate ?? true,
   );
 
-  container.replaceChildren();
-
   if (!figureArt) {
-    // Sprites not loaded yet — board cells show colored fallback via piece-* class
+    container.replaceChildren();
     return;
   }
+
+  const bfigCacheKey = `${pieceType}:${rotation}`;
+  if ((container as any).__mbfKey === bfigCacheKey && container.childElementCount > 0) {
+    return;
+  }
+  (container as any).__mbfKey = bfigCacheKey;
+
+  container.replaceChildren();
 
   const motionSeed = pieceType.charCodeAt(0) + rotation * 37;
   const { body, artLayer, rippleLayer } = createMonsterBodyNode(
@@ -798,7 +924,7 @@ export function populateMonsterBoardFigure(
   );
   body.classList.add('monster-figure-body');
   artLayer.appendChild(createMonsterArtNode(figureArt));
-  for (const frame of createMonsterRippleFrames(figureArt)) {
+  for (const frame of createMonsterRippleFrames(figureArt, `bfig:${pieceType}:${rotation}`, RIPPLE_AMP_SCALE[pieceType] ?? 1.0)) {
     rippleLayer.appendChild(frame);
   }
 

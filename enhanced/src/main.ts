@@ -310,7 +310,15 @@ async function init() {
     homeScreen.classList.add('hidden');
   }
 
+  let renderDirty = false;
+  let lastRenderTime = 0;
+
+  function markRenderDirty() {
+    renderDirty = true;
+  }
+
   function renderCurrentView(now = performance.now()) {
+    renderDirty = false;
     if (appPhase === 'menu') {
       renderHomeMenu(homeRefs, storage, homeState, now);
       homeRefs.monstosCenter.classList.toggle('preview-loading', !monsterSkinReady);
@@ -1662,7 +1670,7 @@ async function init() {
     state,
     input,
     settings,
-    onRender: renderCurrentView,
+    onRender: markRenderDirty,
     onReset: () => {
       clearSavedRun(storage, state.mode);
       transitionTo('countdown', state.mode);
@@ -1939,9 +1947,11 @@ async function init() {
         while (now - state.lastGravity >= gravityMs) {
           dropOnce(state, settings.lockDelayMs);
           state.lastGravity += gravityMs;
+          markRenderDirty();
         }
         if (state.lockDeadline && now >= state.lockDeadline) {
           lockPiece(state);
+          markRenderDirty();
         }
 
         if (state.lastLockAt > lastLockSoundAt) {
@@ -1966,7 +1976,10 @@ async function init() {
           transitionTo(state.sprintComplete ? 'sprint-clear' : 'game-over');
         }
 
-        renderCurrentView(now);
+        if (renderDirty || now - lastRenderTime >= 100) {
+          renderCurrentView(now);
+          lastRenderTime = now;
+        }
         break;
       }
       case 'paused':

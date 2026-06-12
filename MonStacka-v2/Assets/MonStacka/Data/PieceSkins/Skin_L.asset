@@ -1,0 +1,107 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d5e2e37b41d0ce4e93d0cc773c5d68d, type: 3}
+  m_Name: Skin_L
+  m_EditorClassIdentifier: Assembly-CSharp::MonStacka.Visual.PieceSkinData
+  pieceType: 7
+  bodyFrames:
+  - {fileID: 21300000, guid: d7e9c5a2042ae7c4c9250787046c3c05, type: 3}
+  - {fileID: 21300000, guid: d7bbd145433d4cd49bbeb2530a1ccd96, type: 3}
+  - {fileID: 21300000, guid: 91c7cb269296cd14e9cc26131cb10c98, type: 3}
+  cropBounds:
+    x: 595
+    y: 622
+    width: 291
+    height: 430
+  featuresSheet: {fileID: 21300000, guid: c097614bd5631ea47a80f1c722063486, type: 3}
+  features:
+  - featureName: ear_foot
+    motion: 4
+    sheetRect:
+      x: 312
+      y: 557
+      width: 46
+      height: 87
+    boxRect:
+      serializedVersion: 2
+      x: 299.6276
+      y: 219.4289
+      width: 35.372414
+      height: 67.93706
+  - featureName: ear_low
+    motion: 4
+    sheetRect:
+      x: 169
+      y: 557
+      width: 55
+      height: 102
+    boxRect:
+      serializedVersion: 2
+      x: 141.98965
+      y: 239.73193
+      width: 42.293106
+      height: 79.650345
+  - featureName: ear_mid
+    motion: 4
+    sheetRect:
+      x: 226
+      y: 557
+      width: 84
+      height: 99
+    boxRect:
+      serializedVersion: 2
+      x: 125.07241
+      y: 128.06526
+      width: 64.59311
+      height: 77.30769
+  - featureName: blind_eye
+    motion: 2
+    sheetRect:
+      x: 360
+      y: 557
+      width: 87
+      height: 85
+    boxRect:
+      serializedVersion: 2
+      x: 152.75517
+      y: 39.825172
+      width: 66.9
+      height: 66.37529
+  - featureName: ear_top
+    motion: 4
+    sheetRect:
+      x: 519
+      y: 557
+      width: 30
+      height: 74
+    boxRect:
+      serializedVersion: 2
+      x: 112.76897
+      y: 46.072258
+      width: 23.068966
+      height: 57.785545
+  - featureName: small_eye
+    motion: 1
+    sheetRect:
+      x: 112
+      y: 781
+      width: 67
+      height: 35
+    boxRect:
+      serializedVersion: 2
+      x: 122.76552
+      y: 10.151515
+      width: 51.52069
+      height: 27.331001
+  baseRotation: 1
+  boxSize: 3
+  pixelsPerCell: 112

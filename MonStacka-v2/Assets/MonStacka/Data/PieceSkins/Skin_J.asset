@@ -1,0 +1,94 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d5e2e37b41d0ce4e93d0cc773c5d68d, type: 3}
+  m_Name: Skin_J
+  m_EditorClassIdentifier: Assembly-CSharp::MonStacka.Visual.PieceSkinData
+  pieceType: 6
+  bodyFrames:
+  - {fileID: 21300000, guid: 1cd2165ff7701e243a5eb2de2d7ff3eb, type: 3}
+  - {fileID: 21300000, guid: 1468e83d8e60f5b479924a53f60af11e, type: 3}
+  - {fileID: 21300000, guid: fdeeed2c96c13084285390b446038a03, type: 3}
+  cropBounds:
+    x: 49
+    y: 626
+    width: 293
+    height: 427
+  featuresSheet: {fileID: 21300000, guid: c097614bd5631ea47a80f1c722063486, type: 3}
+  features:
+  - featureName: eye_left
+    motion: 2
+    sheetRect:
+      x: 488
+      y: 715
+      width: 53
+      height: 52
+    boxRect:
+      serializedVersion: 2
+      x: 12.982877
+      y: 218.61504
+      width: 40.47603
+      height: 40.89202
+  - featureName: eye_right
+    motion: 2
+    sheetRect:
+      x: 543
+      y: 715
+      width: 60
+      height: 52
+    boxRect:
+      serializedVersion: 2
+      x: 57.277397
+      y: 218.61504
+      width: 45.82192
+      height: 40.89202
+  - featureName: nose_lower
+    motion: 3
+    sheetRect:
+      x: 551
+      y: 557
+      width: 46
+      height: 73
+    boxRect:
+      serializedVersion: 2
+      x: 155.79453
+      y: 242.99297
+      width: 35.13014
+      height: 57.406105
+  - featureName: nose_upper
+    motion: 3
+    sheetRect:
+      x: 449
+      y: 557
+      width: 68
+      height: 81
+    boxRect:
+      serializedVersion: 2
+      x: 135.17465
+      y: 128.96713
+      width: 51.931507
+      height: 63.697186
+  - featureName: sewn_mouth
+    motion: 0
+    sheetRect:
+      x: 605
+      y: 715
+      width: 114
+      height: 46
+    boxRect:
+      serializedVersion: 2
+      x: 123.71918
+      y: 22.805164
+      width: 87.061646
+      height: 36.17371
+  baseRotation: 3
+  boxSize: 3
+  pixelsPerCell: 112

@@ -1,1 +1,27 @@
 /enhanced/node_modules/
+enhanced/debug-*.png
+enhanced/src/assets/debug-*.png
+**/__pycache__/
+*.pyc
+
+# Unity editor/runtime generated files
+MonStacka-v2/Library/
+MonStacka-v2/Temp/
+MonStacka-v2/Obj/
+MonStacka-v2/Logs/
+MonStacka-v2/UserSettings/
+MonStacka-v2/Builds/
+MonStacka-v2/MemoryCaptures/
+
+# Local Unity verification/build artifacts
+MonStacka-v2/*.log
+MonStacka-v2/*audit*.png
+MonStacka-v2/*runtime*.png
+MonStacka-v2/*smoke*.png
+MonStacka-v2/*shot*.png
+MonStacka-v2/*check*.png
+MonStacka-v2/*contact-sheet*.png
+MonStacka-v2/Assets/**/_review*.png
+MonStacka-v2/Assets/**/_review*.png.meta
+MonStacka-v2/layout-smoke*/
+MonStacka-v2/psd_layers/

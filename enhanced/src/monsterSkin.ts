@@ -166,16 +166,12 @@ const INDEPENDENT_EYE_SEEDS: Partial<Record<PieceType, EyeSeedSpec[]>> = {
   Z: [
     { cellIndex: 1, x: 12, y: 8, width: 62, height: 58, style: 'roam' },
   ],
-  O: [
-    { cellIndex: 0, x: 22, y: 10, width: 68, height: 64, style: 'roam' },
-  ],
+  // O uses raw sprite frames for eye animation (no overlay)
   J: [
     { cellIndex: 3, x: 10, y: 18, width: 42, height: 42, style: 'blink' },
     { cellIndex: 3, x: 62, y: 22, width: 38, height: 38, style: 'blink' },
   ],
-  L: [
-    { cellIndex: 0, x: 20, y: 16, width: 52, height: 52, style: 'blink' },
-  ],
+  // L uses raw sprite frames for eye animation (no overlay)
   I: [
     { cellIndex: 0, x: 0, y: 2, width: 54, height: 50, style: 'roam' },
     { cellIndex: 0, x: 58, y: 40, width: 54, height: 52, style: 'roam' },
@@ -829,28 +825,36 @@ async function buildMonsterTiles(): Promise<void> {
       const definitionsMatch = definition.length === baseDefinition.length &&
         definition.every((cell, i) => cell.x === baseDefinition[i].x && cell.y === baseDefinition[i].y);
       const turns = definitionsMatch ? 0 : ((rotation - spec.baseRotation) % 4 + 4) % 4;
-      const rawRotatedCanvases = baseCanvases.map((canvas) =>
-        retainConnectedPiece(rotateCanvas(canvas, turns), definition));
+      // Rotate canvases — keep a clean copy (without retainConnectedPiece)
+      // for eye overlay crops so blink pixels aren't removed by flood fill
+      const rotatedOnlyCanvases = baseCanvases.map((canvas) =>
+        rotateCanvas(canvas, turns));
+      const rawRotatedCanvases = rotatedOnlyCanvases.map((canvas) =>
+        retainConnectedPiece(canvas, definition));
       const eyePlacements = buildEyePlacements(pieceType, rotation);
       const bodyCanvases = eyePlacements.length
         ? neutralizeEyeRegions(rawRotatedCanvases, eyePlacements)
         : rawRotatedCanvases;
       const figureKey = `${pieceType}:${rotation}`;
 
+      const canvasW = rawRotatedCanvases[0].width;
+      const canvasH = rawRotatedCanvases[0].height;
       bodyCanvases.forEach((canvas, frameIndex) => {
         setFramedValue(figures, figureKey, frameIndex, canvas);
       });
       if (eyePlacements.length) {
-        figureEyes.set(figureKey, eyePlacements.map((eye) => ({
-          x: eye.x,
-          y: eye.y,
-          width: eye.width,
-          height: eye.height,
-          frames: rawRotatedCanvases.map((canvas) =>
-            cropRectCanvas(canvas, eye.x, eye.y, eye.width, eye.height)),
-          style: eye.style,
-          seed: eye.seed,
-        })));
+        figureEyes.set(figureKey, eyePlacements.map((eye) => {
+          return {
+            x: eye.x,
+            y: eye.y,
+            width: eye.width,
+            height: eye.height,
+            frames: rotatedOnlyCanvases.map((canvas) =>
+              cropRectCanvas(canvas, eye.x, eye.y, eye.width, eye.height)),
+            style: eye.style,
+            seed: eye.seed,
+          };
+        }));
       } else {
         figureEyes.delete(figureKey);
       }
@@ -859,16 +863,18 @@ async function buildMonsterTiles(): Promise<void> {
         const key = `${pieceType}:${rotation}:${index}`;
         const tileEyeLayers = eyePlacements
           .filter((eye) => eye.tileIndex === index)
-          .map((eye) => ({
-            x: eye.localX,
-            y: eye.localY,
-            width: eye.width,
-            height: eye.height,
-            frames: rawRotatedCanvases.map((canvas) =>
-              cropRectCanvas(canvas, eye.x, eye.y, eye.width, eye.height)),
-            style: eye.style,
-            seed: eye.seed,
-          }));
+          .map((eye) => {
+            return {
+              x: eye.localX,
+              y: eye.localY,
+              width: eye.width,
+              height: eye.height,
+              frames: rotatedOnlyCanvases.map((canvas) =>
+                cropRectCanvas(canvas, eye.x, eye.y, eye.width, eye.height)),
+              style: eye.style,
+              seed: eye.seed,
+            };
+          });
 
         bodyCanvases.forEach((canvas, frameIndex) => {
           const tileCanvas = cropCellCanvas(canvas, cell.x, cell.y);

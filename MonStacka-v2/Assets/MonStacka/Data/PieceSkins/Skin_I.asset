@@ -1,0 +1,211 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d5e2e37b41d0ce4e93d0cc773c5d68d, type: 3}
+  m_Name: Skin_I
+  m_EditorClassIdentifier: Assembly-CSharp::MonStacka.Visual.PieceSkinData
+  pieceType: 1
+  bodyFrames:
+  - {fileID: 21300000, guid: f68c19ed6873aa4468cb642df38fa4e0, type: 3}
+  - {fileID: 21300000, guid: 97e350727b9c4ca419eaec1fb61cdd35, type: 3}
+  - {fileID: 21300000, guid: 0acefcf844f6f904c92df7b86d28e3b0, type: 3}
+  cropBounds:
+    x: 403
+    y: 182
+    width: 151
+    height: 571
+  featuresSheet: {fileID: 21300000, guid: c097614bd5631ea47a80f1c722063486, type: 3}
+  features:
+  - featureName: maw
+    motion: 3
+    sheetRect:
+      x: 220
+      y: 781
+      width: 63
+      height: 32
+    boxRect:
+      serializedVersion: 2
+      x: 255.08
+      y: 0
+      width: 46.62
+      height: 25.094736
+  - featureName: eye_12
+    motion: 1
+    sheetRect:
+      x: 2
+      y: 715
+      width: 64
+      height: 64
+    boxRect:
+      serializedVersion: 2
+      x: 247.68
+      y: 378.77368
+      width: 47.36
+      height: 50.189472
+  - featureName: eye_11
+    motion: 1
+    sheetRect:
+      x: 317
+      y: 781
+      width: 29
+      height: 29
+    boxRect:
+      serializedVersion: 2
+      x: 312.8
+      y: 383.47894
+      width: 21.460001
+      height: 22.742105
+  - featureName: eye_10
+    motion: 1
+    sheetRect:
+      x: 813
+      y: 715
+      width: 39
+      height: 41
+    boxRect:
+      serializedVersion: 2
+      x: 226.22
+      y: 351.3263
+      width: 28.86
+      height: 32.15263
+  - featureName: eye_9
+    motion: 1
+    sheetRect:
+      x: 975
+      y: 715
+      width: 41
+      height: 39
+    boxRect:
+      serializedVersion: 2
+      x: 289.86002
+      y: 339.56314
+      width: 30.34
+      height: 30.58421
+  - featureName: eye_8
+    motion: 1
+    sheetRect:
+      x: 896
+      y: 715
+      width: 39
+      height: 40
+    boxRect:
+      serializedVersion: 2
+      x: 226.22
+      y: 277.6105
+      width: 28.86
+      height: 31.36842
+  - featureName: eye_7
+    motion: 1
+    sheetRect:
+      x: 854
+      y: 715
+      width: 40
+      height: 41
+    boxRect:
+      serializedVersion: 2
+      x: 299.48
+      y: 256.43683
+      width: 29.6
+      height: 32.15263
+  - featureName: eye_6
+    motion: 1
+    sheetRect:
+      x: 937
+      y: 715
+      width: 36
+      height: 40
+    boxRect:
+      serializedVersion: 2
+      x: 243.98
+      y: 229.77368
+      width: 26.64
+      height: 31.36842
+  - featureName: eye_5
+    motion: 1
+    sheetRect:
+      x: 39
+      y: 781
+      width: 36
+      height: 37
+    boxRect:
+      serializedVersion: 2
+      x: 224
+      y: 193.7
+      width: 26.64
+      height: 29.015789
+  - featureName: eye_4
+    motion: 1
+    sheetRect:
+      x: 285
+      y: 781
+      width: 30
+      height: 31
+    boxRect:
+      serializedVersion: 2
+      x: 313.54
+      y: 167.82104
+      width: 22.2
+      height: 24.310526
+  - featureName: eye_3
+    motion: 1
+    sheetRect:
+      x: 599
+      y: 557
+      width: 72
+      height: 73
+    boxRect:
+      serializedVersion: 2
+      x: 255.82
+      y: 127.0421
+      width: 53.28
+      height: 57.247368
+  - featureName: eye_2
+    motion: 1
+    sheetRect:
+      x: 429
+      y: 715
+      width: 57
+      height: 55
+    boxRect:
+      serializedVersion: 2
+      x: 288.38
+      y: 56.463158
+      width: 42.18
+      height: 43.131577
+  - featureName: eye_1
+    motion: 1
+    sheetRect:
+      x: 294
+      y: 715
+      width: 52
+      height: 57
+    boxRect:
+      serializedVersion: 2
+      x: 225.48
+      y: 17.25263
+      width: 38.48
+      height: 44.699997
+  - featureName: drool
+    motion: 7
+    sheetRect:
+      x: 2
+      y: 2
+      width: 144
+      height: 553
+    boxRect:
+      serializedVersion: 2
+      x: 228.44
+      y: 14.115789
+      width: 106.56
+      height: 433.6684
+  baseRotation: 1
+  boxSize: 4
+  pixelsPerCell: 112

@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d5e2e37b41d0ce4e93d0cc773c5d68d, type: 3}
+  m_Name: Skin_O
+  m_EditorClassIdentifier: Assembly-CSharp::MonStacka.Visual.PieceSkinData
+  pieceType: 2
+  bodyFrames:
+  - {fileID: 21300000, guid: 46b6b52314486ee4c9ed8d0a24079c39, type: 3}
+  - {fileID: 21300000, guid: a213bf383b25cf24bbccf366d4f8ed35, type: 3}
+  - {fileID: 21300000, guid: 70e5ef8ea23b0ba4884deefa29637589, type: 3}
+  cropBounds:
+    x: 43
+    y: 314
+    width: 299
+    height: 289
+  featuresSheet: {fileID: 21300000, guid: c097614bd5631ea47a80f1c722063486, type: 3}
+  features:
+  - featureName: eye_mouthlid
+    motion: 2
+    sheetRect:
+      x: 2
+      y: 557
+      width: 165
+      height: 156
+    boxRect:
+      serializedVersion: 2
+      x: 161.38927
+      y: 47.23264
+      width: 123.47315
+      height: 120.79167
+  - featureName: whiskers
+    motion: 5
+    sheetRect:
+      x: 673
+      y: 557
+      width: 296
+      height: 66
+    boxRect:
+      serializedVersion: 2
+      x: 112.74832
+      y: 80.52778
+      width: 221.50336
+      height: 51.104168
+  baseRotation: 0
+  boxSize: 4
+  pixelsPerCell: 112

@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0d14e9956196a94a90f1c124a65ba05, type: 3}
+  m_Name: DefaultBorderDeformTuning
+  m_EditorClassIdentifier: Assembly-CSharp::MonStacka.Visual.BorderDeformTuningProfile
+  springStiffness: 168
+  springDamping: 33
+  maxDisplacementCells: 0.026
+  ambientAmplitudeCells: 0.011
+  ambientDriveFrequency: 3.3
+  ambientFlutterFrequency: 19.5
+  edgeNoiseDensity: 4.1
+  seamAmplitudeCells: 0.017
+  seamDriveFrequency: 6.8
+  seamNoiseBlend: 0.7
+  impactImpulseCells: 0.02
+  settleDurationSeconds: 0.085
+  reboundFrequency: 14.5
+  previewAmplitudeScale: 0.95
+  debugDrawSegments: 0
+  debugDrawSeamLinks: 0
+  debugDrawDisplacement: 0
+  debugDrawImpacts: 0
+  debugLineScaleCells: 0.22

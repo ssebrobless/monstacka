@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d5e2e37b41d0ce4e93d0cc773c5d68d, type: 3}
+  m_Name: Skin_Z
+  m_EditorClassIdentifier: Assembly-CSharp::MonStacka.Visual.PieceSkinData
+  pieceType: 5
+  bodyFrames:
+  - {fileID: 21300000, guid: 9a109b749ad5485469b83dec8a97026d, type: 3}
+  - {fileID: 21300000, guid: aab7bc69b18a667429b4b85185e2ed06, type: 3}
+  - {fileID: 21300000, guid: c26e1c9adaff50a4b8aab5e9b93bcbde, type: 3}
+  cropBounds:
+    x: 585
+    y: 19
+    width: 435
+    height: 292
+  featuresSheet: {fileID: 21300000, guid: c097614bd5631ea47a80f1c722063486, type: 3}
+  features:
+  - featureName: nose
+    motion: 3
+    sheetRect:
+      x: 348
+      y: 715
+      width: 79
+      height: 56
+    boxRect:
+      serializedVersion: 2
+      x: 0
+      y: 0.76632303
+      width: 60.979263
+      height: 42.91409
+  - featureName: grin_teeth
+    motion: 5
+    sheetRect:
+      x: 68
+      y: 715
+      width: 143
+      height: 64
+    boxRect:
+      serializedVersion: 2
+      x: 0
+      y: 48.27835
+      width: 110.38018
+      height: 49.044674
+  - featureName: eye
+    motion: 2
+    sheetRect:
+      x: 213
+      y: 715
+      width: 79
+      height: 59
+    boxRect:
+      serializedVersion: 2
+      x: 43.997696
+      y: 10.728522
+      width: 60.979263
+      height: 45.21306
+  baseRotation: 0
+  boxSize: 3
+  pixelsPerCell: 112

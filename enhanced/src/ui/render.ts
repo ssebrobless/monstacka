@@ -4,6 +4,7 @@ import { getCells, getGhostCells } from '../engine/pieces';
 import { elapsed, formatTime } from '../engine/state';
 import { populateMonsterBoardFigure, populateMonsterCell, populateMonsterFigure } from './monsterDom';
 import { getVisibleScoreRecords, getVisibleSprintRecords } from '../demoRecords';
+import { isMonsterSkinReady } from '../monsterSkin';
 
 export interface DomRefs {
   boardWrap: HTMLElement;
@@ -39,6 +40,36 @@ export interface DomRefs {
   sfxVolumeInput: HTMLInputElement;
   musicEnabledInput: HTMLInputElement;
   musicVolumeInput: HTMLInputElement;
+  ditherEnabledInput: HTMLInputElement;
+  cleanLabelsInput: HTMLInputElement;
+  ditherOverlay: HTMLDivElement;
+}
+
+// --- Render cache: avoid rebuilding DOM that hasn't changed ---
+let cachedLockedKey = '';
+let cachedActiveIdKey = '';
+let cachedActivePosKey = '';
+let cachedGap = -1;
+let cachedCellWidth = 0;
+let cachedCellHeight = 0;
+let cachedHoldPiece: string | null | undefined = undefined;
+let cachedNextQueue = '';
+let cachedLeaderboardKey = '';
+let previousCellValues: string[] = [];
+let activeOverlayNode: HTMLElement | null = null;
+
+export function resetRenderCache(): void {
+  cachedLockedKey = '';
+  cachedActiveIdKey = '';
+  cachedActivePosKey = '';
+  cachedGap = -1;
+  cachedCellWidth = 0;
+  cachedCellHeight = 0;
+  cachedHoldPiece = undefined;
+  cachedNextQueue = '';
+  cachedLeaderboardKey = '';
+  activeOverlayNode = null;
+  previousCellValues = [];
 }
 
 export function getDomRefs(): DomRefs {
@@ -76,6 +107,9 @@ export function getDomRefs(): DomRefs {
     sfxVolumeInput: document.getElementById('sfxVolumeInput') as HTMLInputElement,
     musicEnabledInput: document.getElementById('musicEnabledInput') as HTMLInputElement,
     musicVolumeInput: document.getElementById('musicVolumeInput') as HTMLInputElement,
+    ditherEnabledInput: document.getElementById('ditherEnabledInput') as HTMLInputElement,
+    cleanLabelsInput: document.getElementById('cleanLabelsInput') as HTMLInputElement,
+    ditherOverlay: document.getElementById('ditherOverlay') as HTMLDivElement,
   };
 }
 
@@ -202,12 +236,27 @@ export function render(
       }
     });
 
-    getCells(state.active).forEach((cell, index) => {
+    const activeCellPositions = getCells(state.active);
+    activeCellPositions.forEach((cell, index) => {
       if (cell.y >= HIDDEN_ROWS) {
         rows[cell.y - HIDDEN_ROWS][cell.x] = state.active!.type;
         skinRows[cell.y - HIDDEN_ROWS][cell.x] = `${state.active!.type}:${state.active!.rotation}:${index}`;
       }
     });
+
+    // Comet trail: fading cells above the active piece
+    const activeXSet = new Set(activeCellPositions.map((c) => c.x));
+    for (const col of activeXSet) {
+      // Find the topmost active cell in this column
+      const topY = Math.min(...activeCellPositions.filter((c) => c.x === col).map((c) => c.y));
+      for (let trail = 1; trail <= 2; trail += 1) {
+        const ty = topY - trail;
+        if (ty < HIDDEN_ROWS || ty - HIDDEN_ROWS < 0) continue;
+        const row = ty - HIDDEN_ROWS;
+        if (rows[row][col]) continue; // don't overwrite occupied cells
+        rows[row][col] = `trail-${trail}-${state.active!.type}`;
+      }
+    }
   }
 
   const total = rows.length * COLS;
@@ -221,19 +270,22 @@ export function render(
     }
   }
 
+  const skinReady = isMonsterSkinReady();
   const lockedGroups = buildLockedPieceGroups(skinRows);
   const completeCellKeys = new Set<string>();
-  for (const group of lockedGroups) {
-    if (!group.complete) {
-      continue;
-    }
-    for (const cell of group.cells) {
-      completeCellKeys.add(`${cell.x}:${cell.y}`);
+  if (skinReady) {
+    for (const group of lockedGroups) {
+      if (!group.complete) {
+        continue;
+      }
+      for (const cell of group.cells) {
+        completeCellKeys.add(`${cell.x}:${cell.y}`);
+      }
     }
   }
 
   let activeGroup: BoardPieceGroup | null = null;
-  if (state.active) {
+  if (skinReady && state.active) {
     const definition = DEFINITIONS[state.active.type][state.active.rotation];
     const activeCells = getCells(state.active)
       .filter((cell) => cell.y >= HIDDEN_ROWS)
@@ -254,7 +306,11 @@ export function render(
     }
   }
 
-  rows.flat().forEach((value, index) => {
+  const flatValues = rows.flat();
+  flatValues.forEach((value, index) => {
+    // Skip cells that haven't changed since last frame
+    if (value === previousCellValues[index]) return;
+
     const cell = refs.board.children[index] as HTMLElement;
     const rowIndex = Math.floor(index / COLS);
     const colIndex = index % COLS;
@@ -279,6 +335,15 @@ export function render(
       return;
     }
 
+    if (value.startsWith('trail-')) {
+      const parts = value.split('-');
+      const trailLevel = parts[1];
+      const trailPiece = parts[2].toLowerCase();
+      cell.className = `cell trail-${trailLevel} piece-${trailPiece}`;
+      cell.replaceChildren();
+      return;
+    }
+
     const occupiedNeighbors = {
       left: colIndex > 0 && Boolean(skinRows[rowIndex][colIndex - 1]),
       right: colIndex < COLS - 1 && Boolean(skinRows[rowIndex][colIndex + 1]),
@@ -288,7 +353,7 @@ export function render(
 
     if (occupied) {
       if (isWholePieceCell) {
-        cell.className = 'cell';
+        cell.className = `cell piece-${skinKey.split(':')[0].toLowerCase()}`;
         cell.replaceChildren();
         cell.style.removeProperty('--squish-scale-x');
         cell.style.removeProperty('--squish-scale-y');
@@ -310,15 +375,19 @@ export function render(
       cell.classList.add(`piece-${value.toLowerCase()}`);
     }
   });
+  previousCellValues = flatValues;
 
-  refs.boardMonsterLayer.replaceChildren();
-  const gap = Number.parseFloat(getComputedStyle(refs.board).gap || '3') || 3;
+  // Ensure layout measurements are cached
+  if (cachedGap < 0) {
+    cachedGap = Number.parseFloat(getComputedStyle(refs.board).gap || '3') || 3;
+  }
+  const gap = cachedGap;
   const innerWidth = refs.board.clientWidth - 20;
   const innerHeight = refs.board.clientHeight - 20;
-  const cellWidth = (innerWidth - gap * (COLS - 1)) / COLS;
-  const cellHeight = (innerHeight - gap * (rows.length - 1)) / rows.length;
+  cachedCellWidth = (innerWidth - gap * (COLS - 1)) / COLS;
+  cachedCellHeight = (innerHeight - gap * (rows.length - 1)) / rows.length;
 
-  const renderBoardGroup = (group: BoardPieceGroup): void => {
+  const renderBoardGroup = (group: BoardPieceGroup): HTMLElement => {
     const definition = DEFINITIONS[group.pieceType][group.rotation];
     const minX = Math.min(...definition.map((cell) => cell.x));
     const maxX = Math.max(...definition.map((cell) => cell.x));
@@ -331,20 +400,52 @@ export function render(
 
     const pieceFigure = document.createElement('div');
     pieceFigure.className = 'board-piece-figure';
-    pieceFigure.style.left = `${leftCell * (cellWidth + gap)}px`;
-    pieceFigure.style.top = `${topCell * (cellHeight + gap)}px`;
-    pieceFigure.style.width = `${widthCells * cellWidth + Math.max(0, widthCells - 1) * gap}px`;
-    pieceFigure.style.height = `${heightCells * cellHeight + Math.max(0, heightCells - 1) * gap}px`;
+    pieceFigure.style.left = `${leftCell * (cachedCellWidth + gap)}px`;
+    pieceFigure.style.top = `${topCell * (cachedCellHeight + gap)}px`;
+    pieceFigure.style.width = `${widthCells * cachedCellWidth + Math.max(0, widthCells - 1) * gap}px`;
+    pieceFigure.style.height = `${heightCells * cachedCellHeight + Math.max(0, heightCells - 1) * gap}px`;
     populateMonsterBoardFigure(pieceFigure, group.pieceType, group.rotation, {
       now,
       animate: true,
     });
-    refs.boardMonsterLayer.appendChild(pieceFigure);
+    return pieceFigure;
   };
 
-  lockedGroups.filter((group) => group.complete).forEach(renderBoardGroup);
-  if (activeGroup) {
-    renderBoardGroup(activeGroup);
+  // Rebuild locked piece overlays only when the board changes (lock/clear)
+  const lockedKey = skinReady ? `${state.lastLockAt}:${state.lastLineClearAt}` : '';
+  if (lockedKey !== cachedLockedKey) {
+    cachedLockedKey = lockedKey;
+    refs.boardMonsterLayer.replaceChildren();
+    activeOverlayNode = null;
+    if (skinReady) {
+      lockedGroups.filter((group) => group.complete).forEach((group) => {
+        refs.boardMonsterLayer.appendChild(renderBoardGroup(group));
+      });
+    }
+  }
+
+  // Update active piece overlay — only rebuild on type/rotation change, reposition on move
+  const activeIdKey = skinReady && state.active ? `${state.active.type}:${state.active.rotation}` : '';
+  const activePosKey = state.active ? `${state.active.x}:${state.active.y}` : '';
+
+  if (activeIdKey !== cachedActiveIdKey || (activeIdKey && !activeOverlayNode)) {
+    cachedActiveIdKey = activeIdKey;
+    cachedActivePosKey = activePosKey;
+    if (activeOverlayNode) {
+      activeOverlayNode.remove();
+      activeOverlayNode = null;
+    }
+    if (activeGroup) {
+      activeOverlayNode = renderBoardGroup(activeGroup);
+      refs.boardMonsterLayer.appendChild(activeOverlayNode);
+    }
+  } else if (activePosKey !== cachedActivePosKey && activeOverlayNode && state.active) {
+    cachedActivePosKey = activePosKey;
+    const definition = DEFINITIONS[state.active.type][state.active.rotation];
+    const minX = Math.min(...definition.map((c) => c.x));
+    const minY = Math.min(...definition.map((c) => c.y));
+    activeOverlayNode.style.left = `${(state.active.x + minX) * (cachedCellWidth + gap)}px`;
+    activeOverlayNode.style.top = `${(state.active.y + minY) * (cachedCellHeight + gap)}px`;
   }
 
   refs.board.classList.toggle('lock-flash', now - state.lastLockAt < 120);
@@ -364,59 +465,71 @@ export function render(
   refs.linesLabel.textContent = isTraining ? 'Pieces' : 'Lines';
   refs.lines.textContent = isTraining ? String(state.pieces) : String(state.lines);
 
-  renderPiecePreview(refs.hold, state.hold || null);
+  const holdPiece = state.hold || null;
+  if (holdPiece !== cachedHoldPiece) {
+    cachedHoldPiece = holdPiece;
+    renderPiecePreview(refs.hold, holdPiece);
+  }
 
-  refs.nextQueue.innerHTML = '';
-  state.queue.slice(0, 3).forEach((piece) => {
-    const item = document.createElement('li');
-    item.className = 'queue-item';
-    const preview = document.createElement('div');
-    renderPiecePreview(preview, piece);
-    const label = document.createElement('span');
-    label.className = 'queue-label';
-    label.textContent = piece;
-    item.appendChild(preview);
-    item.appendChild(label);
-    refs.nextQueue.appendChild(item);
-  });
-
-  refs.leaderboardTitle.textContent = isTraining
-    ? 'Training Notes'
-    : state.mode === 'sprint40'
-      ? 'Top 3 40L Times'
-      : 'Top 3 Scores';
-  refs.leaderboard.innerHTML = '';
-  if (isTraining) {
-    const item = document.createElement('li');
-    const faultRate = state.pieces ? Math.round((state.trainingFaults / state.pieces) * 1000) / 10 : 0;
-    item.textContent = `No leaderboard in Training mode. Fault rate ${faultRate}% with ${settings.trainingFeedback.toUpperCase()} feedback.`;
-    refs.leaderboard.appendChild(item);
-  } else if (state.mode === 'sprint40') {
-    const entries = getVisibleSprintRecords(storage.sprint);
-    if (!entries.length) {
+  const nextKey = state.queue.slice(0, 3).join(',');
+  if (nextKey !== cachedNextQueue) {
+    cachedNextQueue = nextKey;
+    refs.nextQueue.innerHTML = '';
+    state.queue.slice(0, 3).forEach((piece) => {
       const item = document.createElement('li');
-      item.textContent = 'No completed 40-line runs yet.';
+      item.className = 'queue-item';
+      const preview = document.createElement('div');
+      renderPiecePreview(preview, piece);
+      const label = document.createElement('span');
+      label.className = 'queue-label';
+      label.textContent = piece;
+      item.appendChild(preview);
+      item.appendChild(label);
+      refs.nextQueue.appendChild(item);
+    });
+  }
+
+  const lbKey = `${state.mode}:${isTraining}:${storage.score.length}:${storage.sprint.length}`;
+  if (lbKey !== cachedLeaderboardKey) {
+    cachedLeaderboardKey = lbKey;
+    refs.leaderboardTitle.textContent = isTraining
+      ? 'Training Notes'
+      : state.mode === 'sprint40'
+        ? 'Top 3 40L Times'
+        : 'Top 3 Scores';
+    refs.leaderboard.innerHTML = '';
+    if (isTraining) {
+      const item = document.createElement('li');
+      const faultRate = state.pieces ? Math.round((state.trainingFaults / state.pieces) * 1000) / 10 : 0;
+      item.textContent = `No leaderboard in Training mode. Fault rate ${faultRate}% with ${settings.trainingFeedback.toUpperCase()} feedback.`;
       refs.leaderboard.appendChild(item);
-    } else {
-      entries.slice(0, 3).forEach((entry, index) => {
+    } else if (state.mode === 'sprint40') {
+      const entries = getVisibleSprintRecords(storage.sprint);
+      if (!entries.length) {
         const item = document.createElement('li');
-        item.textContent = `${index + 1}. ${entry.nickname} - ${formatTime(entry.timeMs)} - ${entry.lines}L`;
+        item.textContent = 'No completed 40-line runs yet.';
         refs.leaderboard.appendChild(item);
-      });
-    }
-  } else {
-    const entries = getVisibleScoreRecords(storage.score);
-    if (!entries.length) {
-      const item = document.createElement('li');
-      item.textContent = 'No high scores yet. Survive a run to set the first record.';
-      refs.leaderboard.appendChild(item);
+      } else {
+        entries.slice(0, 3).forEach((entry, index) => {
+          const item = document.createElement('li');
+          item.textContent = `${index + 1}. ${entry.nickname} - ${formatTime(entry.timeMs)} - ${entry.lines}L`;
+          refs.leaderboard.appendChild(item);
+        });
+      }
     } else {
+      const entries = getVisibleScoreRecords(storage.score);
+      if (!entries.length) {
+        const item = document.createElement('li');
+        item.textContent = 'No high scores yet. Survive a run to set the first record.';
+        refs.leaderboard.appendChild(item);
+      } else {
       entries.slice(0, 3).forEach((entry, index) => {
         const item = document.createElement('li');
         item.textContent = `${index + 1}. ${entry.nickname} - ${entry.score} pts - ${entry.lines}L`;
         refs.leaderboard.appendChild(item);
       });
     }
+  }
   }
 
   const settingsModalHidden = document.getElementById('settingsModal')?.classList.contains('hidden') ?? true;
