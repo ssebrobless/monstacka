@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 
 namespace MonStacka.Editor
@@ -12,6 +13,8 @@ namespace MonStacka.Editor
     {
         private const string OutputRoot = "Builds/Windows";
         private const string ExeName = "MonStackaV2.exe";
+        private const string AppIconAssetPath = "Assets/MonStacka/Art/AppIcon/monstacka-app-icon.png";
+        private const string AppIconFilePath = "Assets/MonStacka/Art/AppIcon/monstacka-app-icon.ico";
 
         [MenuItem("MonStacka/Build Windows Player")]
         public static void BuildWindowsPlayer()
@@ -29,6 +32,8 @@ namespace MonStacka.Editor
             {
                 throw new InvalidOperationException("No enabled scenes were found in EditorBuildSettings.");
             }
+
+            ConfigureStandaloneAppIcon();
 
             var outputPath = Path.GetFullPath(Path.Combine(outputDir, ExeName));
             var options = new BuildPlayerOptions
@@ -56,8 +61,31 @@ namespace MonStacka.Editor
                 "@echo off\r\ncd /d \"%~dp0\"\r\nstart \"\" \"%~dp0MonStackaV2.exe\"\r\n"
             );
             RemoveKnownLegacyBuilds(projectRoot);
-            UpdateCurrentBuildShortcuts(outputPath, outputDir);
+            UpdateCurrentBuildShortcuts(outputPath, outputDir, Path.GetFullPath(Path.Combine(projectRoot, AppIconFilePath)));
             UnityEngine.Debug.Log($"MonStacka v2 Windows build complete: {outputPath}");
+        }
+
+        private static void ConfigureStandaloneAppIcon()
+        {
+            AssetDatabase.ImportAsset(AppIconAssetPath, ImportAssetOptions.ForceUpdate);
+            var icon = AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(AppIconAssetPath);
+            if (icon == null)
+            {
+                UnityEngine.Debug.LogWarning($"Could not set MonStacka app icon: missing {AppIconAssetPath}");
+                return;
+            }
+
+            var iconSizes = PlayerSettings.GetIconSizes(NamedBuildTarget.Standalone, IconKind.Application);
+            var icons = iconSizes.Length > 0
+                ? iconSizes.Select(_ => icon).ToArray()
+                : new[] { icon };
+            var currentIcons = PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application);
+            if (currentIcons.Length == icons.Length && currentIcons.All(currentIcon => currentIcon == icon))
+            {
+                return;
+            }
+
+            PlayerSettings.SetIcons(NamedBuildTarget.Standalone, icons, IconKind.Application);
         }
 
         private static void RemoveKnownLegacyBuilds(string projectRoot)
@@ -129,7 +157,7 @@ namespace MonStacka.Editor
             UnityEngine.Debug.Log($"Removed stale MonStacka shortcut: {path}");
         }
 
-        private static void UpdateCurrentBuildShortcuts(string outputPath, string outputDir)
+        private static void UpdateCurrentBuildShortcuts(string outputPath, string outputDir, string iconPath)
         {
             if (Environment.OSVersion.Platform != PlatformID.Win32NT)
             {
@@ -140,6 +168,7 @@ namespace MonStacka.Editor
 $ErrorActionPreference = 'Stop'
 $exe = '{EscapePowerShellSingleQuotedString(outputPath)}'
 $workDir = '{EscapePowerShellSingleQuotedString(outputDir)}'
+$icon = '{EscapePowerShellSingleQuotedString(iconPath)}'
 $shortcutPaths = @(
     (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\MonStacka\MonStacka Current.lnk'),
     (Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\MonStacka Current.lnk')
@@ -152,7 +181,7 @@ foreach ($shortcutPath in $shortcutPaths)
     $shortcut.TargetPath = $exe
     $shortcut.WorkingDirectory = $workDir
     $shortcut.Description = 'Launch the current MonStacka build'
-    $shortcut.IconLocation = ""$exe,0""
+    $shortcut.IconLocation = if (Test-Path -LiteralPath $icon) {{ $icon }} else {{ ""$exe,0"" }}
     $shortcut.Save()
 }}
 ";
