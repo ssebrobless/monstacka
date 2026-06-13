@@ -61,7 +61,7 @@ namespace MonStacka.Visual
             animateBody = shouldAnimateBody;
             var visualExtrasEnabled = MonStackaAppState.VisualExtrasEnabled;
             var effectivePulseScale = visualExtrasEnabled ? pulseScale : 0f;
-            enableFacialAnimation = visualExtrasEnabled && shouldEnableFacialAnimation && !previewOnly;
+            enableFacialAnimation = visualExtrasEnabled && shouldEnableFacialAnimation;
             localCells.Clear();
             localCells.AddRange(cells);
 

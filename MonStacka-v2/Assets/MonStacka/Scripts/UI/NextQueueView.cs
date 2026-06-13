@@ -8,6 +8,8 @@ namespace MonStacka.UI
 {
     public sealed class NextQueueView : MonoBehaviour
     {
+        private const float SlotStepWorld = 1.32f;
+
         [SerializeField] private Transform contentRoot;
         private readonly List<PieceSkin> previews = new();
         private readonly List<PieceType?> previewSlots = new();
@@ -25,9 +27,6 @@ namespace MonStacka.UI
             {
                 return;
             }
-
-            var slotStep = cellWorldSize * 2.25f;
-            var firstSlotTop = cellWorldSize * 0.3f;
 
             for (var index = 0; index < queue.Count; index += 1)
             {
@@ -47,8 +46,7 @@ namespace MonStacka.UI
                 var heightCells = maxY - minY + 1;
                 var widthWorld = widthCells * cellWorldSize;
                 var heightWorld = heightCells * cellWorldSize;
-                var slotTop = firstSlotTop - (index * slotStep);
-                var slotCenterY = slotTop - (slotStep * 0.5f);
+                var slotCenterY = -(index * SlotStepWorld);
                 var skin = EnsureSlot(index, piece, skinData, normalized, outlineMaterial, deformTuning, cellWorldSize);
                 skin.gameObject.SetActive(true);
                 skin.transform.localPosition = new Vector3(

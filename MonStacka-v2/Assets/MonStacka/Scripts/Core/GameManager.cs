@@ -43,6 +43,7 @@ namespace MonStacka.Core
         [SerializeField] private HUDController hudController;
         [SerializeField] private PauseOverlay pauseOverlay;
         [SerializeField] private DialoguePresenter dialoguePresenter;
+        [SerializeField] private MonStackaAudioController audioController;
         [SerializeField] private Material outlineMaterial;
         [SerializeField] private BorderDeformTuningProfile deformTuning;
         [SerializeField] private PieceSkinData[] pieceSkins;
@@ -160,7 +161,7 @@ namespace MonStacka.Core
             }
             boardState.OnPieceLocked += HandlePieceLocked;
             // Line clears update only the views that actually changed (no full stack rebuild).
-            boardState.OnLinesCleared += _ => { SyncLockedPieceViews(); neighborMapDirty = true; };
+            boardState.OnLinesCleared += _ => { SyncLockedPieceViews(); neighborMapDirty = true; audioController?.PlayUiClick(); };
             boardState.OnGarbageChanged += () => neighborMapDirty = true;
             if (stackRoot)
             {
@@ -702,6 +703,7 @@ namespace MonStacka.Core
 
             neighborMapDirty = true;
             skin.TriggerImpact(lockEvent.Cells, PieceDefinitions.HiddenRows);
+            audioController?.PlayMonsterImpact(lockEvent.PieceType);
         }
 
         private void UpdateVisuals()

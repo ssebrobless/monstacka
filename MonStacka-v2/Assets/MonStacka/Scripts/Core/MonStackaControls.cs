@@ -19,6 +19,21 @@ namespace MonStacka.Core
 
     public static class MonStackaControls
     {
+        public static readonly MonStackaControlAction[] OrderedActions =
+        {
+            MonStackaControlAction.Left,
+            MonStackaControlAction.Right,
+            MonStackaControlAction.Soft,
+            MonStackaControlAction.Hard,
+            MonStackaControlAction.RotateCcw,
+            MonStackaControlAction.RotateCw,
+            MonStackaControlAction.RotateFlip,
+            MonStackaControlAction.Hold,
+            MonStackaControlAction.Retry,
+            MonStackaControlAction.Pause,
+            MonStackaControlAction.RestartPaused,
+        };
+
         private readonly struct AxisBinding
         {
             public AxisBinding(string axisName, int direction, string label)
@@ -51,6 +66,21 @@ namespace MonStacka.Core
         };
 
         private static readonly System.Collections.Generic.Dictionary<MonStackaControlAction, KeyCode[]> KeyboardBindings = new()
+        {
+            [MonStackaControlAction.Left] = new[] { KeyCode.LeftArrow },
+            [MonStackaControlAction.Right] = new[] { KeyCode.RightArrow },
+            [MonStackaControlAction.Soft] = new[] { KeyCode.DownArrow },
+            [MonStackaControlAction.Hard] = new[] { KeyCode.Space },
+            [MonStackaControlAction.RotateCcw] = new[] { KeyCode.Z },
+            [MonStackaControlAction.RotateCw] = new[] { KeyCode.X },
+            [MonStackaControlAction.RotateFlip] = new[] { KeyCode.A },
+            [MonStackaControlAction.Hold] = new[] { KeyCode.C },
+            [MonStackaControlAction.Retry] = new[] { KeyCode.R },
+            [MonStackaControlAction.Pause] = new[] { KeyCode.P, KeyCode.Escape },
+            [MonStackaControlAction.RestartPaused] = new[] { KeyCode.O },
+        };
+
+        private static readonly System.Collections.Generic.Dictionary<MonStackaControlAction, KeyCode[]> DefaultKeyboardBindings = new()
         {
             [MonStackaControlAction.Left] = new[] { KeyCode.LeftArrow },
             [MonStackaControlAction.Right] = new[] { KeyCode.RightArrow },
@@ -220,6 +250,53 @@ namespace MonStacka.Core
                 $"{ActionLabels[MonStackaControlAction.Pause]}: {FormatGamepadBindings(MonStackaControlAction.Pause)}\n" +
                 $"{ActionLabels[MonStackaControlAction.Retry]}: {FormatGamepadBindings(MonStackaControlAction.Retry)}    {ActionLabels[MonStackaControlAction.RestartPaused]}: {FormatGamepadBindings(MonStackaControlAction.RestartPaused)}\n\n" +
                 $"Current timing\nDAS {Mathf.RoundToInt(MonStackaAppState.DasSeconds * 1000f)}ms   ARR {Mathf.RoundToInt(MonStackaAppState.ArrSeconds * 1000f)}ms   Lock {Mathf.RoundToInt(MonStackaAppState.LockDelaySeconds * 1000f)}ms";
+        }
+
+        public static string GetActionLabel(MonStackaControlAction action) =>
+            ActionLabels.TryGetValue(action, out var label) ? label : action.ToString();
+
+        public static string FormatKeyboardBinding(MonStackaControlAction action) => FormatKeyboardBindings(action);
+
+        public static void SetPrimaryKeyboardBinding(MonStackaControlAction action, KeyCode keyCode)
+        {
+            foreach (var pair in KeyboardBindings)
+            {
+                if (pair.Key == action || pair.Value == null)
+                {
+                    continue;
+                }
+
+                KeyboardBindings[pair.Key] = System.Array.FindAll(pair.Value, key => key != keyCode);
+            }
+
+            KeyboardBindings[action] = new[] { keyCode };
+        }
+
+        public static void ResetKeyboardBindings()
+        {
+            foreach (var pair in DefaultKeyboardBindings)
+            {
+                KeyboardBindings[pair.Key] = (KeyCode[])pair.Value.Clone();
+            }
+        }
+
+        public static KeyCode? ReadPressedKeyboardBindingKey()
+        {
+            foreach (KeyCode keyCode in System.Enum.GetValues(typeof(KeyCode)))
+            {
+                if (keyCode == KeyCode.None ||
+                    keyCode.ToString().StartsWith("JoystickButton"))
+                {
+                    continue;
+                }
+
+                if (Input.GetKeyDown(keyCode))
+                {
+                    return keyCode;
+                }
+            }
+
+            return null;
         }
 
         private static string FormatKeyboardBindings(MonStackaControlAction action)

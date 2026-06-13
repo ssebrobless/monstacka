@@ -56,6 +56,8 @@ namespace MonStacka.Editor
         private const string SpriteSheetDir = Root + "/Art/SpriteSheets";
         private const string GeneratedDir = Root + "/Art/Generated/BodyFrames";
         private const string UiArtDir = Root + "/Art/UI";
+        private const string AudioDir = Root + "/Audio";
+        private const string MonstosAudioDir = AudioDir + "/Monstos";
         private const string PieceSkinDir = Root + "/Data/PieceSkins";
         private const string TuningDir = Root + "/Data/Tuning";
         private const string TuningAssetPath = TuningDir + "/DefaultBorderDeformTuning.asset";
@@ -69,6 +71,7 @@ namespace MonStacka.Editor
         private const string OutlinePrefabPath = Root + "/Prefabs/OutlineMesh.prefab";
         private const string HomeBackgroundPath = UiArtDir + "/monstacka-home-menu-clean.png";
         private const string GameBackgroundPath = UiArtDir + "/monstacka-background.png";
+        private const string BackgroundMusicPath = AudioDir + "/monstacka-bgm.wav";
 
         private const float ArtboardWidth = 1920f;
         private const float ArtboardHeight = 1080f;
@@ -92,6 +95,7 @@ namespace MonStacka.Editor
         {
             EnsureDirectories();
             EnsureUiArtAssets();
+            EnsureAudioAssets();
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             ConfigureSourceImports();
             ConfigureUiImports();
@@ -115,6 +119,7 @@ namespace MonStacka.Editor
         {
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "MonStacka/Art/Generated/BodyFrames"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "MonStacka/Art/UI"));
+            Directory.CreateDirectory(Path.Combine(Application.dataPath, "MonStacka/Audio/Monstos"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "MonStacka/Data/PieceSkins"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "MonStacka/Data/Tuning"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "MonStacka/Prefabs"));
@@ -129,6 +134,27 @@ namespace MonStacka.Editor
             CopyAssetIfChanged(Path.Combine(sourceDir, "monstacka-background.png"), Path.Combine(projectRoot, GameBackgroundPath));
             AssetDatabase.ImportAsset(HomeBackgroundPath, ImportAssetOptions.ForceSynchronousImport);
             AssetDatabase.ImportAsset(GameBackgroundPath, ImportAssetOptions.ForceSynchronousImport);
+        }
+
+        private static void EnsureAudioAssets()
+        {
+            var projectRoot = Directory.GetCurrentDirectory();
+            var sourceDir = Path.GetFullPath(Path.Combine(projectRoot, "..", "enhanced", "src", "assets", "audio"));
+            CopyAssetIfChanged(Path.Combine(sourceDir, "monstacka-bgm.wav"), Path.Combine(projectRoot, BackgroundMusicPath));
+            AssetDatabase.ImportAsset(BackgroundMusicPath, ImportAssetOptions.ForceSynchronousImport);
+
+            var monstosSourceDir = Path.Combine(sourceDir, "monstos");
+            if (!Directory.Exists(monstosSourceDir))
+            {
+                return;
+            }
+
+            foreach (var sourcePath in Directory.GetFiles(monstosSourceDir, "*.mp3"))
+            {
+                var destinationPath = Path.Combine(projectRoot, MonstosAudioDir, Path.GetFileName(sourcePath));
+                CopyAssetIfChanged(sourcePath, destinationPath);
+                AssetDatabase.ImportAsset($"{MonstosAudioDir}/{Path.GetFileName(sourcePath)}", ImportAssetOptions.ForceSynchronousImport);
+            }
         }
 
         private static void CopyAssetIfChanged(string sourcePath, string destinationPath)
@@ -686,6 +712,47 @@ namespace MonStacka.Editor
             UnityEngine.Object.DestroyImmediate(outline);
         }
 
+        private static MonStackaAudioController CreateAudioController(string objectName)
+        {
+            var go = new GameObject(objectName);
+            var controller = go.AddComponent<MonStackaAudioController>();
+            SetPrivateField(controller, "backgroundMusic", AssetDatabase.LoadAssetAtPath<AudioClip>(BackgroundMusicPath));
+            SetPrivateField(controller, "pieceBanks", BuildPieceAudioBanks());
+            SetPrivateField(controller, "musicVolume", 0.34f);
+            SetPrivateField(controller, "sfxVolume", 0.76f);
+            SetPrivateField(controller, "playMusicOnAwake", true);
+            return controller;
+        }
+
+        private static MonStackaAudioController.PieceAudioBank[] BuildPieceAudioBanks()
+        {
+            return Enum.GetValues(typeof(PieceType))
+                .Cast<PieceType>()
+                .Select(pieceType => new MonStackaAudioController.PieceAudioBank
+                {
+                    PieceType = pieceType,
+                    ImpactClips = LoadAudioClips(pieceType, "impact"),
+                    NeutralClips = LoadAudioClips(pieceType, "neutral"),
+                })
+                .ToArray();
+        }
+
+        private static AudioClip[] LoadAudioClips(PieceType pieceType, string family)
+        {
+            var prefix = pieceType.ToString().ToLowerInvariant();
+            var clips = new List<AudioClip>();
+            for (var index = 1; index <= 3; index += 1)
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{MonstosAudioDir}/{prefix}-{family}-{index}.mp3");
+                if (clip)
+                {
+                    clips.Add(clip);
+                }
+            }
+
+            return clips.ToArray();
+        }
+
         private static void CreateScenes(PieceSkinData[] skins, BorderDeformTuningProfile tuning, Material material)
         {
             CreateBootScene();
@@ -717,6 +784,8 @@ namespace MonStacka.Editor
             var canvas = CreateCanvas("HomeCanvas");
             BindCanvasToArtboard(camera, canvas);
             CreateEventSystem();
+            var audioController = CreateAudioController("HomeAudio");
+            CreateDitherOverlay(canvas.transform);
 
             var previewLeft = CreateWorldAnchor("PreviewLeftAnchor", 199.5f, 880.5f);
             var previewCenter = CreateWorldAnchor("PreviewCenterAnchor", 491f, 753.5f);
@@ -741,13 +810,13 @@ namespace MonStacka.Editor
             var arcadeButton = CreateTransparentButton(canvas.transform, "ArcadeButton", new Rect(1386f, 617f, 407f, 121f));
             var sprintButton = CreateTransparentButton(canvas.transform, "SprintButton", new Rect(1386f, 763f, 407f, 121f));
             var trainingButton = CreateTransparentButton(canvas.transform, "TrainingButton", new Rect(1386f, 907f, 407f, 121f));
-            var storyButton = CreateButton(canvas.transform, "StoryButton", new Rect(1386f, 478f, 407f, 110f), "STORY MODE");
+            var storyButton = CreateButton(canvas.transform, "StoryButton", new Rect(1386f, 536f, 407f, 76f), "STORY MODE");
             var storyImage = storyButton.GetComponent<Image>();
             storyImage.color = new Color(0.32f, 0.12f, 0.3f, 0.94f);
             var storyLabel = storyButton.GetComponentInChildren<Text>();
             if (storyLabel)
             {
-                storyLabel.fontSize = 34;
+                storyLabel.fontSize = 28;
                 storyLabel.color = new Color(0.97f, 0.9f, 0.95f, 1f);
             }
             ConfigureHomeNavigation(settingsButton, quitButton, storyButton, arcadeButton, sprintButton, trainingButton);
@@ -778,13 +847,29 @@ namespace MonStacka.Editor
             loreText.verticalOverflow = VerticalWrapMode.Truncate;
             lorePanel.SetActive(false);
 
-            var settingsPanel = CreatePanel(canvas.transform, "SettingsPanel", new Rect(640f, 212f, 640f, 408f), new Color(0.11f, 0.13f, 0.24f, 0.96f));
+            var settingsPanel = CreatePanel(canvas.transform, "SettingsPanel", new Rect(500f, 128f, 920f, 820f), new Color(0.06f, 0.08f, 0.16f, 0.98f));
             settingsPanel.SetActive(false);
-            var settingsTitle = CreateText(settingsPanel.transform, "SettingsTitle", new Rect(36f, 34f, 560f, 52f), 28, TextAnchor.MiddleLeft);
+            var settingsTitle = CreateText(settingsPanel.transform, "SettingsTitle", new Rect(44f, 32f, 832f, 52f), 30, TextAnchor.MiddleLeft);
             settingsTitle.text = "Settings";
-            var settingsBody = CreateText(settingsPanel.transform, "SettingsBody", new Rect(36f, 110f, 560f, 170f), 22, TextAnchor.UpperLeft);
+            var settingsBody = CreateText(settingsPanel.transform, "SettingsBody", new Rect(44f, 104f, 832f, 470f), 20, TextAnchor.UpperLeft);
             settingsBody.text = "Unity shell port in progress.\n\nThe current focus is restoring the original MonStacka layout, menu flow, and board shell around the upgraded visuals.";
-            var closeSettingsButton = CreateButton(settingsPanel.transform, "CloseSettingsButton", new Rect(220f, 310f, 200f, 56f), "Close");
+            settingsBody.resizeTextForBestFit = true;
+            settingsBody.resizeTextMinSize = 15;
+            settingsBody.resizeTextMaxSize = 20;
+            settingsBody.verticalOverflow = VerticalWrapMode.Truncate;
+            var musicToggleButton = CreateButton(settingsPanel.transform, "MusicToggleButton", new Rect(44f, 596f, 160f, 48f), "Music ON");
+            var musicDownButton = CreateButton(settingsPanel.transform, "MusicDownButton", new Rect(220f, 596f, 118f, 48f), "Music -");
+            var musicUpButton = CreateButton(settingsPanel.transform, "MusicUpButton", new Rect(354f, 596f, 118f, 48f), "Music +");
+            var sfxToggleButton = CreateButton(settingsPanel.transform, "SfxToggleButton", new Rect(44f, 654f, 160f, 48f), "SFX ON");
+            var sfxDownButton = CreateButton(settingsPanel.transform, "SfxDownButton", new Rect(220f, 654f, 118f, 48f), "SFX -");
+            var sfxUpButton = CreateButton(settingsPanel.transform, "SfxUpButton", new Rect(354f, 654f, 118f, 48f), "SFX +");
+            var ditherToggleButton = CreateButton(settingsPanel.transform, "DitherToggleButton", new Rect(504f, 596f, 170f, 48f), "Dither ON");
+            var controlPreviousButton = CreateButton(settingsPanel.transform, "ControlPreviousButton", new Rect(44f, 728f, 160f, 56f), "< Control");
+            var controlBindButton = CreateButton(settingsPanel.transform, "ControlBindButton", new Rect(220f, 728f, 160f, 56f), "Bind Key");
+            var controlNextButton = CreateButton(settingsPanel.transform, "ControlNextButton", new Rect(396f, 728f, 160f, 56f), "Control >");
+            var controlResetButton = CreateButton(settingsPanel.transform, "ControlResetButton", new Rect(572f, 728f, 140f, 56f), "Defaults");
+            var closeSettingsButton = CreateButton(settingsPanel.transform, "CloseSettingsButton", new Rect(728f, 728f, 148f, 56f), "Close");
+            ConfigureSettingsNavigation(musicToggleButton, musicDownButton, musicUpButton, sfxToggleButton, sfxDownButton, sfxUpButton, ditherToggleButton, controlPreviousButton, controlBindButton, controlNextButton, controlResetButton, closeSettingsButton);
 
             var controllerGo = new GameObject("HomeMenuController");
             var controller = controllerGo.AddComponent<HomeMenuController>();
@@ -805,7 +890,19 @@ namespace MonStacka.Editor
             SetPrivateField(controller, "settingsButton", settingsButton);
             SetPrivateField(controller, "quitButton", quitButton);
             SetPrivateField(controller, "settingsPanel", settingsPanel);
+            SetPrivateField(controller, "musicToggleButton", musicToggleButton);
+            SetPrivateField(controller, "musicDownButton", musicDownButton);
+            SetPrivateField(controller, "musicUpButton", musicUpButton);
+            SetPrivateField(controller, "sfxToggleButton", sfxToggleButton);
+            SetPrivateField(controller, "sfxDownButton", sfxDownButton);
+            SetPrivateField(controller, "sfxUpButton", sfxUpButton);
+            SetPrivateField(controller, "ditherToggleButton", ditherToggleButton);
+            SetPrivateField(controller, "controlPreviousButton", controlPreviousButton);
+            SetPrivateField(controller, "controlBindButton", controlBindButton);
+            SetPrivateField(controller, "controlNextButton", controlNextButton);
+            SetPrivateField(controller, "controlResetButton", controlResetButton);
             SetPrivateField(controller, "closeSettingsButton", closeSettingsButton);
+            SetPrivateField(controller, "audioController", audioController);
             SetPrivateField(controller, "pieceSkins", skins);
             SetPrivateField(controller, "outlineMaterial", material);
             SetPrivateField(controller, "deformTuning", tuning);
@@ -821,6 +918,8 @@ namespace MonStacka.Editor
             var canvas = CreateCanvas("GameCanvas");
             BindCanvasToArtboard(camera, canvas);
             CreateEventSystem();
+            var audioController = CreateAudioController("GameAudio");
+            CreateDitherOverlay(canvas.transform);
 
             var managerGo = new GameObject("GameManager");
             var boardRoot = new GameObject("BoardRoot").transform;
@@ -845,18 +944,18 @@ namespace MonStacka.Editor
             // Previews sit slightly in front of the canvas plane (z=0) so the slot frame
             // images can never draw over them.
             var holdRoot = new GameObject("HoldBox");
-            holdRoot.transform.position = PixelToWorld(230f, 710f) + new Vector3(0f, 0f, -0.5f);
+            holdRoot.transform.position = PixelToWorld(230f, 710f) + new Vector3(0f, 0f, -9.5f);
             var hold = holdRoot.AddComponent<HoldBoxView>();
 
             var nextRoot = new GameObject("NextQueue");
-            nextRoot.transform.position = PixelToWorld(430f, 632f) + new Vector3(0f, 0f, -0.5f);
+            nextRoot.transform.position = PixelToWorld(430f, 640f) + new Vector3(0f, 0f, -9.5f);
             var next = nextRoot.AddComponent<NextQueueView>();
 
-            var primaryPanel = CreatePanel(canvas.transform, "PrimaryPanelBackdrop", new Rect(92f, 142f, 510f, 818f), new Color(0.08f, 0.10f, 0.18f, 0.72f));
+            var primaryPanel = CreatePanel(canvas.transform, "PrimaryPanelBackdrop", new Rect(92f, 142f, 510f, 818f), new Color(0.08f, 0.10f, 0.18f, 0.64f));
             primaryPanel.GetComponent<Image>().raycastTarget = false;
-            var boardPanel = CreatePanel(canvas.transform, "BoardPanelBackdrop", new Rect(635f, 20f, 650f, 1040f), new Color(0.08f, 0.10f, 0.18f, 0.58f));
+            var boardPanel = CreatePanel(canvas.transform, "BoardPanelBackdrop", new Rect(635f, 20f, 650f, 1040f), new Color(0.08f, 0.10f, 0.18f, 0.36f));
             boardPanel.GetComponent<Image>().raycastTarget = false;
-            var secondaryPanel = CreatePanel(canvas.transform, "SecondaryPanelBackdrop", new Rect(1310f, 142f, 498f, 818f), new Color(0.08f, 0.10f, 0.18f, 0.72f));
+            var secondaryPanel = CreatePanel(canvas.transform, "SecondaryPanelBackdrop", new Rect(1310f, 142f, 498f, 818f), new Color(0.08f, 0.10f, 0.18f, 0.64f));
             secondaryPanel.GetComponent<Image>().raycastTarget = false;
 
             var modeDescription = CreateText(canvas.transform, "ModeDescription", new Rect(126f, 184f, 438f, 78f), 21, TextAnchor.UpperLeft);
@@ -893,33 +992,49 @@ namespace MonStacka.Editor
             CreateText(canvas.transform, "HoldLabel", new Rect(154f, 560f, 132f, 28f), 21, TextAnchor.MiddleCenter).text = "Hold";
             CreateText(canvas.transform, "NextLabel", new Rect(358f, 560f, 144f, 28f), 21, TextAnchor.MiddleCenter).text = "Next";
 
-            // Framed slots behind the world-space hold/next previews so the queue
-            // reads as an aligned column instead of floating monsters.
-            CreateSlotFrame(canvas.transform, "HoldSlotFrame", 230f, 710f, 154f);
+            // Framed world-space slots sit behind the world-space hold/next previews.
+            CreateWorldSlotFrame("HoldSlotFrame", 230f, 710f, 154f);
             for (var slot = 0; slot < 3; slot += 1)
             {
-                CreateSlotFrame(canvas.transform, $"NextSlotFrame{slot + 1}", 430f, 672f + (slot * 118f), 142f);
+                CreateWorldSlotFrame($"NextSlotFrame{slot + 1}", 430f, 640f + (slot * 132f), 124f);
             }
 
             var leaderboardValues = CreateLeaderboardPlaceholders(canvas.transform);
 
-            var settingsButton = CreateTransparentButton(canvas.transform, "GameSettingsButton", new Rect(1780f, 11f, 100f, 89f));
-            var quitButton = CreateTransparentButton(canvas.transform, "GameQuitButton", new Rect(1768f, 86f, 116f, 105f));
-            var homeButton = CreateTransparentButton(canvas.transform, "GameHomeButton", new Rect(1784f, 180f, 96f, 93f));
+            var settingsButton = CreateTransparentButton(canvas.transform, "GameSettingsButton", new Rect(1760f, 0f, 140f, 116f));
+            var quitButton = CreateTransparentButton(canvas.transform, "GameQuitButton", new Rect(1754f, 94f, 148f, 126f));
+            var homeButton = CreateTransparentButton(canvas.transform, "GameHomeButton", new Rect(1760f, 190f, 140f, 118f));
             ConfigurePauseNavigation(settingsButton, quitButton, homeButton);
 
-            var settingsPanel = CreatePanel(canvas.transform, "GameSettingsPanel", new Rect(640f, 212f, 640f, 408f), new Color(0.11f, 0.13f, 0.24f, 0.96f));
+            var settingsPanel = CreatePanel(canvas.transform, "GameSettingsPanel", new Rect(500f, 128f, 920f, 820f), new Color(0.06f, 0.08f, 0.16f, 0.98f));
             settingsPanel.SetActive(false);
-            var settingsTitle = CreateText(settingsPanel.transform, "SettingsTitle", new Rect(36f, 34f, 560f, 52f), 28, TextAnchor.MiddleLeft);
+            var settingsTitle = CreateText(settingsPanel.transform, "SettingsTitle", new Rect(44f, 32f, 832f, 52f), 30, TextAnchor.MiddleLeft);
             settingsTitle.text = "Settings";
-            var settingsBody = CreateText(settingsPanel.transform, "SettingsBody", new Rect(36f, 110f, 560f, 170f), 22, TextAnchor.UpperLeft);
+            var settingsBody = CreateText(settingsPanel.transform, "SettingsBody", new Rect(44f, 104f, 832f, 470f), 20, TextAnchor.UpperLeft);
             settingsBody.text = "Gameplay shell restored around the new visuals.\n\nMore detailed settings parity is still being ported into Unity.";
-            var closeSettingsButton = CreateButton(settingsPanel.transform, "CloseSettingsButton", new Rect(220f, 310f, 200f, 56f), "Close");
+            settingsBody.resizeTextForBestFit = true;
+            settingsBody.resizeTextMinSize = 15;
+            settingsBody.resizeTextMaxSize = 20;
+            settingsBody.verticalOverflow = VerticalWrapMode.Truncate;
+            var musicToggleButton = CreateButton(settingsPanel.transform, "MusicToggleButton", new Rect(44f, 596f, 160f, 48f), "Music ON");
+            var musicDownButton = CreateButton(settingsPanel.transform, "MusicDownButton", new Rect(220f, 596f, 118f, 48f), "Music -");
+            var musicUpButton = CreateButton(settingsPanel.transform, "MusicUpButton", new Rect(354f, 596f, 118f, 48f), "Music +");
+            var sfxToggleButton = CreateButton(settingsPanel.transform, "SfxToggleButton", new Rect(44f, 654f, 160f, 48f), "SFX ON");
+            var sfxDownButton = CreateButton(settingsPanel.transform, "SfxDownButton", new Rect(220f, 654f, 118f, 48f), "SFX -");
+            var sfxUpButton = CreateButton(settingsPanel.transform, "SfxUpButton", new Rect(354f, 654f, 118f, 48f), "SFX +");
+            var ditherToggleButton = CreateButton(settingsPanel.transform, "DitherToggleButton", new Rect(504f, 596f, 170f, 48f), "Dither ON");
+            var controlPreviousButton = CreateButton(settingsPanel.transform, "ControlPreviousButton", new Rect(44f, 728f, 160f, 56f), "< Control");
+            var controlBindButton = CreateButton(settingsPanel.transform, "ControlBindButton", new Rect(220f, 728f, 160f, 56f), "Bind Key");
+            var controlNextButton = CreateButton(settingsPanel.transform, "ControlNextButton", new Rect(396f, 728f, 160f, 56f), "Control >");
+            var controlResetButton = CreateButton(settingsPanel.transform, "ControlResetButton", new Rect(572f, 728f, 140f, 56f), "Defaults");
+            var closeSettingsButton = CreateButton(settingsPanel.transform, "CloseSettingsButton", new Rect(728f, 728f, 148f, 56f), "Close");
+            ConfigureSettingsNavigation(musicToggleButton, musicDownButton, musicUpButton, sfxToggleButton, sfxDownButton, sfxUpButton, ditherToggleButton, controlPreviousButton, controlBindButton, controlNextButton, controlResetButton, closeSettingsButton);
 
             var pauseRoot = new GameObject("PauseOverlay");
             pauseRoot.transform.SetParent(canvas.transform, false);
-            var pausePanel = CreatePanel(pauseRoot.transform, "PausePanel", new Rect(780f, 420f, 360f, 110f), new Color(0.06f, 0.08f, 0.16f, 0.95f));
-            var pauseLabel = CreateText(pausePanel.transform, "PauseLabel", new Rect(0f, 0f, 360f, 110f), 34, TextAnchor.MiddleCenter);
+            ConfigureRect(pauseRoot.AddComponent<RectTransform>(), new Rect(0f, 0f, ArtboardWidth, ArtboardHeight));
+            var pausePanel = CreatePanel(pauseRoot.transform, "PausePanel", new Rect(760f, 430f, 400f, 116f), new Color(0.06f, 0.08f, 0.16f, 0.92f));
+            var pauseLabel = CreateText(pausePanel.transform, "PauseLabel", new Rect(0f, 0f, 400f, 116f), 34, TextAnchor.MiddleCenter);
             pauseLabel.text = "PAUSED";
             pauseRoot.SetActive(false);
             var pauseOverlay = pauseRoot.AddComponent<PauseOverlay>();
@@ -949,6 +1064,7 @@ namespace MonStacka.Editor
             SetPrivateField(manager, "hudController", hud);
             SetPrivateField(manager, "pauseOverlay", pauseOverlay);
             SetPrivateField(manager, "outlineMaterial", material);
+            SetPrivateField(manager, "audioController", audioController);
             SetPrivateField(manager, "deformTuning", tuning);
             SetPrivateField(manager, "pieceSkins", skins);
             SetPrivateField(manager, "useThreePieceVerticalSlice", false);
@@ -962,6 +1078,17 @@ namespace MonStacka.Editor
             SetPrivateField(shell, "quitButton", quitButton);
             SetPrivateField(shell, "homeButton", homeButton);
             SetPrivateField(shell, "settingsPanel", settingsPanel);
+            SetPrivateField(shell, "musicToggleButton", musicToggleButton);
+            SetPrivateField(shell, "musicDownButton", musicDownButton);
+            SetPrivateField(shell, "musicUpButton", musicUpButton);
+            SetPrivateField(shell, "sfxToggleButton", sfxToggleButton);
+            SetPrivateField(shell, "sfxDownButton", sfxDownButton);
+            SetPrivateField(shell, "sfxUpButton", sfxUpButton);
+            SetPrivateField(shell, "ditherToggleButton", ditherToggleButton);
+            SetPrivateField(shell, "controlPreviousButton", controlPreviousButton);
+            SetPrivateField(shell, "controlBindButton", controlBindButton);
+            SetPrivateField(shell, "controlNextButton", controlNextButton);
+            SetPrivateField(shell, "controlResetButton", controlResetButton);
             SetPrivateField(shell, "closeSettingsButton", closeSettingsButton);
 
             EditorSceneManager.SaveScene(scene, GameScenePath);
@@ -976,6 +1103,21 @@ namespace MonStacka.Editor
             var outline = frame.AddComponent<Outline>();
             outline.effectColor = new Color(0.3f, 0.34f, 0.55f, 1f);
             outline.effectDistance = new Vector2(2f, 2f);
+        }
+
+        private static void CreateWorldSlotFrame(string objectName, float centerX, float centerY, float size)
+        {
+            var fillSize = size / PixelsPerUnit;
+            var edgeSize = 3f / PixelsPerUnit;
+            var center = PixelToWorld(centerX, centerY);
+            center.z = -9.55f;
+
+            CreateWorldPanelAt($"{objectName}_Fill", center, new Vector2(fillSize, fillSize), new Color(0.13f, 0.16f, 0.3f, 0.26f), -28);
+
+            CreateWorldPanelAt($"{objectName}_Top", center + new Vector3(0f, fillSize * 0.5f, 0f), new Vector2(fillSize, edgeSize), new Color(0.34f, 0.38f, 0.6f, 0.92f), -27);
+            CreateWorldPanelAt($"{objectName}_Bottom", center + new Vector3(0f, -fillSize * 0.5f, 0f), new Vector2(fillSize, edgeSize), new Color(0.34f, 0.38f, 0.6f, 0.92f), -27);
+            CreateWorldPanelAt($"{objectName}_Left", center + new Vector3(-fillSize * 0.5f, 0f, 0f), new Vector2(edgeSize, fillSize), new Color(0.34f, 0.38f, 0.6f, 0.92f), -27);
+            CreateWorldPanelAt($"{objectName}_Right", center + new Vector3(fillSize * 0.5f, 0f, 0f), new Vector2(edgeSize, fillSize), new Color(0.34f, 0.38f, 0.6f, 0.92f), -27);
         }
 
         private static DialoguePresenter CreateDialoguePanel(Transform canvasTransform)
@@ -1092,6 +1234,16 @@ namespace MonStacka.Editor
             SetPrivateField(panel, "sortingOrder", sortingOrder);
         }
 
+        private static void CreateWorldPanelAt(string objectName, Vector3 position, Vector2 size, Color color, int sortingOrder)
+        {
+            var go = new GameObject(objectName);
+            go.transform.position = position;
+            var panel = go.AddComponent<WorldPanelBackdrop>();
+            SetPrivateField(panel, "size", size);
+            SetPrivateField(panel, "color", color);
+            SetPrivateField(panel, "sortingOrder", sortingOrder);
+        }
+
         private static void CreateEventSystem()
         {
             var eventSystemGo = new GameObject("EventSystem");
@@ -1114,6 +1266,16 @@ namespace MonStacka.Editor
             SetExplicitNavigation(settingsButton, null, quitButton, null, null);
             SetExplicitNavigation(quitButton, settingsButton, homeButton, null, null);
             SetExplicitNavigation(homeButton, quitButton, null, null, null);
+        }
+
+        private static void ConfigureSettingsNavigation(params Button[] buttons)
+        {
+            for (var index = 0; index < buttons.Length; index += 1)
+            {
+                var up = index > 0 ? buttons[index - 1] : null;
+                var down = index < buttons.Length - 1 ? buttons[index + 1] : null;
+                SetExplicitNavigation(buttons[index], up, down, null, null);
+            }
         }
 
         private static void SetExplicitNavigation(Button button, Button selectOnUp, Button selectOnDown, Button selectOnLeft, Button selectOnRight)
@@ -1153,6 +1315,13 @@ namespace MonStacka.Editor
             image.color = color;
             ConfigureRect(go.GetComponent<RectTransform>(), rect);
             return go;
+        }
+
+        private static DitherOverlay CreateDitherOverlay(Transform parent)
+        {
+            var go = CreatePanel(parent, "DitherOverlay", new Rect(0f, 0f, ArtboardWidth, ArtboardHeight), Color.white);
+            go.GetComponent<Image>().raycastTarget = false;
+            return go.AddComponent<DitherOverlay>();
         }
 
         private static Text CreateText(Transform parent, string objectName, Rect rect, int fontSize, TextAnchor alignment)

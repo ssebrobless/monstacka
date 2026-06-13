@@ -33,6 +33,8 @@ namespace MonStacka.Core
 
         public static bool VisualExtrasEnabled { get; set; } = true;
 
+        public static bool DitherEnabled { get; set; } = true;
+
         public static MonStackaRippleStage RippleStage { get; set; } = MonStackaRippleStage.HomePreview;
 
         /// <summary>Chapter id the Game scene should run when SelectedMode is Story (e.g. "1.2").</summary>
@@ -54,6 +56,7 @@ namespace MonStacka.Core
             SfxVolume = 70;
             TrainingFeedbackMode = "show";
             VisualExtrasEnabled = true;
+            DitherEnabled = true;
             RippleStage = MonStackaRippleStage.HomePreview;
             SelectedStoryChapterId = null;
             TrainingAssistEnabled = false;

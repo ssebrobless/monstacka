@@ -85,8 +85,20 @@ namespace MonStacka.UI
         [SerializeField] private Button settingsButton;
         [SerializeField] private Button quitButton;
         [SerializeField] private GameObject settingsPanel;
+        [SerializeField] private Button musicToggleButton;
+        [SerializeField] private Button musicDownButton;
+        [SerializeField] private Button musicUpButton;
+        [SerializeField] private Button sfxToggleButton;
+        [SerializeField] private Button sfxDownButton;
+        [SerializeField] private Button sfxUpButton;
+        [SerializeField] private Button ditherToggleButton;
+        [SerializeField] private Button controlPreviousButton;
+        [SerializeField] private Button controlBindButton;
+        [SerializeField] private Button controlNextButton;
+        [SerializeField] private Button controlResetButton;
         [SerializeField] private Button closeSettingsButton;
         [SerializeField] private bool enableVisualExtras = true;
+        [SerializeField] private MonStackaAudioController audioController;
         [SerializeField] private PieceSkinData[] pieceSkins;
         [SerializeField] private Material outlineMaterial;
         [SerializeField] private BorderDeformTuningProfile deformTuning;
@@ -95,6 +107,7 @@ namespace MonStacka.UI
         private readonly List<PieceSkin> previewSkins = new();
         private readonly Dictionary<PieceType, AudioClip> voicePreviewClips = new();
         private readonly List<Button> menuButtons = new();
+        private readonly List<Button> settingsButtons = new();
         private int activeIndex = 1;
         private bool loreOpen;
         private AudioSource voicePreviewSource;
@@ -107,6 +120,9 @@ namespace MonStacka.UI
         private bool previousVoice;
         private bool previousLore;
         private MonStackaMode? commandLineLaunchMode;
+        private int selectedControlIndex;
+        private MonStackaControlAction? awaitingBindingAction;
+        private int bindingCaptureFrame;
 
         private void Awake()
         {
@@ -146,8 +162,19 @@ namespace MonStacka.UI
             startOgbmButton?.onClick.AddListener(() => StartMode(MonStackaMode.Ogbm));
             startSprintButton?.onClick.AddListener(() => StartMode(MonStackaMode.Sprint40));
             startTrainingButton?.onClick.AddListener(() => StartMode(MonStackaMode.Training));
-            startStoryButton?.onClick.AddListener(() => SceneManager.LoadScene("StorySelect"));
+            startStoryButton?.onClick.AddListener(OpenStorySelect);
             settingsButton?.onClick.AddListener(OpenSettings);
+            musicToggleButton?.onClick.AddListener(ToggleMusic);
+            musicDownButton?.onClick.AddListener(() => StepMusicVolume(-5));
+            musicUpButton?.onClick.AddListener(() => StepMusicVolume(5));
+            sfxToggleButton?.onClick.AddListener(ToggleSfx);
+            sfxDownButton?.onClick.AddListener(() => StepSfxVolume(-5));
+            sfxUpButton?.onClick.AddListener(() => StepSfxVolume(5));
+            ditherToggleButton?.onClick.AddListener(ToggleDither);
+            controlPreviousButton?.onClick.AddListener(() => StepSelectedControl(-1));
+            controlBindButton?.onClick.AddListener(BeginControlBinding);
+            controlNextButton?.onClick.AddListener(() => StepSelectedControl(1));
+            controlResetButton?.onClick.AddListener(ResetControls);
             closeSettingsButton?.onClick.AddListener(CloseSettings);
             quitButton?.onClick.AddListener(QuitGame);
             menuButtons.Clear();
@@ -156,6 +183,19 @@ namespace MonStacka.UI
             if (startOgbmButton) menuButtons.Add(startOgbmButton);
             if (startSprintButton) menuButtons.Add(startSprintButton);
             if (startTrainingButton) menuButtons.Add(startTrainingButton);
+            settingsButtons.Clear();
+            if (musicToggleButton) settingsButtons.Add(musicToggleButton);
+            if (musicDownButton) settingsButtons.Add(musicDownButton);
+            if (musicUpButton) settingsButtons.Add(musicUpButton);
+            if (sfxToggleButton) settingsButtons.Add(sfxToggleButton);
+            if (sfxDownButton) settingsButtons.Add(sfxDownButton);
+            if (sfxUpButton) settingsButtons.Add(sfxUpButton);
+            if (ditherToggleButton) settingsButtons.Add(ditherToggleButton);
+            if (controlPreviousButton) settingsButtons.Add(controlPreviousButton);
+            if (controlBindButton) settingsButtons.Add(controlBindButton);
+            if (controlNextButton) settingsButtons.Add(controlNextButton);
+            if (controlResetButton) settingsButtons.Add(controlResetButton);
+            if (closeSettingsButton) settingsButtons.Add(closeSettingsButton);
 
             CloseSettings();
             SetLoreVisible(false);
@@ -196,12 +236,20 @@ namespace MonStacka.UI
 
         private void StartMode(MonStackaMode mode)
         {
+            StopVoicePreview();
             MonStackaAppState.SelectedMode = mode;
             SceneManager.LoadScene("Game");
         }
 
+        private void OpenStorySelect()
+        {
+            StopVoicePreview();
+            SceneManager.LoadScene("StorySelect");
+        }
+
         private void Cycle(int direction)
         {
+            StopVoicePreview();
             activeIndex = (activeIndex + direction + Profiles.Length) % Profiles.Length;
             RebuildPreview();
         }
@@ -277,8 +325,8 @@ namespace MonStacka.UI
                 deformTuning,
                 true,
                 pulseScale,
-                pulseScale > 0.001f,
-                false
+                true,
+                true
             );
             go.transform.localPosition = new Vector3(
                 -(widthCells * cellWorldSize) * 0.5f,
@@ -321,8 +369,21 @@ namespace MonStacka.UI
             }
 
             voicePreviewSource.Stop();
-            voicePreviewSource.clip = GetOrCreateVoiceClip(active.PieceType);
-            voicePreviewSource.Play();
+            if (audioController)
+            {
+                audioController.PlayMonsterPreview(active.PieceType);
+            }
+            else
+            {
+                voicePreviewSource.clip = GetOrCreateVoiceClip(active.PieceType);
+                voicePreviewSource.Play();
+            }
+        }
+
+        private void StopVoicePreview()
+        {
+            voicePreviewSource?.Stop();
+            audioController?.StopMonsterPreview();
         }
 
         private AudioClip GetOrCreateVoiceClip(PieceType pieceType)
@@ -448,9 +509,13 @@ namespace MonStacka.UI
             SetLoreVisible(false);
             RefreshSettingsText();
 
-            if (closeSettingsButton && EventSystem.current)
+            if (EventSystem.current)
             {
-                EventSystem.current.SetSelectedGameObject(closeSettingsButton.gameObject);
+                var selected = settingsButtons.Count > 0 ? settingsButtons[0] : closeSettingsButton;
+                if (selected)
+                {
+                    EventSystem.current.SetSelectedGameObject(selected.gameObject);
+                }
             }
         }
 
@@ -461,6 +526,7 @@ namespace MonStacka.UI
                 settingsPanel.SetActive(false);
             }
 
+            awaitingBindingAction = null;
             if (startOgbmButton && EventSystem.current)
             {
                 EventSystem.current.SetSelectedGameObject(startOgbmButton.gameObject);
@@ -486,7 +552,98 @@ namespace MonStacka.UI
             }
 
             settingsBody.text =
+                BuildSettingsSummaryText();
+            RefreshSettingsButtonLabels();
+        }
+
+        private void ToggleDither()
+        {
+            MonStackaAppState.DitherEnabled = !MonStackaAppState.DitherEnabled;
+            RefreshSettingsText();
+        }
+
+        private void ToggleMusic()
+        {
+            MonStackaAppState.MusicEnabled = !MonStackaAppState.MusicEnabled;
+            RefreshSettingsText();
+        }
+
+        private void ToggleSfx()
+        {
+            MonStackaAppState.SfxEnabled = !MonStackaAppState.SfxEnabled;
+            RefreshSettingsText();
+        }
+
+        private void StepMusicVolume(int delta)
+        {
+            MonStackaAppState.MusicVolume = Mathf.Clamp(MonStackaAppState.MusicVolume + delta, 0, 100);
+            RefreshSettingsText();
+        }
+
+        private void StepSfxVolume(int delta)
+        {
+            MonStackaAppState.SfxVolume = Mathf.Clamp(MonStackaAppState.SfxVolume + delta, 0, 100);
+            RefreshSettingsText();
+        }
+
+        private void StepSelectedControl(int delta)
+        {
+            var actions = MonStackaControls.OrderedActions;
+            selectedControlIndex = (selectedControlIndex + delta + actions.Length) % actions.Length;
+            awaitingBindingAction = null;
+            RefreshSettingsText();
+        }
+
+        private void BeginControlBinding()
+        {
+            awaitingBindingAction = MonStackaControls.OrderedActions[selectedControlIndex];
+            bindingCaptureFrame = Time.frameCount + 1;
+            RefreshSettingsText();
+        }
+
+        private void ResetControls()
+        {
+            awaitingBindingAction = null;
+            MonStackaControls.ResetKeyboardBindings();
+            RefreshSettingsText();
+        }
+
+        private string BuildSettingsSummaryText()
+        {
+            var selectedAction = MonStackaControls.OrderedActions[selectedControlIndex];
+            var bindingLine = awaitingBindingAction.HasValue
+                ? $"Listening for {MonStackaControls.GetActionLabel(awaitingBindingAction.Value)}. Press a key, Esc to cancel."
+                : $"{MonStackaControls.GetActionLabel(selectedAction)}: {MonStackaControls.FormatKeyboardBinding(selectedAction)}";
+            return
+                "Audio\n" +
+                $"Music: {(MonStackaAppState.MusicEnabled ? "ON" : "OFF")}   Volume {MonStackaAppState.MusicVolume}\n" +
+                $"SFX: {(MonStackaAppState.SfxEnabled ? "ON" : "OFF")}   Volume {MonStackaAppState.SfxVolume}\n\n" +
+                "Visual\n" +
+                $"Dither overlay: {(MonStackaAppState.DitherEnabled ? "ON" : "OFF")}\n\n" +
+                "Controls\n" +
+                bindingLine + "\n\n" +
                 MonStackaControls.BuildControlsSummaryText();
+        }
+
+        private void RefreshSettingsButtonLabels()
+        {
+            SetButtonLabel(musicToggleButton, $"Music {(MonStackaAppState.MusicEnabled ? "ON" : "OFF")}");
+            SetButtonLabel(musicDownButton, "Music -");
+            SetButtonLabel(musicUpButton, "Music +");
+            SetButtonLabel(sfxToggleButton, $"SFX {(MonStackaAppState.SfxEnabled ? "ON" : "OFF")}");
+            SetButtonLabel(sfxDownButton, "SFX -");
+            SetButtonLabel(sfxUpButton, "SFX +");
+            SetButtonLabel(ditherToggleButton, $"Dither {(MonStackaAppState.DitherEnabled ? "ON" : "OFF")}");
+            SetButtonLabel(controlPreviousButton, "< Control");
+            SetButtonLabel(controlBindButton, awaitingBindingAction.HasValue ? "Listening..." : "Bind Key");
+            SetButtonLabel(controlNextButton, "Control >");
+            SetButtonLabel(controlResetButton, "Defaults");
+        }
+
+        private static void SetButtonLabel(Button button, string value)
+        {
+            var label = button ? button.GetComponentInChildren<Text>() : null;
+            if (label) label.text = value;
         }
 
         private void HandleMenuInput()
@@ -502,6 +659,29 @@ namespace MonStacka.UI
 
             if (settingsPanel && settingsPanel.activeSelf)
             {
+                if (HandleBindingCapture())
+                {
+                    previousNavigateUp = navigateUp;
+                    previousNavigateDown = navigateDown;
+                    previousCycleLeft = cycleLeft;
+                    previousCycleRight = cycleRight;
+                    previousSubmit = submit;
+                    previousCancel = cancel;
+                    previousVoice = voice;
+                    previousLore = lore;
+                    return;
+                }
+
+                if (WasPressed(navigateUp, ref previousNavigateUp))
+                {
+                    MoveSettingsSelection(-1);
+                }
+
+                if (WasPressed(navigateDown, ref previousNavigateDown))
+                {
+                    MoveSettingsSelection(1);
+                }
+
                 if (WasPressed(cancel, ref previousCancel))
                 {
                     CloseSettings();
@@ -511,8 +691,6 @@ namespace MonStacka.UI
                     ActivateSelectedButton();
                 }
 
-                previousNavigateUp = navigateUp;
-                previousNavigateDown = navigateDown;
                 previousCycleLeft = cycleLeft;
                 previousCycleRight = cycleRight;
                 previousVoice = voice;
@@ -593,6 +771,58 @@ namespace MonStacka.UI
             {
                 EventSystem.current.SetSelectedGameObject(nextButton.gameObject);
             }
+        }
+
+        private void MoveSettingsSelection(int direction)
+        {
+            if (settingsButtons.Count == 0 || !EventSystem.current)
+            {
+                return;
+            }
+
+            var current = EventSystem.current.currentSelectedGameObject;
+            var currentIndex = settingsButtons.FindIndex(button => button && button.gameObject == current);
+            if (currentIndex < 0)
+            {
+                currentIndex = 0;
+            }
+
+            var nextIndex = Mathf.Clamp(currentIndex + direction, 0, settingsButtons.Count - 1);
+            var nextButton = settingsButtons[nextIndex];
+            if (nextButton)
+            {
+                EventSystem.current.SetSelectedGameObject(nextButton.gameObject);
+            }
+        }
+
+        private bool HandleBindingCapture()
+        {
+            if (!awaitingBindingAction.HasValue)
+            {
+                return false;
+            }
+
+            if (Time.frameCount <= bindingCaptureFrame)
+            {
+                return true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                awaitingBindingAction = null;
+                RefreshSettingsText();
+                return true;
+            }
+
+            var keyCode = MonStackaControls.ReadPressedKeyboardBindingKey();
+            if (keyCode.HasValue)
+            {
+                MonStackaControls.SetPrimaryKeyboardBinding(awaitingBindingAction.Value, keyCode.Value);
+                awaitingBindingAction = null;
+                RefreshSettingsText();
+            }
+
+            return true;
         }
 
         private static void ActivateSelectedButton()
