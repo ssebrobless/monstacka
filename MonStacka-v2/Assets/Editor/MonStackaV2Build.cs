@@ -87,6 +87,46 @@ namespace MonStacka.Editor
                 Directory.Delete(fullPath, true);
                 UnityEngine.Debug.Log($"Removed stale MonStacka build folder: {fullPath}");
             }
+
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrWhiteSpace(localAppData))
+            {
+                RemoveExactLegacyDirectory(Path.Combine(localAppData, "MonStacka!"));
+            }
+
+            var programs = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+            if (!string.IsNullOrWhiteSpace(programs))
+            {
+                RemoveExactLegacyFile(Path.Combine(programs, "MonStacka!.lnk"));
+            }
+
+            var commonPrograms = Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms);
+            if (!string.IsNullOrWhiteSpace(commonPrograms))
+            {
+                RemoveExactLegacyFile(Path.Combine(commonPrograms, "MonStacka!.lnk"));
+            }
+        }
+
+        private static void RemoveExactLegacyDirectory(string path)
+        {
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            Directory.Delete(path, true);
+            UnityEngine.Debug.Log($"Removed stale MonStacka build folder: {path}");
+        }
+
+        private static void RemoveExactLegacyFile(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            File.Delete(path);
+            UnityEngine.Debug.Log($"Removed stale MonStacka shortcut: {path}");
         }
 
         private static void UpdateCurrentBuildShortcuts(string outputPath, string outputDir)
