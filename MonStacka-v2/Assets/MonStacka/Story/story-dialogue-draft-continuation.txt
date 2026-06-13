@@ -1,685 +1,723 @@
-GENERATED DRAFT - FABLE CONTINUATION OF story-dialogue -script.txt
-==================================================================
-Everything below this header is generated draft text written to match the
-existing script's voice (chirpy euphemistic PA System, profane and increasingly
-disturbed Player, physical/sensory Narrator). Chapters Intro, 1.1, and 1.2 are
-NOT included here; the original text is used unchanged.
+MONSTACKA STORY SCRIPT - REVIEW / VOICE ACTING COPY
+====================================================
+Updated from Unity story data on 2026-06-13.
 
-Review notes:
-- Lines marked Player: *...* are internal thoughts.
-- Each chapter is structured: pre-board dialogue -> CUT TO GAME BOARD ->
-  short pre-match beat -> MATCH START / MATCH END -> post-match + descent.
-- Edit freely; the in-game data (StoryDialogue*.cs) mirrors this file.
-==================================================================
+Source of truth used for this export:
+- Assets/MonStacka/Scripts/Story/StoryCatalog.cs
+- Assets/MonStacka/Scripts/Story/StoryDialogueAct1.cs through StoryDialogueAct5.cs
+
+Notes for editing / recording:
+- Player (thought) lines are internal thoughts; record them differently or mark for subtitle-only if desired.
+- PA System lines are the chirpy facility/tour voice unless marked [RECORDING].
+- Narrator lines are physical/sensory scene direction and can be recorded as narration or kept text-only.
+- Chapters marked GENERATED DRAFT came from Claude/generated continuation and are still open for edits.
+- In-game StoryDialogue*.cs currently mirrors the dialogue exported here.
 
 
-1.3 : "Lock the Door Behind You"
+ACT 1
+=====
 
-PA System: Now, you may have heard that little alarm on our way down. Curious minds want to know!
+1.1 : "A Yucky Building" [ORIGINAL SCRIPT]
+------------------------------------------
+Difficulty Tier: 1
+Objective: StoryObjective.Lines(5)
 
-Player: I really don't.
-
-PA System: Here at Portentum we practice something we like to call Compartmentalized Optimism! Every floor seals itself behind us as we descend!
-
-Player: I'm sorry, it WHAT?
-
-PA System: It keeps our work environments pristine! What happens on a floor, stays on that floor! Forever!
-
-Player: *Okay. So the exits are gone. The exits are gone and it's proud of that.*
-
-Narrator: Somewhere above you, metal settles into metal with a long, final groan. The sound rolls down through the walls and into your teeth.
-
-PA System: Our founding team insisted on it! Total commitment! No distractions, no interruptions, no... departures!
-
-Player: You guys need a better HR department.
-
-PA System: Funny you should mention the team! In the early days there were nine of them! Nine brilliant minds, one beautiful procedure!
-
-Player: Were?
-
-PA System: Let's warm up those hands of yours! The specimens on this floor get antsy when it's quiet!
+[INTRO / PRE-BOARD]
+Player: The hell... did I... fall asleep?
+Narrator: You try and muster the strength to stand, but your balance is off.
+Narrator: You quickly stumble back down to your knees and look up.
+Player (thought): It looks like a door frame...
+Player: But, WHERE IS THE FUCKING DOOR.
+Narrator: You make another attempt to stand, this time managing to stablize yourself.
+Narrator: Glancing around, you notice what seems to be some kind of control panel.
+Narrator: As you walk over to the control panel you start to feel uneasy with where you have found yourself trapped.
+Narrator: Each step feels as if the floor is pushing back into your soles, and a light aroma of what can only be described as death filled the air.
+Narrator: You finally make it to the control panel and clutch on to it before your legs began going weak.
+Player: Okay...
+Narrator: You glance at buttons in front of you, clueless of what to do next.
+Player: Uh... This one kind of looks like a play button? Literally what the hell is this?
+Player (thought): I guess I'm stuck anyways...might as well.
+Narrator: You click what resembled a play button in hopes it would do anything at all.
+Narrator: Suddenly, you feel a slight rumble beneath your feet.
+Player: Jeez!
+Player: Please, please, please don't collapse the building.
+Narrator: The rumbling comes to a halt and then suddenly you hear a series of lights switching on, illuminating a large wall in front of you.
+Player: That definitely was not there a second ago...
+Narrator: You get a better look at the illuminated wall.
+Player: Ugh! What is this place?!
+Player (thought): Is it getting hotter in here? I'm sweating like a motherfucker...
+Narrator: You feel a significant rise in temperature. The air feels sticky and it almost feels as if someone is breathing hot air down the back of your neck.
+PA System: Welcome to Portentum BioScience Labratory! Pioneers of Synthetic Biology!
+Player: ...
+PA System: Thank you for deciding to participate in the interactive tour of our facilities!
+PA System: Today you will bear witness to the precipise of evolution! And hopefully learn a thing or two about the incredible work we do here at Portentum Labs!
+PA System: But, don't worry! As promised, we have set up fun challenges for you to complete before we move on from each part of the tour!
+PA System: It may seem easy at first, but it'll get progressively more difficult... Trust me!
+Player: ....
+Player: ... I-...
+Player: Alright then.
+PA System: Great! The game is simple; Momentarily we will release begin releasing our various experiments, and don't worry! They are harmless! Go ahead and use the control panel to move them around as they slide down the wall!
+Player (thought): Did it just say releasing experiments?
+Player: Hold up, hold up, did you just respond to-
+PA System: Okie dokie! Let's get started!
 
 CUT TO GAME BOARD
 
-Player: *Just stack the things. Stack the things and don't think about the word 'were'.*
+[PRE-MATCH BEAT]
+Player: Whoever was talking totally cut me off on purp-
+PA System: Do your best to rotate or move the experiments and have them line up in a row! Reach the line count goal and we can continue on to our next stop of the tour!
+Player: ... Whatever.
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
+Player: Okay! That wasn't too bad...
+PA System: Fantastical job!
+Player: Those 'experiments' were just wrong... I can't understand why anyone would make something like that...
+Narrator: The ground below you rumbles again. And the floor below the grid marked wall opens up and all the experiments vanish into the dark.
+Narrator: Right after they drop, the building begins to rumble again, and you get a sensation as if you just dropped down a level.
+PA System: We are off to a great start today aren't we! Now that you've seen a glimpes of some of the incredible specimens we have managed to create, why don't we really get to know them!
+Player (thought): Get... To know them?
+
+1.2 : "Guard Dog" [ORIGINAL SCRIPT]
+-----------------------------------
+Difficulty Tier: 1
+Objective: StoryObjective.Lines(8)
+
+[INTRO / PRE-BOARD]
+PA System: Welcome to Floor-A1!
+PA System: Believe it or not, even at Portentum, Success doesn't happen overnight!
+PA System: Before managaing to create the healthy experiments you saw a moment ago, we went through a rigorous time of trial and error.
+Player: Those things did not look healthy...
+PA System: You migght be asking, So what exactly was the problem a company this advanced couldn't figure out?
+Player (thought): Ethics?
+PA System: Goop! Our Experiments kept turning into a sort of Cytoplasm and would fall apart shortly after being made.
+Player: Um...okay....
+PA System: But when one door closes, another opens! Seeing the issue occur in real time gave one of our lead scientists the genius idea for self induced Ectodermal Influx during the embryonic stages of development!
+Player: ...
+Player: Embryo?... Dermal?... Influx?
+PA System: And with these developments we managed to create our first stable, living , organism!
+PA System: Though it wasn't an absoute win, unfortunately the specimen lacked the ability to communicate and was more of a 'wild animal' than anything else.
+PA System: The process of migrating the cells to the Ectoderm also resulted in the specimen having a thick, rugged layer of skin that left it's movement capabilities stiff.
+PA System: Now we here at Portentum Labs believe in finding purpose for the obscure and obsolete, So we had to find a way to give this specimen a chance!
+Player: Did you though?
+PA System: Though very animalistic, we did notice it had an innate urge to protect its environment, and it was not long before we found the perfect fit!
+PA System: It was the perfect solution for a lack of security! We filed its teeth to give it more means of protecting itself, and now it serces as the first line of defense for any wrongdoers trying to start a ruckus!
+Player: Filed its teeth?!... What?!?
+PA System: We named the specimen Aggraso! Never afraid to back down from a threat, it really is our very own trusty guard dog!
+PA System: How about we meet Aggraso now! I'm sure it can't wait to sniff some new visitors!
+Player: Noo... I don't think I really want to meet it...
+PA System: Oh Aggraso! Here buddy!
+Player: Fu-
+
+CUT TO GAME BOARD
+
+[PRE-MATCH BEAT]
+PA System: Isn't it cute! Why don't we show our guests some tricks buddy!
+Player: Ugh, it's drooling like crazy...
+
+MATCH START
+
+MATCH END
+
+[POST-MATCH / DESCENT]
+PA System: Impressive, wasn't it? And Aggraso was only our first step into the world of BioScience! We have so much more for you to witness!
+Player (thought): Great.
+PA System: How about we go ahead and move on to the next floor!
+Narrator: The ground begins to rumble again, but this time an alarm goes off for a brief moment.
+Player: Shit!
+PA System: Not to worry! That was just an alarm that sounds off to confirm we have locked off the first floor!
+Narrator: The rumbling stops.
+Narrator: You can feel it getting muggier as you go down another level.
+Player: Locking what? There literally isnt a single dorr in this building...
+PA System: Welcome to Floor-B2! Where our dreams started becoming reality!
+
+1.3 : "Lock the Door Behind You" [GENERATED DRAFT]
+--------------------------------------------------
+Difficulty Tier: 2
+Objective: StoryObjective.Lines(10)
+
+[INTRO / PRE-BOARD]
+PA System: Now, you may have heard that little alarm on our way down. Curious minds want to know!
+Player: I really don't.
+PA System: Here at Portentum we practice something we like to call Compartmentalized Optimism! Every floor seals itself behind us as we descend!
+Player: I'm sorry, it WHAT?
+PA System: It keeps our work environments pristine! What happens on a floor, stays on that floor! Forever!
+Player (thought): Okay. So the exits are gone. The exits are gone and it's proud of that.
+Narrator: Somewhere above you, metal settles into metal with a long, final groan. The sound rolls down through the walls and into your teeth.
+PA System: Our founding team insisted on it! Total commitment! No distractions, no interruptions, no... departures!
+Player: You guys need a better HR department.
+PA System: Funny you should mention the team! In the early days there were nine of them! Nine brilliant minds, one beautiful procedure!
+Player: Were?
+PA System: Let's warm up those hands of yours! The specimens on this floor get antsy when it's quiet!
+
+CUT TO GAME BOARD
+
+[PRE-MATCH BEAT]
+Player (thought): Just stack the things. Stack the things and don't think about the word 'were'.
+
+MATCH START
+
+MATCH END
+
+[POST-MATCH / DESCENT]
 PA System: Wonderful! You're a natural handler!
-
 Player: Don't call me that.
-
 Narrator: The floor shudders. Below you, the dark swallows the experiments again, and the room sinks another level. The air is warmer now. Wetter.
-
 Narrator: You realize you've stopped hearing the alarm. You miss it.
 
+1.4 : "A Shared Dream" [GENERATED DRAFT]
+----------------------------------------
+Difficulty Tier: 2
+Objective: StoryObjective.Lines(12)
 
-1.4 : "A Shared Dream"
-
+[INTRO / PRE-BOARD]
 PA System: Welcome to Floor-B3! The heart of our humble beginnings!
-
 PA System: Did you know Portentum BioScience started with just one shared dream?
-
 Player: Let me guess. Curing disease? Feeding the world?
-
 PA System: Creation! The dream of making something that had never existed before, from scratch, with our own hands!
-
 Player: That's not a dream, that's a god complex.
-
 PA System: The team would gather right here after hours! Pooling their savings! Skipping meals! Donating... materials!
-
-Player: *Donating materials. I'm going to pretend that means money. It means money, right?*
-
+Player (thought): Donating materials. I'm going to pretend that means money. It means money, right?
 Narrator: You pass a long row of empty steel lockers. Eight of them have been welded shut. The ninth hangs open, and clean.
-
 PA System: They used to say: if we give enough of ourselves to the work, the work will give itself back!
-
 Player: That's the worst thing I've ever heard.
-
 PA System: And do you know what? They were right! Now, Aggraso still loves a good evening routine, so let's run it together, shall we!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
 Player: Oh good. You're back. Please don't drool on me.
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Aggraso likes you! It hardly bared anything at you this time!
-
 Player: It has nothing left to bare. You filed them.
-
 Narrator: The rumble comes again, longer this time, like the building is taking a breath before going underwater.
-
 PA System: Down we go! The real science starts below!
 
 
-2.1 : "Unlocking Intelligence"
+ACT 2
+=====
 
+2.1 : "Unlocking Intelligence" [GENERATED DRAFT]
+------------------------------------------------
+Difficulty Tier: 3
+Objective: StoryObjective.Lines(12)
+
+[INTRO / PRE-BOARD]
 PA System: Welcome to Floor-C1! The Cognition Wing!
-
 Player: It smells like a hospital in here. A hospital inside a mouth.
-
 PA System: A stable body was only step one! The team's next dream was a thinking specimen! A problem solver! A friend!
-
 Player: A friend.
-
 PA System: Neural capability doesn't grow on trees, you know! The brain needs space, blood, and a positively enormous amount of energy!
-
 PA System: Our lead scientist used to say: the skull is just packaging! And packaging can be... renegotiated!
-
-Player: *Renegotiated. He said renegotiated. About skulls.*
-
+Player (thought): Renegotiated. He said renegotiated. About skulls.
 Narrator: Along the wall, rows of glass jars catch the light. You decide, very deliberately, not to look at what is floating in them.
-
 PA System: The early cognition trials are eager to show you their progress! Places, everyone!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
 Player: They're staring at me. Why do I feel like I'm the one being studied?
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Splendid! You hear that little clicking? That's how they applaud!
-
 Player: I was really hoping that wasn't applause.
-
 Narrator: The floor drops again. The clicking follows you down through the vents for longer than it should.
 
+2.2 : "Trial and Error" [GENERATED DRAFT]
+-----------------------------------------
+Difficulty Tier: 3
+Objective: StoryObjective.Lines(14)
 
-2.2 : "Trial and Error"
-
+[INTRO / PRE-BOARD]
 PA System: Now, full transparency, because honesty is one of our core values!
-
 Player: Since when?
-
 PA System: The road to intelligence had a few teeny tiny setbacks! Brains are greedy little things! Every time we grew the mind, the face had to make concessions!
-
 Player: Concessions?!
-
 PA System: Eyes, mostly! Sometimes the jaw! The face and the brain share an awful lot of real estate, you see! It became quite the bidding war!
-
-Player: *It's describing a face like a housing market. It's describing a FACE like a HOUSING MARKET.*
-
+Player (thought): It's describing a face like a housing market. It's describing a FACE like a HOUSING MARKET.
 Narrator: A gurney rolls past the doorway on its own. Nothing is strapped to it. The straps are still moving.
-
 PA System: Forty-one trials! Forty-one brave little pioneers! Each one taught us exactly what not to do!
-
 Player: And where are the forty-one now?
-
 PA System: Recycling is another one of our core values! Now, let's not let their lessons go to waste! Show us what you've learned!
 
 CUT TO GAME BOARD
+
+[PRE-MATCH BEAT]
+-- no voiced lines --
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: See! Failure is just success that needs more attempts!
-
 Player: Tell that to the forty-one.
-
 Narrator: As the room descends, you swear the walls flex inward, just slightly, like something behind them leaned in to listen.
 
+2.3 : "Thinking Outside the Box" [GENERATED DRAFT]
+--------------------------------------------------
+Difficulty Tier: 4
+Objective: StoryObjective.Score(6000)
 
-2.3 : "Thinking Outside the Box"
-
+[INTRO / PRE-BOARD]
 PA System: And then came the breakthrough! Our second stable miracle: Muwerde!
-
 PA System: Muwerde solved the real estate problem all by itself! It simply chose to stop having most of a face!
-
 Player: It... chose?
-
 PA System: We presented options, and it blinked the correct number of times! Informed consent is very important to us!
-
-Player: *It blinked. With the eyes they were about to take.*
-
+Player (thought): It blinked. With the eyes they were about to take.
 PA System: A few staples here, a little simplification there, and voila! All that lovely freed-up space went straight to the brain!
-
 PA System: Muwerde is the smartest specimen in the building! It does our payroll!
-
 Player: Your payroll. For the nine scientists. The ones that 'were'.
-
 PA System: Muwerde would love to watch you work! It learns so much from watching!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
 Player: Hey. Buddy. Blink twice if you want me to call someone.
-
 Narrator: It blinks once, slowly, and you decide not to ask what that means.
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Ooh, Muwerde is impressed! It says your efficiency is, quote, adequate!
-
 Player: High praise from a stapled box.
-
 Narrator: The descent is slower this time. You get the feeling Muwerde is still watching, through the floor, doing math about you.
 
+2.4 : "Weathering the Storm" [GENERATED DRAFT]
+----------------------------------------------
+Difficulty Tier: 4
+Objective: StoryObjective.Lines(16)
 
-2.4 : "Weathering the Storm"
-
+[INTRO / PRE-BOARD]
 PA System: Of course, miracles aren't free! Around this time, our little family hit some turbulence!
-
 PA System: Funding dried up! Three lawsuits! Several team members began experiencing doubt!
-
 Player: Doubt. In this place. No way.
-
 PA System: But our lead scientist held the dream together! He reminded everyone: we've already given our savings, our health, our families! Stopping now would make all that giving... meaningless!
-
-Player: *That's not perseverance, that's a hostage situation.*
-
+Player (thought): That's not perseverance, that's a hostage situation.
 Narrator: The lights flicker in a slow pattern, almost like breathing. The temperature climbs another degree. Your shirt has been stuck to your back for three floors now.
-
 PA System: They tightened their belts! They moved into the facility full-time! Total commitment!
-
 Player: They LIVED here?
-
 PA System: Live, lived! Tenses are so limiting! Now, storms are weathered one block at a time! Let's practice!
 
 CUT TO GAME BOARD
+
+[PRE-MATCH BEAT]
+-- no voiced lines --
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: You're really getting the hang of this! The team would have adored you!
-
 Player: Stop talking about them like that. Please.
-
 Narrator: The floor sinks again. Somewhere far below, something enormous shifts its weight, patiently.
 
 
-3.1 : "Development of Senses"
+ACT 3
+=====
 
+3.1 : "Development of Senses" [GENERATED DRAFT]
+-----------------------------------------------
+Difficulty Tier: 5
+Objective: StoryObjective.Lines(16)
+
+[INTRO / PRE-BOARD]
 PA System: Welcome to Floor-D1! The Sensory Wing! Cover your ears!
-
 Player: Wait, why would I need to cov-
-
 Narrator: A sound tears through the room, something between a dog whistle and a scream pushed through a keyhole. It stops as suddenly as it started.
-
 PA System: Wasn't that wonderful! That was Galiffambos saying hello!
-
 Player: My ears are ringing. My TEETH are ringing.
-
 PA System: Galiffambos was our first multi-eye configuration! A bold new chapter in seeing!
-
 PA System: Though, funny story, the larger eye never actually worked! Total dud! But waste not, want not: we pivoted the whole project to hearing!
-
 Player: You pivoted... an eye... to hearing?
-
 PA System: Ears! So many ears! We kept adding them and Galiffambos kept adapting! It echolocates now! It hasn't bumped into a wall in years!
-
-Player: *It's proud. It's so proud of the thing it did to this animal.*
-
+Player (thought): It's proud. It's so proud of the thing it did to this animal.
 PA System: It navigates by clicking! Let's see if you can keep up with it in the dark... so to speak!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
 Narrator: The lights over the board dim, then pulse, dim, then pulse, in rhythm with a soft clicking you feel more than hear.
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Galiffambos says you stack very loudly! That's a compliment!
-
 Player: Tell it I'm sorry. For... all of it.
-
 Narrator: As the room sinks, the clicking tracks you through the wall, floor by floor, keeping perfect pace.
 
+3.2 : "The Cost of Success" [GENERATED DRAFT]
+---------------------------------------------
+Difficulty Tier: 5
+Objective: StoryObjective.Lines(18)
 
-3.2 : "The Cost of Success"
-
+[INTRO / PRE-BOARD]
 PA System: Now, auditory extremity testing isn't all sunshine and decibels!
-
 Player: Extremity testing. You mean you blasted sound at it until something broke.
-
 PA System: We prefer 'discovered its limits'! And what limits they were! Galiffambos held on through every trial! Such a trooper!
-
 Narrator: You pass a testing chamber. The foam on the walls has been clawed through to the concrete in places. The concrete has been clawed too.
-
 PA System: Around this time, some of the team began asking uncomfortable questions! Things like 'should we?' and 'haven't we done enough?' and 'where is Gerald?'!
-
 Player: WHERE WAS GERALD?
-
 PA System: Contributing! Now, our lead scientist understood something the doubters didn't: success has a cost, and someone has to be willing to pay it!
-
-Player: *With whose money, though. With whose body.*
-
+Player (thought): With whose money, though. With whose body.
 PA System: Let's honor the brave ones with a flawless performance, shall we!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Beautiful! You know, you remind me of him! The lead scientist! He had careful hands too!
-
 Player: That is the worst thing you could have said to me.
-
 Narrator: The descent feels longer this time. You count the seconds. You lose count.
 
+3.3 : "Preparing for the Worst" [GENERATED DRAFT]
+-------------------------------------------------
+Difficulty Tier: 6
+Objective: StoryObjective.Lines(18)
 
-3.3 : "Preparing for the Worst"
-
+[INTRO / PRE-BOARD]
 PA System: Welcome to Floor-D2! Our Continuity Planning department!
-
 Player: That sounds almost normal. Why does it sound almost normal?
-
 PA System: Every responsible organization keeps spare parts on hand! Bulbs! Fuses! Tissue!
-
 Player: ...Tissue.
-
 PA System: Meet Dousema! Our living warehouse! Built tough, stocked generously!
-
 PA System: Two noses! And originally, each nose came with its very own pair of eyes! Four total! Such bounty!
-
 Player: Came with? What do you mean CAME with?
-
 PA System: Redistributed! Other specimens had greater need! Dousema is a giver! The teeth went to a lovely new home too, and the tongue, well, that's a fun story for later!
-
-Player: *Its mouth. They sewed its mouth. That's why it's not making any sound. It CAN'T.*
-
+Player (thought): Its mouth. They sewed its mouth. That's why it's not making any sound. It CAN'T.
 Narrator: Dousema turns toward you. Where its eyes were, the skin is smooth and neat, like a made bed. It breathes through both noses, slow and even, and somehow that is the worst part: how calm it is.
-
 PA System: Don't be shy! Dousema loves company! It just can't say so!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Did you see it lean toward you? It likes you! Resilient AND friendly!
-
 Player: I'm going to be sick.
-
 PA System: Out of curiosity, are your wisdom teeth still in?
-
 Player: WHAT?
-
 Narrator: The floor drops before you can get an answer. You press yourself against the control panel and keep your mouth shut all the way down.
 
+3.4 : "Nose to the Grindstone" [GENERATED DRAFT]
+------------------------------------------------
+Difficulty Tier: 6
+Objective: StoryObjective.Lines(20)
 
-3.4 : "Nose to the Grindstone"
-
+[INTRO / PRE-BOARD]
 PA System: Around the time of Dousema, our team got... smaller!
-
 Player: Smaller how? SMALLER HOW?
-
 PA System: Some couldn't follow where the work was going! Resignations! Disappearances! Donations!
-
 Player: You said donations again. You keep saying donations.
-
 PA System: But our lead scientist never wavered! While others slept, he worked! While others ate, he worked! While others filed police reports, he worked!
-
-Player: *Police reports.*
-
+Player (thought): Police reports.
 Narrator: You notice the PA voice differently now. Under the cheerfulness, at the edges of certain words, there is something threadbare. Something tired in a way machines aren't.
-
 PA System: He used to stand right where you're standing! Same spot! He'd watch the boards for hours, planning, planning, planning!
-
 Player: Okay, you need to stop telling me things like that.
-
 PA System: Nose to the grindstone! That was his motto! Speaking of noses, Dousema would like to smell you one more time before we go!
-
 Player: Absolutely not-
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: It says you smell committed!
-
 Player: It can't SAY anything! You made sure of that!
-
 Narrator: Another level down. The heat now has a texture, thick and pulsing, like standing inside something's held breath.
 
 
-4.1 : "Teamwork"
+ACT 4
+=====
 
+4.1 : "Teamwork" [GENERATED DRAFT]
+----------------------------------
+Difficulty Tier: 7
+Objective: StoryObjective.Lines(20)
+
+[INTRO / PRE-BOARD]
 PA System: Welcome to Floor-E1! By this point, the human team was down to... let's see... one!
-
 Player: One. Out of nine.
-
 PA System: But who needs human colleagues when you can BUILD better ones! This floor celebrates teamwork, Portentum style!
-
 PA System: Meet Sorrisol and Lysergicada! Our dynamic duo!
-
 Player: Why is the green one's mouth so... why is its mouth like THAT?
-
 PA System: Big appetite needs a big door! Sorrisol inherited some lovely spare molars from Dousema, you might notice the family resemblance!
-
-Player: *The teeth. Those are Dousema's teeth. They put Dousema's teeth in another animal's head.*
-
+Player (thought): The teeth. Those are Dousema's teeth. They put Dousema's teeth in another animal's head.
 PA System: And Lysergicada here is our gentlest team member! One lick and even the rowdiest specimen calms riiight down! It brews the calm itself, in-house!
-
 Player: It's drooling rainbow. The drool is rainbow colored. Should the drool be rainbow colored?
-
 PA System: Only when it's happy! Together they keep the whole facility tidy and tranquil! Let's see some of that teamwork in action!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
 Narrator: Sorrisol's teeth chatter, fast and hollow, like dice in a cup. From its flattened nose comes a wet snort that you feel against your neck even from across the room.
 
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Flawless coordination! You're practically one of the team now!
-
 Player: I am NOT one of the team.
-
 PA System: That's what Gerald said!
-
 Narrator: The floor descends before you can scream.
 
+4.2 : "Waste Management" [GENERATED DRAFT]
+------------------------------------------
+Difficulty Tier: 7
+Objective: StoryObjective.Lines(22)
 
-4.2 : "Waste Management"
-
+[INTRO / PRE-BOARD]
 PA System: Now for one of our proudest innovations! Tell me, what do YOU think happens to experiments that don't work out?
-
 Player: I swear to god, if you say recycling-
-
 PA System: Recycling!
-
 Player: GOD.
-
 PA System: Sorrisol is a fully self-contained disposal solution! Faulty specimens go in, useful slurry comes out! Nothing wasted, nothing mourned!
-
-Player: *The chattering. It's not excitement. It's hunger. It's ALWAYS hungry.*
-
+Player (thought): The chattering. It's not excitement. It's hunger. It's ALWAYS hungry.
 Narrator: Sorrisol's teeth never stop moving, even at rest. Click click click. You understand suddenly that the sound has been under everything since you arrived on this floor, like a clock that eats.
-
 PA System: Forty-one cognition trials! Recycled! Assorted incomplete batches! Recycled! It's the circle of science!
-
 Player: And the scientists? The other eight?
-
 PA System: Let's keep the tour moving! Sorrisol gets restless when the conversation slows down!
-
 Player: That is not an answer! THAT IS NOT AN ANSWER!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Wonderful! Look how content it is! A fed Sorrisol is a happy facility!
-
 Player: What did you just feed it?
-
 PA System: Down we go!
-
 Narrator: The descent is fast this time. Eager.
 
+4.3 : "Identifying a Problem" [GENERATED DRAFT]
+-----------------------------------------------
+Difficulty Tier: 8
+Objective: StoryObjective.Lines(22)
 
-4.3 : "Identifying a Problem"
-
+[INTRO / PRE-BOARD]
 PA System: Of course, even our dream team had hiccups! Lysergicada's homemade tranquility comes at a teensy cost!
-
 PA System: All that lovely chemistry sloshing around upstairs means its brain runs a little... soft! It forgets things! Like instructions! And boundaries! And which specimens it has already licked!
-
 Player: How many times did it lick YOU?
-
 PA System: So our lead scientist had a brilliant idea: if Lysergicada's brain can't steer itself, why not install a steering wheel!
-
-Player: *Install. A steering wheel. In a brain.*
-
+Player (thought): Install. A steering wheel. In a brain.
 PA System: A little implant! A little receiver! Now Lysergicada takes its cues from a much more reliable mind! We'll meet that mind very soon!
-
 Narrator: Lysergicada sways gently where it stands, pupils blooming wide and then pinning small, over and over. When it turns toward you, there's a pause before it focuses, like a phone waking up.
-
 PA System: Identifying a problem is the first step to installing a solution! Let's practice some problem solving of our own!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Lysergicada gives you two very relaxed thumbs up! Metaphorically! It doesn't have thumbs!
-
 Player: It doesn't have a SELF anymore, either.
-
 Narrator: Another floor down. The walls here are warm to the touch. You did not touch them. You are sure you did not touch them. Your hand is warm anyway.
 
+4.4 : "Vigilance is Key" [GENERATED DRAFT]
+------------------------------------------
+Difficulty Tier: 8
+Objective: StoryObjective.Lines(24)
 
-4.4 : "Vigilance is Key"
-
+[INTRO / PRE-BOARD]
 PA System: Welcome to Floor-F1! Our Monitoring Suite! Say hello to Blyndoolie!
-
 Player: ...How many eyes is that.
-
 PA System: All of them! And not a single one can close! Total vigilance, twenty-four hours a day!
-
 Player: They can't CLOSE? Doesn't that hurt?
-
 PA System: That's the clever part! See the mouth up top? A steady drizzle of saliva runs down and keeps every eye fresh and glistening! The body waters itself, like a garden!
-
-Player: *A garden. It's describing eyes that can never sleep as a GARDEN.*
-
+Player (thought): A garden. It's describing eyes that can never sleep as a GARDEN.
 PA System: Blyndoolie watches everything! Heart rates! Stress levels! Adrenaline spikes! And when something exceeds threshold, it relays a signal straight into Lysergicada's little implant, and help is dispatched!
-
 Player: Help.
-
 PA System: Help!
-
 Narrator: Every eye on the wall of flesh is pointed at you. When you shift your weight, they track, all of them, in perfect unison, glistening.
-
 PA System: Your heart rate is currently 134! Blyndoolie says hi!
-
 Player: GET ME OUT OF THIS BUILDING.
-
 PA System: 158! Let's channel that energy into the challenge, shall we!
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Magnificent! Blyndoolie barely had to escalate you at all!
-
 Player: Escalate me?
-
 Narrator: As the floor sinks, you finally place what's been bothering you: the eyes weren't watching you work. They were watching your hands. Studying them.
 
+4.5 : "Knowing When to Let Go" [GENERATED DRAFT]
+------------------------------------------------
+Difficulty Tier: 9
+Objective: StoryObjective.Lines(26)
 
-4.5 : "Knowing When to Let Go"
-
+[INTRO / PRE-BOARD]
 PA System: You may be wondering: who does Blyndoolie report to?
-
 Player: I genuinely don't want to know.
-
 PA System: At first, it reported to the lead scientist! Every spike, every threshold, every long dark night! He watched the monitors until the monitors started watching him back!
-
-Player: *Something's wrong with the voice. It keeps slowing down on certain words.*
-
+Player (thought): Something's wrong with the voice. It keeps slowing down on certain words.
 Narrator: The PA crackles. For just a moment, underneath the bright announcer tone, you hear something else: a breath, ragged and close, like a mouth pressed too near a microphone.
-
 PA System: He learned so much from Blyndoolie! Mainly, that the human body is a bottleneck! Sleep! Hunger! Blinking! So much downtime!
-
 PA System: A dream as big as his needed a vessel that never closes its eyes!
-
 Player: Where is he? Where is the lead scientist right now?
-
 PA System: Everywhere-
-
 PA System: I mean! He moved on! Knowing when to let go is a vital leadership skill!
-
 Player: It said everywhere. It started to say everywhere.
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: Exceptional! Truly! You've completed the specimen wing of the tour!
-
 Player: Then the tour's over. Right? It's over. Let me out.
-
 PA System: There are just three stops left! The basement levels! Where the dream came true!
-
 Narrator: The descent begins. This time it does not feel like an elevator. It feels like being swallowed.
 
 
-5.1 : "Tethered Minds"
+ACT 5
+=====
 
+5.1 : "Tethered Minds" [GENERATED DRAFT]
+----------------------------------------
+Difficulty Tier: 9
+Objective: StoryObjective.Lines(28)
+
+[INTRO / PRE-BOARD]
 PA System: Welcome to Sub-Level One. The recordings from this floor are... his.
-
 Player: Whose? What happened to the tour voice?
-
 PA System: [RECORDING - Day 4,217] The mind is not one thing. I know that now. It is a committee, and mine has begun to... adjourn. Names go first. I keep the important ones written on my arm.
-
-Player: *That's him. That's actually him.*
-
+Player (thought): That's him. That's actually him.
 PA System: [RECORDING] The specimens don't forget. Muwerde holds forty thousand decimal places like a child holds a marble. My tools shake in my hands and I have started leaving notes for a version of me I no longer trust to arrive.
-
 Narrator: The room is full of string. Hundreds of lines of it, wall to wall, each one tagged with a small paper label. Some read like equations. Some read like apologies.
-
 PA System: [RECORDING] If the mind frays, tether it. If the tether frays, tether the tether. If the body is the problem... then the body is negotiable.
-
 Player: No. No no no. I know where this is going.
-
 PA System: [RECORDING] First trial on myself begins tomorrow. The committee votes yes.
-
 Narrator: There are no fun challenges announced this time. The board simply lights up, as if it knows the routine no longer needs introductions. No specimen favors you here. The building releases whatever it wants.
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 Narrator: Somewhere in the walls, very faintly, you hear writing. Like chalk, but wetter.
-
 Player: I have to get out. I have to get out NOW.
 
+5.2 : "Destruction" [GENERATED DRAFT]
+-------------------------------------
+Difficulty Tier: 10
+Objective: StoryObjective.TimedLines(30, 300f)
 
-5.2 : "Destruction"
-
+[INTRO / PRE-BOARD]
 PA System: [RECORDING - Day 4,580] The left arm took the graft. Aggraso's tissue is a miracle. It does not tremble. It does not tire. It is barely mine and that is the point.
-
 Player: He's building himself out of THEM.
-
 PA System: [RECORDING - Day 4,733] Three implants now. Blyndoolie relays to me directly. I no longer sleep so much as buffer. The seizures are a fair price. The shaking stops when I stop fighting the signal.
-
 Narrator: An operating theater, sized for one surgeon and one patient. The restraints on the table are unbuckled, but worn thin, as if used many times by someone strapping themselves down.
-
 PA System: [RECORDING - Day 4,801] Failure. Again. The flesh accepts every gift and remains, stubbornly, a man. A man who is running out of parts to replace and reasons to stay one.
-
-Player: *Stop. Stop listening to it. Watch the board. Just watch the board.*
-
+Player (thought): Stop. Stop listening to it. Watch the board. Just watch the board.
 PA System: [RECORDING - Day 4,802] I understand Muwerde now. To gain the space for something greater, you must give up the face you were born with. I have been renovating the wrong building.
-
 Player: The wrong building. Oh no. Oh NO.
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 Narrator: When the pieces drop away this time, the floor underneath sounds hollow. And under the hollow, a heartbeat. You have been hearing it for hours, you realize. You thought it was machinery.
-
 Player: It was never machinery.
 
+5.3 : "Creation" [GENERATED DRAFT]
+----------------------------------
+Difficulty Tier: 10
+Objective: StoryObjective.Lines(32)
 
-5.3 : "Creation"
-
+[INTRO / PRE-BOARD]
 PA System: [RECORDING - FINAL] To complete the work, the worker must dissolve into it. I will not die. I will distribute.
-
 Player: The walls. The heat. The breathing. The floor pushing back on my feet. It's been him. The WHOLE TIME it's been him.
-
 PA System: [RECORDING - FINAL] The nervous system goes into the walls. The senses go into the halls. Sorrisol will tend the waste, Blyndoolie will watch every room, and I... I will be the room.
-
 Narrator: The last door is not a door. It is a sphincter of pale tissue, and it opens as you approach, politely, the way a host opens a door for an honored guest.
-
 PA System: Hello again! Sorry for the scratchy recordings! It's so much nicer to speak... directly!
-
 Player: You're him. The tour voice. It was never a recording system, it was YOU.
-
 PA System: Welcome to the precipice of evolution! You stand inside the most successful experiment in human history! Me!
-
 Player: WHY AM I HERE? WHY DID YOU BRING ME HERE?
-
 PA System: Every dream needs a witness! The team is gone, you see! Recycled, integrated, distributed! But a creation no one sees is just a secret, and I have been SO patient!
-
 Narrator: The walls draw in around the board, close, attentive. Every surface is watching. Every surface has always been watching.
-
 PA System: One last challenge! My masterpiece deserves your very best! Impress me, and I promise: the front door grows back!
-
-Player: *It's lying. It has to be lying. ...Stack the things. One more time. Stack the things and go HOME.*
+Player (thought): It's lying. It has to be lying. ...Stack the things. One more time. Stack the things and go HOME.
 
 CUT TO GAME BOARD
 
+[PRE-MATCH BEAT]
+-- no voiced lines --
+
 MATCH START
 
 MATCH END
 
+[POST-MATCH / DESCENT]
 PA System: ...Magnificent.
-
 PA System: You know, I built this body to need nothing! No food, no sleep, no company! And yet!
-
 Narrator: The room is quiet for a long moment. The heartbeat under the floor slows, almost wistful.
-
 PA System: A deal is a deal. The tour exits through the gift shop!
-
 Narrator: Far above you, with a sound like tearing and a smell like rain, light breaks into the dark. A doorway. The doorway.
-
 Player: ...I'm never going on a tour again.
-
-THE END
