@@ -26,8 +26,19 @@ namespace MonStacka.UI
         private static Sprite textureSprite;
         private Image image;
 
+        private void Reset()
+        {
+            EnsureFullScreenRect();
+        }
+
+        private void OnValidate()
+        {
+            EnsureFullScreenRect();
+        }
+
         private void Awake()
         {
+            EnsureFullScreenRect();
             image = GetComponent<Image>();
             image.sprite = GetOrCreateTextureSprite();
             image.type = Image.Type.Simple;
@@ -48,6 +59,22 @@ namespace MonStacka.UI
             {
                 transform.SetAsLastSibling();
             }
+        }
+
+        public void EnsureFullScreenRect()
+        {
+            var rect = GetComponent<RectTransform>();
+            if (!rect)
+            {
+                return;
+            }
+
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
+            rect.localScale = Vector3.one;
         }
 
         private static Sprite GetOrCreateTextureSprite()

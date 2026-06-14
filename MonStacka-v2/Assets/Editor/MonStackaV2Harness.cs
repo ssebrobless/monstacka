@@ -10,6 +10,7 @@ using MonStacka.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MonStacka.Editor
 {
@@ -115,6 +116,7 @@ namespace MonStacka.Editor
                 new HarnessScenario("settings and controls smoke", VerifySettingsAndControlsSmoke),
                 new HarnessScenario("ability reference text is player-facing", VerifyAbilityReferenceText),
                 new HarnessScenario("scene wiring smoke", VerifySceneWiringSmoke),
+                new HarnessScenario("visual layout geometry smoke", VerifyVisualLayoutGeometrySmoke),
                 new HarnessScenario("current Windows build artifacts", VerifyCurrentBuildArtifacts),
             };
 
@@ -326,6 +328,38 @@ namespace MonStacka.Editor
             Expect(UnityEngine.Object.FindFirstObjectByType<DitherOverlay>() != null, "Game scene should contain DitherOverlay.");
         }
 
+        private static void VerifyVisualLayoutGeometrySmoke()
+        {
+            EditorSceneManager.OpenScene(HomeScenePath);
+            var homeCanvas = RequireRect("HomeCanvas");
+            var homeDitherComponent = UnityEngine.Object.FindFirstObjectByType<DitherOverlay>();
+            Expect(homeDitherComponent != null, "Home scene should contain DitherOverlay.");
+            homeDitherComponent.EnsureFullScreenRect();
+            var homeDither = RequireRect("DitherOverlay");
+            AssertMostlyCovers(homeDither, homeCanvas, "Home dither overlay");
+            AssertNotOverlapping("StoryButton", "ArcadeButton", 6f);
+            AssertNotOverlapping("StoryButton", "SprintButton", 6f);
+            AssertNotOverlapping("LeaderboardStyleToggle", "StoryButton", 4f, allowMissing: true);
+            AssertTextReadable("MonstosName", minFontSize: 20);
+            AssertTextReadable("SettingsTitle", minFontSize: 20);
+
+            EditorSceneManager.OpenScene(GameScenePath);
+            var gameCanvas = RequireRect("GameCanvas");
+            var gameDitherComponent = UnityEngine.Object.FindFirstObjectByType<DitherOverlay>();
+            Expect(gameDitherComponent != null, "Game scene should contain DitherOverlay.");
+            gameDitherComponent.EnsureFullScreenRect();
+            var gameDither = RequireRect("DitherOverlay");
+            AssertMostlyCovers(gameDither, gameCanvas, "Game dither overlay");
+            AssertNotOverlapping("GameSettingsButton", "GameQuitButton", 4f);
+            AssertNotOverlapping("GameHomeButton", "GameQuitButton", 4f);
+            AssertRenderersNotOverlapping("HoldSlotFrame_Fill", "NextSlotFrame1_Fill", 0.02f);
+            AssertRenderersNotOverlapping("NextSlotFrame1_Fill", "NextSlotFrame2_Fill", 0.02f);
+            AssertRenderersNotOverlapping("NextSlotFrame2_Fill", "NextSlotFrame3_Fill", 0.02f);
+            AssertTextReadable("HoldLabel", minFontSize: 14);
+            AssertTextReadable("NextLabel", minFontSize: 14);
+            AssertTextReadable("ScoreLabel", minFontSize: 14);
+        }
+
         private static void VerifyCurrentBuildArtifacts()
         {
             var buildDir = Path.Combine(Directory.GetCurrentDirectory(), "Builds", "Windows");
@@ -364,6 +398,114 @@ namespace MonStacka.Editor
 
             return report.ToString();
         }
+
+        private static RectTransform RequireRect(string objectName)
+        {
+            var rect = FindSceneRect(objectName);
+            Expect(rect != null, $"Scene should contain RectTransform named {objectName}.");
+            return rect;
+        }
+
+        private static RectTransform FindSceneRect(string objectName) =>
+            Resources.FindObjectsOfTypeAll<RectTransform>()
+                .FirstOrDefault(rect => rect && rect.gameObject.scene.IsValid() && rect.gameObject.scene.isLoaded && rect.name == objectName);
+
+        private static void AssertNotOverlapping(string firstName, string secondName, float minimumGap, bool allowMissing = false)
+        {
+            var first = FindSceneRect(firstName);
+            var second = FindSceneRect(secondName);
+            if (allowMissing && (!first || !second))
+            {
+                return;
+            }
+
+            Expect(first != null, $"Scene should contain RectTransform named {firstName}.");
+            Expect(second != null, $"Scene should contain RectTransform named {secondName}.");
+            var firstRect = GetWorldRect(first);
+            var secondRect = GetWorldRect(second);
+            Expect(!firstRect.Overlaps(secondRect), $"{firstName} should not overlap {secondName}. {firstName}={FormatRect(firstRect)} {secondName}={FormatRect(secondRect)}");
+            var gap = RectGap(firstRect, secondRect);
+            Expect(gap >= minimumGap, $"{firstName} and {secondName} should have at least {minimumGap:0.#}px gap, got {gap:0.#}.");
+        }
+
+        private static void AssertMostlyCovers(RectTransform overlay, RectTransform canvas, string label)
+        {
+            var overlayRect = GetWorldRect(overlay);
+            var canvasRect = GetWorldRect(canvas);
+            Expect(overlayRect.width >= canvasRect.width * 0.95f, $"{label} should cover canvas width.");
+            Expect(overlayRect.height >= canvasRect.height * 0.95f, $"{label} should cover canvas height.");
+            Expect(overlayRect.Contains(canvasRect.center), $"{label} should cover canvas center.");
+        }
+
+        private static void AssertRenderersNotOverlapping(string firstName, string secondName, float minimumGap)
+        {
+            var first = FindSceneRenderer(firstName);
+            var second = FindSceneRenderer(secondName);
+            Expect(first != null, $"Scene should contain Renderer named {firstName}.");
+            Expect(second != null, $"Scene should contain Renderer named {secondName}.");
+            var firstRect = BoundsToRect(first.bounds);
+            var secondRect = BoundsToRect(second.bounds);
+            Expect(!firstRect.Overlaps(secondRect), $"{firstName} should not overlap {secondName}. {firstName}={FormatRect(firstRect)} {secondName}={FormatRect(secondRect)}");
+            var gap = RectGap(firstRect, secondRect);
+            Expect(gap >= minimumGap, $"{firstName} and {secondName} should have at least {minimumGap:0.###} world gap, got {gap:0.###}.");
+        }
+
+        private static Renderer FindSceneRenderer(string objectName) =>
+            Resources.FindObjectsOfTypeAll<Renderer>()
+                .FirstOrDefault(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.gameObject.scene.isLoaded && renderer.name == objectName);
+
+        private static void AssertTextReadable(string objectName, int minFontSize)
+        {
+            var rect = RequireRect(objectName);
+            var text = rect.GetComponent<Text>();
+            Expect(text != null, $"{objectName} should have Text.");
+            Expect(text.fontSize >= minFontSize || text.resizeTextForBestFit, $"{objectName} should use readable text size.");
+            Expect(text.horizontalOverflow != HorizontalWrapMode.Overflow || rect.rect.width >= 90f, $"{objectName} overflow text should have a wide container.");
+            Expect(text.verticalOverflow != VerticalWrapMode.Overflow || rect.rect.height >= 24f, $"{objectName} overflow text should have a tall enough container.");
+        }
+
+        private static Rect GetWorldRect(RectTransform rectTransform)
+        {
+            var corners = new Vector3[4];
+            rectTransform.GetWorldCorners(corners);
+            var minX = corners.Min(corner => corner.x);
+            var maxX = corners.Max(corner => corner.x);
+            var minY = corners.Min(corner => corner.y);
+            var maxY = corners.Max(corner => corner.y);
+            return Rect.MinMaxRect(minX, minY, maxX, maxY);
+        }
+
+        private static Rect BoundsToRect(Bounds bounds) =>
+            Rect.MinMaxRect(bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y);
+
+        private static float RectGap(Rect first, Rect second)
+        {
+            var horizontalGap = first.xMax < second.xMin
+                ? second.xMin - first.xMax
+                : second.xMax < first.xMin
+                    ? first.xMin - second.xMax
+                    : 0f;
+            var verticalGap = first.yMax < second.yMin
+                ? second.yMin - first.yMax
+                : second.yMax < first.yMin
+                    ? first.yMin - second.yMax
+                    : 0f;
+
+            if (horizontalGap <= 0f)
+            {
+                return verticalGap;
+            }
+
+            if (verticalGap <= 0f)
+            {
+                return horizontalGap;
+            }
+
+            return Mathf.Sqrt((horizontalGap * horizontalGap) + (verticalGap * verticalGap));
+        }
+
+        private static string FormatRect(Rect rect) =>
+            $"x={rect.xMin:0.#}..{rect.xMax:0.#}, y={rect.yMin:0.#}..{rect.yMax:0.#}";
 
         private static void Expect(bool condition, string message)
         {
