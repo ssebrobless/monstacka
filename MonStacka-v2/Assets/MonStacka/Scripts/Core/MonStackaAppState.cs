@@ -43,6 +43,9 @@ namespace MonStacka.Core
         /// <summary>Zany mode enables friendly held-piece abilities outside Story.</summary>
         public static bool FriendlyAbilitiesEnabled { get; set; } = true;
 
+        /// <summary>Editor harness hook; normal player builds leave this false.</summary>
+        public static bool SkipDialogueForHarness { get; set; }
+
         public static void ResetDefaults()
         {
             SelectedMode = MonStackaMode.Ogbm;
@@ -60,6 +63,7 @@ namespace MonStacka.Core
             RippleStage = MonStackaRippleStage.HomePreview;
             SelectedStoryChapterId = null;
             FriendlyAbilitiesEnabled = true;
+            SkipDialogueForHarness = false;
         }
     }
 }

@@ -177,7 +177,7 @@ namespace MonStacka.UI
                 monstosLoreText.horizontalOverflow = HorizontalWrapMode.Wrap;
                 monstosLoreText.verticalOverflow = VerticalWrapMode.Truncate;
                 monstosLoreText.lineSpacing = 0.88f;
-                monstosLoreText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                monstosLoreText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 var outline = monstosLoreText.GetComponent<Outline>() ?? monstosLoreText.gameObject.AddComponent<Outline>();
                 outline.effectColor = new Color(0.02f, 0.015f, 0.05f, 0.92f);
                 outline.effectDistance = new Vector2(1.4f, -1.4f);
@@ -637,7 +637,7 @@ namespace MonStacka.UI
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
             leaderboardStyleToggleLabel = labelGo.GetComponent<Text>();
-            leaderboardStyleToggleLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            leaderboardStyleToggleLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             leaderboardStyleToggleLabel.fontSize = 18;
             leaderboardStyleToggleLabel.fontStyle = FontStyle.Bold;
             leaderboardStyleToggleLabel.alignment = TextAnchor.MiddleCenter;
@@ -661,7 +661,7 @@ namespace MonStacka.UI
                 rect.sizeDelta = new Vector2(112f, 34f);
 
                 var text = go.GetComponent<Text>();
-                text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 text.fontSize = 20;
                 text.fontStyle = FontStyle.Bold;
                 text.alignment = TextAnchor.MiddleCenter;
@@ -728,7 +728,7 @@ namespace MonStacka.UI
 
             var text = go.GetComponent<Text>();
             text.text = value;
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = fontSize;
             text.alignment = TextAnchor.MiddleCenter;
             text.color = new Color(0.95f, 0.94f, 1f, 1f);
@@ -822,7 +822,7 @@ namespace MonStacka.UI
 
             var text = labelGo.GetComponent<Text>();
             text.text = label;
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = 17;
             text.fontStyle = FontStyle.Bold;
             text.alignment = TextAnchor.MiddleCenter;

@@ -316,7 +316,7 @@ namespace MonStacka.UI
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
             zanyToggleLabel = labelGo.GetComponent<Text>();
-            zanyToggleLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            zanyToggleLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             zanyToggleLabel.fontSize = 15;
             zanyToggleLabel.fontStyle = FontStyle.Bold;
             zanyToggleLabel.alignment = TextAnchor.MiddleCenter;

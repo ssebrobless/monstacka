@@ -115,10 +115,11 @@ namespace MonStacka.Visual
         {
             var turns = GetTextureTurns(skinData, pieceType, rotation);
             var cacheKey = $"{skinData.GetInstanceID()}:{pieceType}:{turns}";
-            if (RotatedTextureCache.TryGetValue(cacheKey, out var cached))
+            if (RotatedTextureCache.TryGetValue(cacheKey, out var cached) && cached.All(IsTextureAlive))
             {
                 return cached;
             }
+            RotatedTextureCache.Remove(cacheKey);
 
             var textures = new Texture2D[skinData.bodyFrames.Length];
             for (var frameIndex = 0; frameIndex < skinData.bodyFrames.Length; frameIndex += 1)
@@ -148,10 +149,11 @@ namespace MonStacka.Visual
                 .ThenBy(cell => cell.x)
                 .Select(cell => $"{cell.x},{cell.y}"));
             var cacheKey = $"{texture.GetInstanceID()}:{signature}:{pixelsPerCell}:{pieceType}:{rotation}:{frameIndex}";
-            if (BodySpriteCache.TryGetValue(cacheKey, out var sprite))
+            if (BodySpriteCache.TryGetValue(cacheKey, out var sprite) && IsSpriteAlive(sprite))
             {
                 return sprite;
             }
+            BodySpriteCache.Remove(cacheKey);
 
             if (MatchesFullDefinition(pieceType, rotation, localCells))
             {
@@ -208,6 +210,41 @@ namespace MonStacka.Visual
             var sprite = Sprite.Create(texture, rect, new Vector2(0f, 1f), pixelsPerCell);
             sprite.name = $"{pieceType}_{rotation}_{frameIndex}_body_full";
             return sprite;
+        }
+
+        private static bool IsTextureAlive(Texture2D texture)
+        {
+            if (!texture)
+            {
+                return false;
+            }
+
+            try
+            {
+                _ = texture.height;
+                return true;
+            }
+            catch (MissingReferenceException)
+            {
+                return false;
+            }
+        }
+
+        private static bool IsSpriteAlive(Sprite sprite)
+        {
+            if (!sprite)
+            {
+                return false;
+            }
+
+            try
+            {
+                return IsTextureAlive(sprite.texture);
+            }
+            catch (MissingReferenceException)
+            {
+                return false;
+            }
         }
 
         private static Sprite BuildCompositeSprite(

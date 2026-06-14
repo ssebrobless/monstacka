@@ -117,6 +117,7 @@ namespace MonStacka.Editor
                 new HarnessScenario("ability reference text is player-facing", VerifyAbilityReferenceText),
                 new HarnessScenario("scene wiring smoke", VerifySceneWiringSmoke),
                 new HarnessScenario("visual layout geometry smoke", VerifyVisualLayoutGeometrySmoke),
+                new HarnessScenario("runtime game flow smoke", VerifyRuntimeGameFlowSmoke),
                 new HarnessScenario("current Windows build artifacts", VerifyCurrentBuildArtifacts),
             };
 
@@ -360,6 +361,53 @@ namespace MonStacka.Editor
             AssertTextReadable("ScoreLabel", minFontSize: 14);
         }
 
+        private static void VerifyRuntimeGameFlowSmoke()
+        {
+            var ogbm = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true);
+            Expect(ogbm.CurrentMode == MonStackaMode.Ogbm, "Runtime O.G.B.M. should start in O.G.B.M. mode.");
+            Expect(ogbm.FriendlyAbilitiesEnabled, "Runtime zany O.G.B.M. should have assists.");
+            Expect(!ogbm.IsPaused, "Runtime O.G.B.M. should start unpaused.");
+            ogbm.PauseIfRunning();
+            Expect(ogbm.IsPaused, "PauseIfRunning should pause a match.");
+            ogbm.ResumeGame();
+            Expect(!ogbm.IsPaused, "ResumeGame should unpause a match.");
+            ogbm.RequestRestart();
+            Expect(ogbm.IsPaused, "Restart confirmation should pause non-training modes.");
+            Expect(ogbm.IsRestartConfirmActive, "Restart confirmation should become active for non-training modes.");
+            Expect(ogbm.HasRestartConfirmUi, "Restart confirmation UI should be created.");
+            ogbm.TogglePause();
+            Expect(!ogbm.IsRestartConfirmActive, "Toggling pause while restart confirm is active should cancel the prompt.");
+            Expect(ogbm.IsPaused, "Canceling restart confirmation should leave the run paused.");
+
+            var training = LoadGameManagerForMode(MonStackaMode.Training, friendlyAbilitiesEnabled: false);
+            Expect(training.CurrentMode == MonStackaMode.Training, "Runtime training should start in Training mode.");
+            Expect(training.CanToggleFriendlyAbilities, "Training should expose the zany toggle.");
+            Expect(!training.FriendlyAbilitiesEnabled, "Training should honor classic friendly ability off state.");
+            var beforeTrainingBoard = training.Board;
+            training.ToggleFriendlyAbilitiesAndRestart();
+            Expect(MonStackaAppState.FriendlyAbilitiesEnabled, "Training zany toggle should update app state.");
+            Expect(training.FriendlyAbilitiesEnabled, "Training zany toggle should enable assists.");
+            Expect(!ReferenceEquals(beforeTrainingBoard, null), "Training board should exist before toggle.");
+            Expect(training.Board != null, "Training board should exist after toggle.");
+            Expect(training.Board.PiecesPlaced == 0, "Training zany toggle restart should reset placed pieces.");
+            training.RequestRestart();
+            Expect(!training.IsRestartConfirmActive, "Training restart should not ask for confirmation.");
+
+            var story = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.1");
+            Expect(story.CurrentMode == MonStackaMode.Story, "Runtime story should start in Story mode.");
+            Expect(story.FriendlyAbilitiesEnabled, "Story should force friendly abilities on.");
+            Expect(!story.IsDialogueInputBlocking, "Harness story launch should skip dialogue gate.");
+            story.RequestRestart();
+            Expect(story.IsRestartConfirmActive, "Story restart should ask for confirmation.");
+            Expect(story.IsPaused, "Story restart confirmation should pause the match.");
+
+            var gameOver = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: false);
+            gameOver.Board.Grid[0, 4] = (int)PieceType.I;
+            Expect(!gameOver.Board.SpawnNext(PieceType.O), "Runtime top-out setup should force game over.");
+            gameOver.RequestRestart();
+            Expect(gameOver.IsRestartConfirmActive, "Game-over restart path should still create restart confirmation when requested directly.");
+        }
+
         private static void VerifyCurrentBuildArtifacts()
         {
             var buildDir = Path.Combine(Directory.GetCurrentDirectory(), "Builds", "Windows");
@@ -372,6 +420,21 @@ namespace MonStacka.Editor
             Expect(Directory.Exists(dataDir), "Current Windows build data folder should exist.");
             Expect(File.Exists(launchScript), "Current Windows build launch script should exist.");
             Expect(File.Exists(stamp), "Current Windows build stamp should exist.");
+        }
+
+        private static GameManager LoadGameManagerForMode(MonStackaMode mode, bool friendlyAbilitiesEnabled, string storyChapterId = null)
+        {
+            MonStackaAppState.ResetDefaults();
+            MonStackaAppState.SelectedMode = mode;
+            MonStackaAppState.FriendlyAbilitiesEnabled = friendlyAbilitiesEnabled;
+            MonStackaAppState.SelectedStoryChapterId = storyChapterId;
+            MonStackaAppState.SkipDialogueForHarness = true;
+
+            EditorSceneManager.OpenScene(GameScenePath);
+            var manager = UnityEngine.Object.FindFirstObjectByType<GameManager>();
+            Expect(manager != null, "Game scene should contain GameManager for runtime flow.");
+            manager.SendMessage("Awake", SendMessageOptions.DontRequireReceiver);
+            return manager;
         }
 
         private static string BuildReport(IReadOnlyList<HarnessResult> results)

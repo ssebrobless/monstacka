@@ -193,6 +193,7 @@ namespace MonStacka.Core
             var skipDialogue = System.Array.Exists(
                 System.Environment.GetCommandLineArgs(),
                 arg => string.Equals(arg, "-monstacka-skip-dialogue", System.StringComparison.OrdinalIgnoreCase));
+            skipDialogue |= MonStackaAppState.SkipDialogueForHarness;
             if (storyChapter != null && dialoguePresenter && !skipDialogue)
             {
                 // Intro + pre-match dialogue plays before the countdown starts.
@@ -1354,6 +1355,8 @@ namespace MonStacka.Core
 
         public AssistEffectSystem AssistSystem => assistSystem;
 
+        public BoardState Board => boardState;
+
         public MonStackaMode CurrentMode => mode;
 
         public bool FriendlyAbilitiesEnabled => assistSystem != null;
@@ -1375,6 +1378,10 @@ namespace MonStacka.Core
         public bool IsRestartConfirmActive => restartConfirmActive;
 
         public bool IsEndRunPanelActive => endRunPanelShown;
+
+        public bool HasRestartConfirmUi => restartConfirmRoot != null;
+
+        public bool HasEndRunUi => endRunRoot != null;
 
         public void RequestRestart()
         {
@@ -1604,7 +1611,7 @@ namespace MonStacka.Core
             var go = CreateRestartUiObject(name, parent);
             var text = go.AddComponent<Text>();
             text.text = value;
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = fontSize;
             text.alignment = alignment;
             text.color = new Color(0.93f, 0.9f, 1f, 1f);
