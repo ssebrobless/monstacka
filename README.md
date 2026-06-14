@@ -2,6 +2,24 @@
 
 This repository is being evolved into a dual-version Tetris project with one low-friction browser build and one improved desktop-focused build.
 
+## MonStacka v2 Playtest Download
+
+The current friend-ready build is the Unity version in [MonStacka-v2/](./MonStacka-v2/).
+
+Fastest way to play:
+
+1. Open the latest GitHub Release.
+2. Download `MonStackaV2-Windows-x64.zip`.
+3. Extract the whole zip folder.
+4. Double-click `Launch-MonStackaV2.cmd`.
+
+Do not run `MonStackaV2.exe` from inside the zip preview. Windows needs the extracted folder because the executable depends on the nearby `MonStackaV2_Data/`, `MonoBleedingEdge/`, `D3D12/`, and `UnityPlayer.dll` files.
+
+Current platform status:
+
+- Windows: supported by the current downloadable build.
+- macOS: not packaged yet for MonStacka v2. The Unity project should be portable in principle, but a proper Mac `.app` build still needs to be produced and tested.
+
 ```text
 ╔══════════════ Launch Flow ══════════════╗
 ║ Start-Tetris.cmd / Launcher.ps1         ║
