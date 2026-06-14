@@ -55,6 +55,7 @@ namespace MonStacka.Core
         public PieceType PieceType;
         public int Rotation;
         public List<Vector2Int> Cells = new();
+        public List<Vector2Int> SourceCells = new();
         public Vector2Int? BoxOrigin;
     }
 
@@ -90,6 +91,8 @@ namespace MonStacka.Core
 
         public int[,] Grid { get; private set; }
         public int[,] PieceIds { get; private set; }
+        public int[,] SourceCellXs { get; private set; }
+        public int[,] SourceCellYs { get; private set; }
         public bool HasActivePiece { get; private set; }
         public PieceInstance ActivePiece => activePiece;
         public bool HasHoldPiece { get; private set; }
@@ -129,6 +132,8 @@ namespace MonStacka.Core
             trainingFeedbackMode = string.IsNullOrWhiteSpace(trainingFeedback) ? "show" : trainingFeedback;
             Grid = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             PieceIds = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellXs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellYs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             NextQueue = new Queue<PieceType>();
             Reset();
         }
@@ -137,6 +142,8 @@ namespace MonStacka.Core
         {
             Grid = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             PieceIds = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellXs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellYs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             lockedPieces.Clear();
             pieceTypeById.Clear();
             pieceRotationById.Clear();
@@ -428,6 +435,8 @@ namespace MonStacka.Core
 
                 Grid[cell.y, cell.x] = (int)activePiece.Type;
                 PieceIds[cell.y, cell.x] = pieceId;
+                SourceCellXs[cell.y, cell.x] = cell.x - activePiece.X;
+                SourceCellYs[cell.y, cell.x] = cell.y - activePiece.Y;
                 placedCells.Add(cell);
             }
 
@@ -437,6 +446,7 @@ namespace MonStacka.Core
                 PieceType = activePiece.Type,
                 Rotation = activePiece.Rotation,
                 Cells = placedCells.ToList(),
+                SourceCells = placedCells.Select(cell => new Vector2Int(cell.x - activePiece.X, cell.y - activePiece.Y)).ToList(),
                 BoxOrigin = new Vector2Int(activePiece.X, activePiece.Y),
             };
             pieceTypeById[pieceId] = activePiece.Type;
@@ -467,6 +477,8 @@ namespace MonStacka.Core
         {
             var keptTypes = new List<int[]>();
             var keptIds = new List<int[]>();
+            var keptSourceXs = new List<int[]>();
+            var keptSourceYs = new List<int[]>();
             var cleared = 0;
 
             for (var row = 0; row < PieceDefinitions.TotalRows; row += 1)
@@ -489,20 +501,28 @@ namespace MonStacka.Core
 
                 var typeRow = new int[PieceDefinitions.Columns];
                 var idRow = new int[PieceDefinitions.Columns];
+                var sourceXRow = new int[PieceDefinitions.Columns];
+                var sourceYRow = new int[PieceDefinitions.Columns];
                 for (var col = 0; col < PieceDefinitions.Columns; col += 1)
                 {
                     typeRow[col] = Grid[row, col];
                     idRow[col] = PieceIds[row, col];
+                    sourceXRow[col] = SourceCellXs[row, col];
+                    sourceYRow[col] = SourceCellYs[row, col];
                 }
 
                 keptTypes.Add(typeRow);
                 keptIds.Add(idRow);
+                keptSourceXs.Add(sourceXRow);
+                keptSourceYs.Add(sourceYRow);
             }
 
             while (keptTypes.Count < PieceDefinitions.TotalRows)
             {
                 keptTypes.Insert(0, new int[PieceDefinitions.Columns]);
                 keptIds.Insert(0, new int[PieceDefinitions.Columns]);
+                keptSourceXs.Insert(0, new int[PieceDefinitions.Columns]);
+                keptSourceYs.Insert(0, new int[PieceDefinitions.Columns]);
             }
 
             for (var row = 0; row < PieceDefinitions.TotalRows; row += 1)
@@ -511,6 +531,8 @@ namespace MonStacka.Core
                 {
                     Grid[row, col] = keptTypes[row][col];
                     PieceIds[row, col] = keptIds[row][col];
+                    SourceCellXs[row, col] = keptSourceXs[row][col];
+                    SourceCellYs[row, col] = keptSourceYs[row][col];
                 }
             }
 
@@ -561,6 +583,8 @@ namespace MonStacka.Core
 
             Grid = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             PieceIds = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellXs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellYs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             lockedPieces.Clear();
             pieceTypeById.Clear();
             pieceRotationById.Clear();
@@ -592,6 +616,8 @@ namespace MonStacka.Core
         {
             Grid = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             PieceIds = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellXs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
+            SourceCellYs = new int[PieceDefinitions.TotalRows, PieceDefinitions.Columns];
             lockedPieces.Clear();
             pieceTypeById.Clear();
             pieceRotationById.Clear();
@@ -658,6 +684,7 @@ namespace MonStacka.Core
                     PieceType = record.PieceType,
                     Rotation = record.Rotation,
                     Cells = record.Cells.ToList(),
+                    SourceCells = record.SourceCells.ToList(),
                     BoxOrigin = record.BoxOrigin,
                 })
                 .ToList();
@@ -737,6 +764,7 @@ namespace MonStacka.Core
                     }
 
                     record.Cells.Add(new Vector2Int(col, row));
+                    record.SourceCells.Add(new Vector2Int(SourceCellXs[row, col], SourceCellYs[row, col]));
                 }
             }
 
@@ -800,6 +828,8 @@ namespace MonStacka.Core
                 {
                     Grid[row, col] = Grid[row + 1, col];
                     PieceIds[row, col] = PieceIds[row + 1, col];
+                    SourceCellXs[row, col] = SourceCellXs[row + 1, col];
+                    SourceCellYs[row, col] = SourceCellYs[row + 1, col];
                 }
             }
 
@@ -808,6 +838,8 @@ namespace MonStacka.Core
             {
                 Grid[bottom, col] = col == holeColumn ? 0 : GarbageCellValue;
                 PieceIds[bottom, col] = 0;
+                SourceCellXs[bottom, col] = 0;
+                SourceCellYs[bottom, col] = 0;
             }
 
             foreach (var record in lockedPieces.Values)
@@ -856,6 +888,8 @@ namespace MonStacka.Core
 
                 Grid[row, col] = GarbageCellValue;
                 PieceIds[row, col] = 0;
+                SourceCellXs[row, col] = 0;
+                SourceCellYs[row, col] = 0;
                 placed += 1;
             }
 
@@ -884,6 +918,8 @@ namespace MonStacka.Core
 
                     Grid[row, col] = 0;
                     PieceIds[row, col] = 0;
+                    SourceCellXs[row, col] = 0;
+                    SourceCellYs[row, col] = 0;
                     removed += 1;
                 }
             }
@@ -927,6 +963,8 @@ namespace MonStacka.Core
 
                     Grid[row, col] = GarbageCellValue;
                     PieceIds[row, col] = 0;
+                    SourceCellXs[row, col] = 0;
+                    SourceCellYs[row, col] = 0;
                     OnGarbageChanged?.Invoke();
                     return true;
                 }

@@ -51,6 +51,7 @@ namespace MonStacka.Visual
             PieceType type,
             int currentRotation,
             IReadOnlyCollection<Vector2Int> cells,
+            IReadOnlyCollection<Vector2Int> sourceCells,
             float worldCellSize,
             Material outlineMaterial,
             BorderDeformTuningProfile deformTuning,
@@ -86,7 +87,7 @@ namespace MonStacka.Visual
             var bodyRoot = new GameObject("Body");
             bodyRoot.transform.SetParent(transform, false);
             bodyRoot.transform.localScale = new Vector3(cellWorldSize, cellWorldSize, 1f);
-            bodyBuild = ConnectedBodyBuilder.Build(bodyRoot.transform, skinData, pieceType, rotation, localCells, cellWorldSize, previewOnly, useFullBoxSprite);
+            bodyBuild = ConnectedBodyBuilder.Build(bodyRoot.transform, skinData, pieceType, rotation, localCells, cellWorldSize, previewOnly, useFullBoxSprite, sourceCells);
             CreateDitherShadow(bodyBuild.RendererHost);
 
             if (effectivePulseScale > 0.001f)

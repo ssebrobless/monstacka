@@ -399,6 +399,7 @@ namespace MonStacka.Editor
                         skin.pieceType,
                         0,
                         PieceDefinitions.GetCells(skin.pieceType, 0),
+                        PieceDefinitions.GetCells(skin.pieceType, 0),
                         1f,
                         outlineMaterial,
                         tuning,
@@ -443,7 +444,7 @@ namespace MonStacka.Editor
             Expect(summary.Contains("Move Left: D-pad Left / Left Stick Left"), "Xbox left default should be visible in controls summary.");
             Expect(summary.Contains("Move Right: D-pad Right / Left Stick Right"), "Xbox right default should be visible in controls summary.");
             Expect(summary.Contains("Soft Drop: D-pad Down / Left Stick Down"), "Xbox soft drop default should be visible in controls summary.");
-            Expect(summary.Contains("Hard Drop: D-pad Up / Left Stick Up"), "Xbox hard drop default should be visible in controls summary.");
+            Expect(summary.Contains("Hard Drop: D-pad Up"), "Xbox hard drop default should be visible in controls summary.");
             Expect(summary.Contains("Rotate CCW: A"), "Xbox CCW default should be visible in controls summary.");
             Expect(summary.Contains("Rotate CW: B"), "Xbox CW default should be visible in controls summary.");
             Expect(summary.Contains("Rotate 180: Y"), "Xbox 180 default should be visible in controls summary.");
@@ -473,6 +474,7 @@ namespace MonStacka.Editor
                         skin,
                         PieceType.I,
                         0,
+                        PieceDefinitions.GetCells(PieceType.I, 0),
                         PieceDefinitions.GetCells(PieceType.I, 0),
                         1f,
                         outlineMaterial,

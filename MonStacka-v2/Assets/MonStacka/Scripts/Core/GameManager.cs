@@ -14,14 +14,16 @@ namespace MonStacka.Core
     {
         private readonly struct PieceRenderData
         {
-            public PieceRenderData(List<Vector2Int> localCells, Vector2Int origin, bool useFullBoxSprite)
+            public PieceRenderData(List<Vector2Int> localCells, List<Vector2Int> sourceCells, Vector2Int origin, bool useFullBoxSprite)
             {
                 LocalCells = localCells;
+                SourceCells = sourceCells;
                 Origin = origin;
                 UseFullBoxSprite = useFullBoxSprite;
             }
 
             public List<Vector2Int> LocalCells { get; }
+            public List<Vector2Int> SourceCells { get; }
             public Vector2Int Origin { get; }
             public bool UseFullBoxSprite { get; }
         }
@@ -54,6 +56,9 @@ namespace MonStacka.Core
         private const int MaxLockResets = 15;
         /// <summary>v1 parity: pre-game countdown duration (COUNTDOWN_MS).</summary>
         private const float CountdownSeconds = 1f;
+        private const float ArtboardWidth = 1920f;
+        private const float ArtboardHeight = 1080f;
+        private const float CanvasPixelsPerWorldUnit = 100f;
 
         private readonly Dictionary<int, PieceSkin> stackViews = new();
         private readonly Dictionary<int, string> stackViewSignatures = new();
@@ -123,6 +128,7 @@ namespace MonStacka.Core
         private void Awake()
         {
             EnsureSceneReferences();
+            AlignBoardPanelToPlayableGrid();
             RebuildSkinLookup();
             mode = MonStackaAppState.SelectedMode;
             gravitySeconds = MonStackaAppState.GravitySeconds;
@@ -136,6 +142,7 @@ namespace MonStacka.Core
             {
                 storyChapter = StoryCatalog.GetChapter(MonStackaAppState.SelectedStoryChapterId)
                     ?? StoryProgress.CurrentChapter();
+                MonStackaAppState.FriendlyAbilitiesEnabled = true;
                 gravitySeconds = storyChapter.GravitySeconds;
                 lockDelaySeconds = storyChapter.LockDelaySeconds;
                 if (!storyChapter.Objective.HasBossHealth &&
@@ -953,8 +960,8 @@ namespace MonStacka.Core
             foreach (var record in boardState.GetLockedPieceGroups())
             {
                 syncSeenIds.Add(record.PieceId);
-                var renderData = BuildLockedRenderData(record.PieceType, record.Rotation, record.Cells, record.BoxOrigin);
-                var signature = BuildCellSignature(renderData.LocalCells);
+                var renderData = BuildLockedRenderData(record.PieceType, record.Rotation, record.Cells, record.SourceCells, record.BoxOrigin);
+                var signature = BuildCellSignature(renderData.LocalCells, renderData.SourceCells);
 
                 if (stackViews.TryGetValue(record.PieceId, out var view) && view)
                 {
@@ -989,30 +996,41 @@ namespace MonStacka.Core
 
         private void CreateLockedPieceView(LockedPieceRecord record, PieceRenderData? prebuilt = null, string signature = null)
         {
-            var renderData = prebuilt ?? BuildLockedRenderData(record.PieceType, record.Rotation, record.Cells, record.BoxOrigin);
+            var renderData = prebuilt ?? BuildLockedRenderData(record.PieceType, record.Rotation, record.Cells, record.SourceCells, record.BoxOrigin);
+            var isWholePiece = ConnectedBodyBuilder.MatchesFullDefinition(record.PieceType, record.Rotation, renderData.LocalCells);
             var pieceView = CreatePieceSkin(
                 $"Piece_{record.PieceId}",
                 stackRoot,
                 record.PieceType,
                 record.Rotation,
                 renderData.LocalCells,
+                renderData.SourceCells,
                 false,
                 record.PieceId,
                 renderData.UseFullBoxSprite,
-                GetLockedPulseScale()
+                isWholePiece ? GetLockedPulseScale() : 0f,
+                shouldAnimateBody: isWholePiece,
+                shouldEnableFeatures: isWholePiece
             );
             pieceView.transform.localPosition = BoardToWorld(renderData.Origin.x, renderData.Origin.y);
             stackViews[record.PieceId] = pieceView;
-            stackViewSignatures[record.PieceId] = signature ?? BuildCellSignature(renderData.LocalCells);
+            stackViewSignatures[record.PieceId] = signature ?? BuildCellSignature(renderData.LocalCells, renderData.SourceCells);
         }
 
-        private static string BuildCellSignature(List<Vector2Int> cells)
+        private static string BuildCellSignature(List<Vector2Int> cells, List<Vector2Int> sourceCells)
         {
-            var sorted = cells.OrderBy(cell => cell.y).ThenBy(cell => cell.x);
+            var sorted = cells
+                .Select((cell, index) => (cell, source: sourceCells != null && index < sourceCells.Count ? sourceCells[index] : cell))
+                .OrderBy(entry => entry.cell.y)
+                .ThenBy(entry => entry.cell.x);
             var builder = new System.Text.StringBuilder(cells.Count * 6);
-            foreach (var cell in sorted)
+            foreach (var entry in sorted)
             {
-                builder.Append(cell.x).Append(',').Append(cell.y).Append(';');
+                builder
+                    .Append(entry.cell.x).Append(',').Append(entry.cell.y)
+                    .Append('<')
+                    .Append(entry.source.x).Append(',').Append(entry.source.y)
+                    .Append(">;");
             }
             return builder.ToString();
         }
@@ -1055,6 +1073,7 @@ namespace MonStacka.Core
                     piece.Type,
                     piece.Rotation,
                     renderData.LocalCells,
+                    renderData.SourceCells,
                     false,
                     -1,
                     renderData.UseFullBoxSprite,
@@ -1106,10 +1125,13 @@ namespace MonStacka.Core
             PieceType pieceType,
             int rotation,
             IReadOnlyCollection<Vector2Int> localCells,
+            IReadOnlyCollection<Vector2Int> sourceCells,
             bool previewOnly,
             int pieceId,
             bool useFullBoxSprite = false,
-            float pulseScale = 0f)
+            float pulseScale = 0f,
+            bool shouldAnimateBody = true,
+            bool shouldEnableFeatures = true)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -1126,13 +1148,14 @@ namespace MonStacka.Core
                     pieceType,
                     rotation,
                     localCells,
+                    sourceCells,
                     cellWorldSize,
                     outlineMaterial,
                     deformTuning,
                     previewOnly,
                     effectivePulseScale,
-                    animateBody,
-                    enableFacialAnimation,
+                    animateBody && shouldAnimateBody,
+                    enableFacialAnimation && shouldEnableFeatures,
                     useFullBoxSprite
                 );
                 hasAnyGameplayPulse |= pieceSkin.UsesBorderPulse;
@@ -1174,6 +1197,7 @@ namespace MonStacka.Core
             PieceType pieceType,
             int rotation,
             IReadOnlyCollection<Vector2Int> absoluteCells,
+            IReadOnlyList<Vector2Int> sourceCells,
             Vector2Int? boxOrigin)
         {
             if (boxOrigin.HasValue && MatchesAbsoluteDefinition(pieceType, rotation, boxOrigin.Value, absoluteCells))
@@ -1190,7 +1214,10 @@ namespace MonStacka.Core
             var normalizedLockedCells = absoluteCells
                 .Select(cell => new Vector2Int(cell.x - minX, cell.y - minY))
                 .ToList();
-            return new PieceRenderData(normalizedLockedCells, new Vector2Int(minX, minY), false);
+            var sourceCellList = sourceCells != null && sourceCells.Count == normalizedLockedCells.Count
+                ? sourceCells.ToList()
+                : normalizedLockedCells.ToList();
+            return new PieceRenderData(normalizedLockedCells, sourceCellList, new Vector2Int(minX, minY), false);
         }
 
         private static PieceRenderData BuildActiveRenderData(PieceInstance piece)
@@ -1211,6 +1238,7 @@ namespace MonStacka.Core
             {
                 return new PieceRenderData(
                     sourceCells.ToList(),
+                    sourceCells.ToList(),
                     boxOrigin,
                     true
                 );
@@ -1224,6 +1252,7 @@ namespace MonStacka.Core
 
             return new PieceRenderData(
                 normalizedCells,
+                normalizedCells.ToList(),
                 new Vector2Int(boxOrigin.x + minX, boxOrigin.y + minY),
                 useFullBoxSprite
             );
@@ -1269,6 +1298,30 @@ namespace MonStacka.Core
             stackRoot.SetParent(boardRoot, false);
             activeRoot ??= new GameObject("ActivePieceView").transform;
             activeRoot.SetParent(boardRoot, false);
+        }
+
+        private void AlignBoardPanelToPlayableGrid()
+        {
+            if (!boardRoot)
+            {
+                return;
+            }
+
+            var panelObject = GameObject.Find("BoardPanelBackdrop");
+            if (!panelObject || !panelObject.TryGetComponent<RectTransform>(out var rectTransform))
+            {
+                return;
+            }
+
+            var boardPixelX = (boardRoot.localPosition.x * CanvasPixelsPerWorldUnit) + (ArtboardWidth * 0.5f);
+            var boardPixelY = (ArtboardHeight * 0.5f) - (boardRoot.localPosition.y * CanvasPixelsPerWorldUnit);
+            var cellPixels = Mathf.Max(1f, cellWorldSize * CanvasPixelsPerWorldUnit);
+
+            rectTransform.anchorMin = new Vector2(0f, 1f);
+            rectTransform.anchorMax = new Vector2(0f, 1f);
+            rectTransform.pivot = new Vector2(0f, 1f);
+            rectTransform.anchoredPosition = new Vector2(boardPixelX, -boardPixelY);
+            rectTransform.sizeDelta = new Vector2(PieceDefinitions.Columns * cellPixels, PieceDefinitions.VisibleRows * cellPixels);
         }
 
         private void RebuildSkinLookup()

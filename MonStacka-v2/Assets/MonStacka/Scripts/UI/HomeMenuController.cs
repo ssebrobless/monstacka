@@ -376,6 +376,7 @@ namespace MonStacka.UI
                 profile.PieceType,
                 profile.PreviewRotation,
                 normalized,
+                normalized,
                 cellWorldSize,
                 outlineMaterial,
                 deformTuning,

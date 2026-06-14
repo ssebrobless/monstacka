@@ -953,7 +953,7 @@ namespace MonStacka.Editor
 
             var primaryPanel = CreatePanel(canvas.transform, "PrimaryPanelBackdrop", new Rect(92f, 142f, 510f, 818f), new Color(0.08f, 0.10f, 0.18f, 0.64f));
             primaryPanel.GetComponent<Image>().raycastTarget = false;
-            var boardPanel = CreatePanel(canvas.transform, "BoardPanelBackdrop", new Rect(635f, 20f, 650f, 1040f), new Color(0.08f, 0.10f, 0.18f, 0.36f));
+            var boardPanel = CreatePanel(canvas.transform, "BoardPanelBackdrop", new Rect(700f, 20f, 520f, 1040f), new Color(0.08f, 0.10f, 0.18f, 0.36f));
             boardPanel.GetComponent<Image>().raycastTarget = false;
             var secondaryPanel = CreatePanel(canvas.transform, "SecondaryPanelBackdrop", new Rect(1310f, 142f, 498f, 818f), new Color(0.08f, 0.10f, 0.18f, 0.64f));
             secondaryPanel.GetComponent<Image>().raycastTarget = false;

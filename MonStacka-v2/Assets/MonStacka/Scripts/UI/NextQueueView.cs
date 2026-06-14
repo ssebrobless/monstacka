@@ -147,6 +147,7 @@ namespace MonStacka.UI
                 piece,
                 0,
                 normalizedCells,
+                normalizedCells,
                 cellWorldSize,
                 outlineMaterial,
                 deformTuning,

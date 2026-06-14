@@ -32,6 +32,7 @@ namespace MonStacka.UI
         private Text storyScoreValueText;
         private Text storyBossLabelText;
         private Text storyEnemyStatusText;
+        private Text[] storyRankTexts;
         private string lastStoryEnemyStatus;
         private readonly List<PointPopup> pointPopups = new();
 
@@ -88,6 +89,7 @@ namespace MonStacka.UI
 
             EnsureStoryRightHud();
             SetStoryRightHudVisible(mode == MonStackaMode.Story && currentStoryObjective.HasBossHealth);
+            SetStoryLeaderboardVisible(mode != MonStackaMode.Story);
             EnsureBossHealthBar();
             SetBossHealthBarVisible(mode == MonStackaMode.Story && currentStoryObjective.HasBossHealth);
             lastBossScore = int.MinValue;
@@ -199,10 +201,10 @@ namespace MonStacka.UI
             rootRect.anchorMax = anchorRect.anchorMax;
             rootRect.pivot = anchorRect.pivot;
             rootRect.anchoredPosition = currentMode == MonStackaMode.Story
-                ? new Vector2(1220f, -255f)
+                ? new Vector2(1340f, -262f)
                 : anchorRect.anchoredPosition + new Vector2(0f, -42f);
             rootRect.sizeDelta = currentMode == MonStackaMode.Story
-                ? new Vector2(300f, 24f)
+                ? new Vector2(330f, 24f)
                 : new Vector2(190f, 14f);
 
             var back = bossHealthBarRoot.GetComponent<Image>();
@@ -233,10 +235,10 @@ namespace MonStacka.UI
                 return;
             }
 
-            storyBossLabelText = CreateStoryHudText(anchorRect.parent, "StoryBossLabel", "MISSION HP", 22, FontStyle.Bold, new Vector2(1220f, -218f), new Vector2(300f, 30f), TextAnchor.MiddleLeft);
-            storyScoreLabelText = CreateStoryHudText(anchorRect.parent, "StoryScoreLabel", "SCORE", 20, FontStyle.Normal, new Vector2(1220f, -292f), new Vector2(300f, 28f), TextAnchor.MiddleLeft);
-            storyScoreValueText = CreateStoryHudText(anchorRect.parent, "StoryScoreValue", "0", 36, FontStyle.Bold, new Vector2(1220f, -324f), new Vector2(300f, 44f), TextAnchor.MiddleLeft);
-            storyEnemyStatusText = CreateStoryHudText(anchorRect.parent, "StoryEnemyStatus", string.Empty, 16, FontStyle.Normal, new Vector2(1220f, -418f), new Vector2(340f, 330f), TextAnchor.UpperLeft);
+            storyBossLabelText = CreateStoryHudText(anchorRect.parent, "StoryBossLabel", "MISSION HP", 22, FontStyle.Bold, new Vector2(1340f, -224f), new Vector2(360f, 30f), TextAnchor.MiddleLeft);
+            storyScoreLabelText = CreateStoryHudText(anchorRect.parent, "StoryScoreLabel", "SCORE", 20, FontStyle.Normal, new Vector2(1340f, -306f), new Vector2(360f, 28f), TextAnchor.MiddleLeft);
+            storyScoreValueText = CreateStoryHudText(anchorRect.parent, "StoryScoreValue", "0", 36, FontStyle.Bold, new Vector2(1340f, -338f), new Vector2(360f, 44f), TextAnchor.MiddleLeft);
+            storyEnemyStatusText = CreateStoryHudText(anchorRect.parent, "StoryEnemyStatus", string.Empty, 17, FontStyle.Normal, new Vector2(1340f, -430f), new Vector2(420f, 430f), TextAnchor.UpperLeft);
             storyEnemyStatusText.lineSpacing = 0.92f;
             storyEnemyStatusText.horizontalOverflow = HorizontalWrapMode.Wrap;
         }
@@ -285,6 +287,34 @@ namespace MonStacka.UI
             if (storyEnemyStatusText)
             {
                 storyEnemyStatusText.gameObject.SetActive(visible);
+            }
+        }
+
+        private void SetStoryLeaderboardVisible(bool visible)
+        {
+            if (leaderboardValueTexts != null)
+            {
+                foreach (var valueText in leaderboardValueTexts)
+                {
+                    if (valueText)
+                    {
+                        valueText.gameObject.SetActive(visible);
+                    }
+                }
+            }
+
+            storyRankTexts ??= new[]
+            {
+                GameObject.Find("Rank1")?.GetComponent<Text>(),
+                GameObject.Find("Rank2")?.GetComponent<Text>(),
+                GameObject.Find("Rank3")?.GetComponent<Text>(),
+            };
+            foreach (var rankText in storyRankTexts)
+            {
+                if (rankText)
+                {
+                    rankText.gameObject.SetActive(visible);
+                }
             }
         }
 

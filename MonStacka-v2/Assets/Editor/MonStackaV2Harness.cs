@@ -136,10 +136,30 @@ namespace MonStacka.Editor
             Expect(MonStackaAppState.SfxVolume == 90, "Default SFX volume should be punchy enough for match feedback.");
             Expect(MonStackaAppState.DitherEnabled, "Dither should default on.");
             Expect(MonStackaAppState.VisualExtrasEnabled, "Visual extras should default on.");
+
+            var controls = MonStackaControls.BuildControlsSummaryText();
+            Expect(controls.Contains("Hard Drop: Space"), "Keyboard hard drop should stay on Space.");
+            Expect(!controls.Contains("Hard Drop: D-pad Up / Left Stick Up"), "Gameplay hard drop must not be driven by the Vertical axis.");
+
+            foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
+            {
+                Expect(CanReachOuterColumn(pieceType, leftSide: true), $"{pieceType} should be able to reach the left outer lane.");
+                Expect(CanReachOuterColumn(pieceType, leftSide: false), $"{pieceType} should be able to reach the right outer lane.");
+            }
+
+            VerifyLineClearPreservesPieceArtSources();
         }
 
         private static void VerifyStoryModifierScenarios()
         {
+            var firstMission = StoryCatalog.GetChapter("1.1");
+            Expect(firstMission != null, "Story 1.1 should exist.");
+            Expect(firstMission.Modifiers.Contains(StoryModifier.GuardPressure), "Story 1.1 should run an enemy ability tracker.");
+            var firstMissionBoard = new BoardState(new[] { PieceType.Z }, seed: 111);
+            var firstMissionModifiers = new StoryModifierSystem(firstMission, firstMissionBoard, seed: 111);
+            firstMissionModifiers.OnMatchStart();
+            Expect(!firstMissionModifiers.BuildEnemyAbilityStatus().Contains("No enemy modifiers"), "Story 1.1 enemy tracker should not be empty.");
+
             var combinedSpec = new StoryChapterSpec
             {
                 Id = "harness-all-modifiers",
@@ -367,6 +387,7 @@ namespace MonStacka.Editor
             Expect(ogbm.CurrentMode == MonStackaMode.Ogbm, "Runtime O.G.B.M. should start in O.G.B.M. mode.");
             Expect(ogbm.FriendlyAbilitiesEnabled, "Runtime zany O.G.B.M. should have assists.");
             Expect(!ogbm.IsPaused, "Runtime O.G.B.M. should start unpaused.");
+            AssertBoardPanelMatchesPlayableGrid();
             ogbm.PauseIfRunning();
             Expect(ogbm.IsPaused, "PauseIfRunning should pause a match.");
             ogbm.ResumeGame();
@@ -406,6 +427,60 @@ namespace MonStacka.Editor
             Expect(!gameOver.Board.SpawnNext(PieceType.O), "Runtime top-out setup should force game over.");
             gameOver.RequestRestart();
             Expect(gameOver.IsRestartConfirmActive, "Game-over restart path should still create restart confirmation when requested directly.");
+        }
+
+        private static bool CanReachOuterColumn(PieceType pieceType, bool leftSide)
+        {
+            var board = new BoardState(new[] { pieceType }, seed: 1200 + (int)pieceType);
+            var guard = 0;
+            while (guard++ < 16 && board.TryMove(leftSide ? -1 : 1, 0))
+            {
+            }
+
+            var cells = PieceDefinitions.GetAbsoluteCells(board.ActivePiece);
+            return leftSide
+                ? cells.Min(cell => cell.x) == 0
+                : cells.Max(cell => cell.x) == PieceDefinitions.Columns - 1;
+        }
+
+        private static void VerifyLineClearPreservesPieceArtSources()
+        {
+            var board = new BoardState(new[] { PieceType.T }, seed: 44);
+            var survivorRow = PieceDefinitions.TotalRows - 2;
+            var clearRow = PieceDefinitions.TotalRows - 1;
+            const int survivorPieceId = 42;
+
+            board.Grid[survivorRow, 0] = (int)PieceType.T;
+            board.PieceIds[survivorRow, 0] = survivorPieceId;
+            board.SourceCellXs[survivorRow, 0] = 2;
+            board.SourceCellYs[survivorRow, 0] = 0;
+
+            for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+            {
+                board.Grid[clearRow, col] = (int)PieceType.O;
+                board.PieceIds[clearRow, col] = 100 + col;
+                board.SourceCellXs[clearRow, col] = col % 2;
+                board.SourceCellYs[clearRow, col] = col / 2;
+            }
+
+            Expect(board.ClearLines() == 1, "Harness line clear setup should clear exactly one row.");
+            var record = board.GetLockedPieceGroups().FirstOrDefault(group => group.PieceId == survivorPieceId);
+            Expect(record != null, "Surviving partial piece should be rebuilt after line clear.");
+            Expect(record.Cells.Count == 1 && record.Cells[0] == new Vector2Int(0, clearRow), "Surviving partial cell should drop into the cleared row.");
+            Expect(record.SourceCells.Count == 1 && record.SourceCells[0] == new Vector2Int(2, 0), "Surviving partial cell should keep its original art source coordinate.");
+        }
+
+        private static void AssertBoardPanelMatchesPlayableGrid()
+        {
+            var boardPanel = RequireRect("BoardPanelBackdrop");
+            const float CellPixels = 52f;
+            var expectedWidth = PieceDefinitions.Columns * CellPixels;
+            var expectedHeight = PieceDefinitions.VisibleRows * CellPixels;
+
+            Expect(Mathf.Abs(boardPanel.rect.width - expectedWidth) <= 1f, $"Board panel width should match playable columns. Expected {expectedWidth:0.#}, got {boardPanel.rect.width:0.#}.");
+            Expect(Mathf.Abs(boardPanel.rect.height - expectedHeight) <= 1f, $"Board panel height should match visible rows. Expected {expectedHeight:0.#}, got {boardPanel.rect.height:0.#}.");
+            Expect(Mathf.Abs(boardPanel.anchoredPosition.x - 700f) <= 1f, $"Board panel x should align with BoardRoot. Got {boardPanel.anchoredPosition.x:0.#}.");
+            Expect(Mathf.Abs(boardPanel.anchoredPosition.y + 20f) <= 1f, $"Board panel y should align with BoardRoot. Got {boardPanel.anchoredPosition.y:0.#}.");
         }
 
         private static void VerifyCurrentBuildArtifacts()

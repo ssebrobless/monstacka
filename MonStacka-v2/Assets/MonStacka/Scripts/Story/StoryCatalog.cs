@@ -42,6 +42,7 @@ namespace MonStacka.Story
                     Id = "1.1", Title = "A Yucky Building", Act = 1, Sequence = 1,
                     DifficultyTier = 1, GravitySeconds = 0.85f, LockDelaySeconds = 0.5f,
                     Objective = StoryObjective.Lines(5),
+                    Modifiers = new[] { StoryModifier.GuardPressure },
                     IntroDialogue = StoryDialogueAct1.GameIntro,
                     PreMatchDialogue = StoryDialogueAct1.PreMatch_1_1,
                     PostMatchDialogue = StoryDialogueAct1.PostMatch_1_1,

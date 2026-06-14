@@ -27,8 +27,12 @@ namespace MonStacka.Visual
             IReadOnlyCollection<Vector2Int> localCells,
             float cellWorldSize,
             bool previewOnly,
-            bool useFullBoxSprite)
+            bool useFullBoxSprite,
+            IReadOnlyCollection<Vector2Int> sourceCells = null)
         {
+            var sourceCellList = sourceCells != null && sourceCells.Count == localCells.Count
+                ? sourceCells.ToList()
+                : localCells.ToList();
             var result = new ConnectedBodyBuildResult
             {
                 RotatedFrameTextures = GetRotatedFrameTextures(skinData, pieceType, rotation),
@@ -59,7 +63,8 @@ namespace MonStacka.Visual
                     skinData.pixelsPerCell,
                     pieceType,
                     rotation,
-                    frameIndex
+                    frameIndex,
+                    sourceCellList
                 );
             }
 
@@ -142,12 +147,14 @@ namespace MonStacka.Visual
             int pixelsPerCell,
             PieceType pieceType,
             int rotation,
-            int frameIndex)
+            int frameIndex,
+            IReadOnlyList<Vector2Int> sourceCells)
         {
             var signature = string.Join(";", localCells
-                .OrderBy(cell => cell.y)
-                .ThenBy(cell => cell.x)
-                .Select(cell => $"{cell.x},{cell.y}"));
+                .Select((cell, index) => (cell, source: sourceCells != null && index < sourceCells.Count ? sourceCells[index] : cell))
+                .OrderBy(entry => entry.cell.y)
+                .ThenBy(entry => entry.cell.x)
+                .Select(entry => $"{entry.cell.x},{entry.cell.y}<{entry.source.x},{entry.source.y}>"));
             var cacheKey = $"{texture.GetInstanceID()}:{signature}:{pixelsPerCell}:{pieceType}:{rotation}:{frameIndex}";
             if (BodySpriteCache.TryGetValue(cacheKey, out var sprite) && IsSpriteAlive(sprite))
             {
@@ -157,8 +164,8 @@ namespace MonStacka.Visual
 
             if (MatchesFullDefinition(pieceType, rotation, localCells))
             {
-                var sourceCells = PieceDefinitions.GetCells(pieceType, rotation).ToArray();
-                var sourceBounds = GetBounds(sourceCells);
+                var definitionCells = PieceDefinitions.GetCells(pieceType, rotation).ToArray();
+                var sourceBounds = GetBounds(definitionCells);
                 sprite = BuildCroppedFigureSprite(
                     texture,
                     sourceBounds.minX,
@@ -177,6 +184,7 @@ namespace MonStacka.Visual
             sprite = BuildCompositeSprite(
                 texture,
                 localCells,
+                sourceCells,
                 minCellX,
                 minCellY,
                 widthCells,
@@ -250,6 +258,7 @@ namespace MonStacka.Visual
         private static Sprite BuildCompositeSprite(
             Texture2D texture,
             IReadOnlyCollection<Vector2Int> sourceCells,
+            IReadOnlyList<Vector2Int> textureSourceCells,
             int minCellX,
             int minCellY,
             int widthCells,
@@ -275,10 +284,14 @@ namespace MonStacka.Visual
             }
             composite.SetPixels(clearPixels);
 
-            foreach (var cell in sourceCells)
+            var renderCells = sourceCells.ToList();
+            for (var index = 0; index < renderCells.Count; index += 1)
             {
-                var sourceY = texture.height - ((cell.y + 1) * pixelsPerCell);
-                var sourcePixels = texture.GetPixels(cell.x * pixelsPerCell, sourceY, pixelsPerCell, pixelsPerCell);
+                var cell = renderCells[index];
+                var sourceCell = textureSourceCells != null && index < textureSourceCells.Count ? textureSourceCells[index] : cell;
+                var sourceX = Mathf.Clamp(sourceCell.x * pixelsPerCell, 0, Mathf.Max(0, texture.width - pixelsPerCell));
+                var sourceY = Mathf.Clamp(texture.height - ((sourceCell.y + 1) * pixelsPerCell), 0, Mathf.Max(0, texture.height - pixelsPerCell));
+                var sourcePixels = texture.GetPixels(sourceX, sourceY, pixelsPerCell, pixelsPerCell);
                 var destX = (cell.x - minCellX) * pixelsPerCell;
                 var destY = outputHeight - (((cell.y - minCellY) + 1) * pixelsPerCell);
                 composite.SetPixels(destX, destY, pixelsPerCell, pixelsPerCell, sourcePixels);

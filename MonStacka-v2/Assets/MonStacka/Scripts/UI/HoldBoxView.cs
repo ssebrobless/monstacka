@@ -61,6 +61,7 @@ namespace MonStacka.UI
                 holdPiece.Value,
                 0,
                 normalized,
+                normalized,
                 cellWorldSize,
                 outlineMaterial,
                 deformTuning,

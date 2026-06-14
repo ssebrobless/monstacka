@@ -115,7 +115,6 @@ namespace MonStacka.Core
             [MonStackaControlAction.Left] = new[] { new AxisBinding("Horizontal", -1, "Left Stick Left") },
             [MonStackaControlAction.Right] = new[] { new AxisBinding("Horizontal", 1, "Left Stick Right") },
             [MonStackaControlAction.Soft] = new[] { new AxisBinding("Vertical", -1, "Left Stick Down") },
-            [MonStackaControlAction.Hard] = new[] { new AxisBinding("Vertical", 1, "Left Stick Up") },
         };
 
         public static float ReadHorizontalAxis() => Input.GetAxisRaw("Horizontal");
