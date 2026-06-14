@@ -310,9 +310,31 @@ namespace MonStacka.Story
             for (var index = 0; index < chapters.Count; index += 1)
             {
                 chapters[index].UnlocksNext = index + 1 < chapters.Count ? chapters[index + 1].Id : null;
+                chapters[index].Objective = NormalizeBossObjective(chapters[index]);
             }
 
             return chapters;
+        }
+
+        private static StoryObjective NormalizeBossObjective(StoryChapterSpec chapter)
+        {
+            var objective = chapter.Objective;
+            if (objective.HasBossHealth)
+            {
+                return objective;
+            }
+
+            var health = objective.Kind == StoryObjectiveKind.ReachScore && objective.TargetScore > 0
+                ? objective.TargetScore
+                : 900 + (chapter.DifficultyTier * 620) + (chapter.Act * 260) + (chapter.Sequence * 140);
+
+            var seconds = objective.TimeLimitSeconds;
+            if (seconds <= 0f && chapter.DifficultyTier >= 2)
+            {
+                seconds = System.Math.Max(95f, 245f - (chapter.DifficultyTier * 11f) - (chapter.Act * 7f));
+            }
+
+            return objective.WithBossHealth(health, seconds);
         }
     }
 }

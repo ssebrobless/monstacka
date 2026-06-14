@@ -22,8 +22,10 @@ namespace MonStacka.UI
         private int index;
         private Action onFinished;
         private bool previousAdvanceHeld = true;
+        private bool waitForAdvanceRelease;
 
         public bool IsActive => root && root.activeSelf;
+        public bool IsWaitingForAdvanceRelease => waitForAdvanceRelease;
 
         public void Play(DialogueLine[] dialogue, Action finished)
         {
@@ -52,15 +54,16 @@ namespace MonStacka.UI
 
         private void Update()
         {
+            var advanceHeld = IsAdvanceHeld();
+            if (waitForAdvanceRelease)
+            {
+                waitForAdvanceRelease = advanceHeld;
+            }
+
             if (!IsActive)
             {
                 return;
             }
-
-            var advanceHeld =
-                MonStackaControls.IsMenuSubmitHeld() ||
-                MonStackaControls.IsGameplayHardDropHeld() ||
-                Input.GetMouseButton(0);
 
             if (advanceHeld && !previousAdvanceHeld)
             {
@@ -91,8 +94,14 @@ namespace MonStacka.UI
 
             var callback = onFinished;
             onFinished = null;
+            waitForAdvanceRelease = IsAdvanceHeld();
             callback?.Invoke();
         }
+
+        private static bool IsAdvanceHeld() =>
+            MonStackaControls.IsMenuSubmitHeld() ||
+            MonStackaControls.IsGameplayHardDropHeld() ||
+            Input.GetMouseButton(0);
 
         private void ShowCurrentLine()
         {

@@ -35,8 +35,9 @@ namespace MonStacka.Core
         public readonly IReadOnlyList<Vector2Int> Cells;
         public readonly Vector2Int BoxOrigin;
         public readonly bool CameFromHold;
+        public readonly int RotationInputs;
 
-        public PieceLockEvent(int pieceId, PieceType pieceType, int rotation, IReadOnlyList<Vector2Int> cells, Vector2Int boxOrigin, bool cameFromHold = false)
+        public PieceLockEvent(int pieceId, PieceType pieceType, int rotation, IReadOnlyList<Vector2Int> cells, Vector2Int boxOrigin, bool cameFromHold = false, int rotationInputs = 0)
         {
             PieceId = pieceId;
             PieceType = pieceType;
@@ -44,6 +45,7 @@ namespace MonStacka.Core
             Cells = cells;
             BoxOrigin = boxOrigin;
             CameFromHold = cameFromHold;
+            RotationInputs = rotationInputs;
         }
     }
 
@@ -103,12 +105,14 @@ namespace MonStacka.Core
         public int Score { get; private set; }
         public int PiecesPlaced { get; private set; }
         public int CurrentPieceInputs { get; private set; }
+        public int CurrentPieceRotations { get; private set; }
         public int TrainingFaults { get; private set; }
         public int TrainingPerfectStreak { get; private set; }
         public string LastTrainingFaultMessage { get; private set; } = string.Empty;
 
         public event Action<PieceLockEvent> OnPieceLocked;
         public event Action<int> OnLinesCleared;
+        public event Action<int, PieceType?> OnPointsGained;
 
         public BoardState(
             IEnumerable<PieceType> piecePool = null,
@@ -151,6 +155,7 @@ namespace MonStacka.Core
             Score = 0;
             PiecesPlaced = 0;
             CurrentPieceInputs = 0;
+            CurrentPieceRotations = 0;
             TrainingFaults = 0;
             TrainingPerfectStreak = 0;
             LastTrainingFaultMessage = string.Empty;
@@ -181,6 +186,7 @@ namespace MonStacka.Core
             HoldUsed = false;
             ActivePieceCameFromHold = false;
             HasSpawnedAny = true;
+            CurrentPieceRotations = 0;
             bag.EnsureQueue(NextQueue, true);
             CaptureTrainingSnapshot();
             return true;
@@ -214,7 +220,7 @@ namespace MonStacka.Core
 
             if (mode != MonStackaMode.Training)
             {
-                Score += 1;
+                AwardScore(1);
             }
 
             return true;
@@ -235,7 +241,7 @@ namespace MonStacka.Core
 
             if (mode != MonStackaMode.Training)
             {
-                Score += distance * 2;
+                AwardScore(distance * 2);
             }
 
             return LockPiece();
@@ -244,10 +250,26 @@ namespace MonStacka.Core
         /// <summary>External score award (assist bonuses, story modifiers).</summary>
         public void AddScore(int points)
         {
+            AddScore(points, null);
+        }
+
+        public void AddScore(int points, PieceType? sourcePiece)
+        {
             if (points > 0 && !GameOver)
             {
-                Score += points;
+                AwardScore(points, sourcePiece);
             }
+        }
+
+        private void AwardScore(int points, PieceType? sourcePiece = null)
+        {
+            if (points <= 0)
+            {
+                return;
+            }
+
+            Score += points;
+            OnPointsGained?.Invoke(points, sourcePiece);
         }
 
         public void RegisterTrainingInput()
@@ -277,6 +299,7 @@ namespace MonStacka.Core
                 if (IsValid(candidate))
                 {
                     activePiece = candidate;
+                    CurrentPieceRotations += 1;
                     return true;
                 }
             }
@@ -307,6 +330,7 @@ namespace MonStacka.Core
                 activePiece = candidate;
                 HasActivePiece = true;
                 ActivePieceCameFromHold = true;
+                CurrentPieceRotations = 0;
             }
             else
             {
@@ -320,6 +344,33 @@ namespace MonStacka.Core
             }
 
             HoldUsed = true;
+            return true;
+        }
+
+        public bool TrySwapHoldWithUpcoming(int upcomingIndex)
+        {
+            if (!HasHoldPiece || GameOver || upcomingIndex < 0)
+            {
+                return false;
+            }
+
+            bag.EnsureQueue(NextQueue, HasSpawnedAny);
+            var queue = NextQueue.ToList();
+            if (upcomingIndex >= queue.Count)
+            {
+                return false;
+            }
+
+            var oldHold = HoldPiece;
+            HoldPiece = queue[upcomingIndex];
+            queue[upcomingIndex] = oldHold;
+
+            NextQueue.Clear();
+            foreach (var piece in queue)
+            {
+                NextQueue.Enqueue(piece);
+            }
+
             return true;
         }
 
@@ -396,12 +447,16 @@ namespace MonStacka.Core
             HasActivePiece = false;
             ActivePieceCameFromHold = false;
             PiecesPlaced += 1;
-            OnPieceLocked?.Invoke(new PieceLockEvent(pieceId, activePiece.Type, activePiece.Rotation, placedCells, new Vector2Int(activePiece.X, activePiece.Y), cameFromHold));
+            OnPieceLocked?.Invoke(new PieceLockEvent(pieceId, activePiece.Type, activePiece.Rotation, placedCells, new Vector2Int(activePiece.X, activePiece.Y), cameFromHold, CurrentPieceRotations));
 
             ClearLines();
             if (lineTarget.HasValue && Lines >= lineTarget.Value)
             {
                 SprintComplete = true;
+                GameOver = true;
+            }
+            else if (HasLockedCellsInHiddenRows())
+            {
                 GameOver = true;
             }
 
@@ -462,14 +517,14 @@ namespace MonStacka.Core
             if (cleared > 0)
             {
                 Lines += cleared;
-                Score += cleared switch
+                AwardScore(cleared switch
                 {
                     1 => 100,
                     2 => 300,
                     3 => 500,
                     4 => 800,
                     _ => 0,
-                };
+                });
                 RebuildLockedPiecesFromGrid();
                 OnLinesCleared?.Invoke(cleared);
             }
@@ -480,8 +535,11 @@ namespace MonStacka.Core
         private void LockTrainingPiece()
         {
             var lockedPiece = activePiece;
+            var cameFromHold = ActivePieceCameFromHold;
             var evaluation = TrainingEvaluator.Evaluate(lockedPiece, CurrentPieceInputs);
             PiecesPlaced += 1;
+            ActivePieceCameFromHold = false;
+            OnPieceLocked?.Invoke(new PieceLockEvent(-1, lockedPiece.Type, lockedPiece.Rotation, PieceDefinitions.GetAbsoluteCells(lockedPiece), new Vector2Int(lockedPiece.X, lockedPiece.Y), cameFromHold, CurrentPieceRotations));
 
             if (evaluation.IsFault)
             {
@@ -511,7 +569,6 @@ namespace MonStacka.Core
             HasHoldPiece = false;
             HoldUsed = false;
             Lines = 0;
-            Score = 0;
             CurrentPieceInputs = 0;
             SpawnNext();
         }
@@ -522,11 +579,13 @@ namespace MonStacka.Core
             {
                 trainingSnapshot = null;
                 CurrentPieceInputs = 0;
+                CurrentPieceRotations = 0;
                 return;
             }
 
             trainingSnapshot = new TrainingSnapshot(activePiece, NextQueue);
             CurrentPieceInputs = 0;
+            CurrentPieceRotations = 0;
         }
 
         private void RestoreTrainingSnapshot(TrainingSnapshot snapshot)
@@ -542,8 +601,8 @@ namespace MonStacka.Core
             HasHoldPiece = false;
             HoldUsed = false;
             Lines = 0;
-            Score = 0;
             CurrentPieceInputs = 0;
+            CurrentPieceRotations = 0;
             NextQueue.Clear();
             foreach (var piece in snapshot.Queue)
             {
@@ -554,6 +613,22 @@ namespace MonStacka.Core
         }
 
         public bool IsGameOver() => GameOver;
+
+        private bool HasLockedCellsInHiddenRows()
+        {
+            for (var row = 0; row < PieceDefinitions.HiddenRows; row += 1)
+            {
+                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+                {
+                    if (Grid[row, col] != 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
 
         public bool IsValid(PieceInstance piece)
         {

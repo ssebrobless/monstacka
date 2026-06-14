@@ -9,14 +9,18 @@ namespace MonStacka.UI
     {
         private const int TextureWidth = 1920;
         private const int TextureHeight = 1080;
-        private const int BayerSize = 4;
-        private const int PixelScale = 2;
-        private static readonly float[,] Bayer4 =
+        private const int BayerSize = 8;
+        private const int PixelScale = 1;
+        private static readonly int[,] Bayer8 =
         {
-            { 0f / 16f, 8f / 16f, 2f / 16f, 10f / 16f },
-            { 12f / 16f, 4f / 16f, 14f / 16f, 6f / 16f },
-            { 3f / 16f, 11f / 16f, 1f / 16f, 9f / 16f },
-            { 15f / 16f, 7f / 16f, 13f / 16f, 5f / 16f },
+            { 0, 48, 12, 60, 3, 51, 15, 63 },
+            { 32, 16, 44, 28, 35, 19, 47, 31 },
+            { 8, 56, 4, 52, 11, 59, 7, 55 },
+            { 40, 24, 36, 20, 43, 27, 39, 23 },
+            { 2, 50, 14, 62, 1, 49, 13, 61 },
+            { 34, 18, 46, 30, 33, 17, 45, 29 },
+            { 10, 58, 6, 54, 9, 57, 5, 53 },
+            { 42, 26, 38, 22, 41, 25, 37, 21 },
         };
 
         private static Sprite textureSprite;
@@ -30,6 +34,7 @@ namespace MonStacka.UI
             image.pixelsPerUnitMultiplier = 1f;
             image.color = Color.white;
             image.raycastTarget = false;
+            transform.SetAsLastSibling();
         }
 
         private void LateUpdate()
@@ -37,6 +42,11 @@ namespace MonStacka.UI
             if (image)
             {
                 image.enabled = MonStackaAppState.DitherEnabled;
+            }
+
+            if (MonStackaAppState.DitherEnabled && transform.GetSiblingIndex() != transform.parent.childCount - 1)
+            {
+                transform.SetAsLastSibling();
             }
         }
 
@@ -57,16 +67,31 @@ namespace MonStacka.UI
             for (var y = 0; y < TextureHeight; y += 1)
             {
                 var vertical = y / (float)(TextureHeight - 1);
-                var depth = Mathf.Lerp(0.58f, 1.08f, vertical);
+                var floorDepth = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.18f, 1f, vertical));
                 for (var x = 0; x < TextureWidth; x += 1)
                 {
                     var cellX = (x / PixelScale) % BayerSize;
                     var cellY = (y / PixelScale) % BayerSize;
                     var centerX = (x / (float)(TextureWidth - 1)) - 0.5f;
                     var centerY = (y / (float)(TextureHeight - 1)) - 0.5f;
-                    var vignette = Mathf.Clamp01((centerX * centerX * 0.8f) + (centerY * centerY * 0.55f));
-                    var alpha = Bayer4[cellY, cellX] * Mathf.Lerp(0.095f, 0.15f, vignette) * depth;
-                    texture.SetPixel(x, y, new Color(0f, 0f, 0f, alpha));
+                    var edgeDepth = Mathf.Clamp01((centerX * centerX * 1.56f) + (centerY * centerY * 0.84f));
+                    var shaftShadow = Mathf.Clamp01(1f - Mathf.Abs((centerY + 0.18f) + (centerX * 0.16f)) * 3.4f);
+                    var lowerPocket = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.70f, 1f, vertical));
+                    var wallStrata = Mathf.Abs(Mathf.Sin((vertical * 31f) + (centerX * 5.5f)));
+                    var strataDepth = Mathf.SmoothStep(0.38f, 1f, wallStrata) * 0.10f;
+                    var coverage = Mathf.Clamp01(
+                        0.72f +
+                        (floorDepth * 0.08f) +
+                        (lowerPocket * 0.08f) +
+                        (edgeDepth * 0.13f) +
+                        (shaftShadow * Mathf.Lerp(0.10f, 0.17f, floorDepth)) +
+                        strataDepth
+                    );
+                    var threshold = (Bayer8[cellY, cellX] + 0.5f) / 64f;
+                    var alpha = coverage > threshold
+                        ? Mathf.Lerp(0.122f, 0.198f, Mathf.Clamp01((floorDepth * 0.34f) + (lowerPocket * 0.18f) + (edgeDepth * 0.28f) + (strataDepth * 0.2f)))
+                        : 0f;
+                    texture.SetPixel(x, y, new Color(0.005f, 0.008f, 0.030f, alpha));
                 }
             }
 

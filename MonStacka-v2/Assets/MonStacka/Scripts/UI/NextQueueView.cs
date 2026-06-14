@@ -85,6 +85,16 @@ namespace MonStacka.UI
             }
         }
 
+        public void SetPreviewsVisible(bool visible)
+        {
+            if (!contentRoot)
+            {
+                contentRoot = transform;
+            }
+
+            contentRoot.gameObject.SetActive(visible);
+        }
+
         private bool QueueMatches(IReadOnlyList<PieceType> queue)
         {
             if (currentQueue.Count != queue.Count)

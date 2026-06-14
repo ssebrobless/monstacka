@@ -38,7 +38,7 @@ MonoBehaviour:
       width: 123.47315
       height: 120.79167
   - featureName: whiskers
-    motion: 5
+    motion: 8
     sheetRect:
       x: 673
       y: 557

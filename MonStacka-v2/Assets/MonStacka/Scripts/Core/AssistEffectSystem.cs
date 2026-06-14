@@ -67,6 +67,7 @@ namespace MonStacka.Core
         private int piecesUntilTrigger = TriggerEvery;
         private float windowRemaining;
         private AssistType? activeWindow;
+        private PieceType? activeWindowPiece;
         private int comboCount;
         private bool hasTriggeredBefore;
         private int piecesSinceTrigger;
@@ -74,6 +75,7 @@ namespace MonStacka.Core
         /// <summary>0..TriggerEvery-1 progress shown in the HUD ("Held Assist: 2/3").</summary>
         public int HeldProgress => TriggerEvery - piecesUntilTrigger;
         public AssistType? ActiveWindow => windowRemaining > 0f ? activeWindow : null;
+        public PieceType? ActiveWindowPiece => windowRemaining > 0f ? activeWindowPiece : null;
         public float WindowRemaining => Mathf.Max(0f, windowRemaining);
         public int ComboCount => comboCount;
 
@@ -89,11 +91,12 @@ namespace MonStacka.Core
         public float AlertScoreMultiplier(BoardState board) =>
             ActiveWindow == AssistType.Alert && IsInDanger(board) ? 1.5f : 1f;
 
-        public static bool IsEnabledFor(MonStackaMode mode, bool trainingAssistToggle = false) => mode switch
+        public static bool IsEnabledFor(MonStackaMode mode, bool friendlyAbilitiesEnabled = false) => mode switch
         {
-            MonStackaMode.Ogbm => true,
-            MonStackaMode.Sprint40 => true,
-            MonStackaMode.Training => trainingAssistToggle,
+            MonStackaMode.Ogbm => friendlyAbilitiesEnabled,
+            MonStackaMode.Sprint40 => friendlyAbilitiesEnabled,
+            MonStackaMode.Training => friendlyAbilitiesEnabled,
+            MonStackaMode.Story => true,
             _ => true,
         };
 
@@ -126,6 +129,7 @@ namespace MonStacka.Core
             piecesUntilTrigger = TriggerEvery;
             windowRemaining = 0f;
             activeWindow = null;
+            activeWindowPiece = null;
             comboCount = 0;
             hasTriggeredBefore = false;
             piecesSinceTrigger = 0;
@@ -139,6 +143,7 @@ namespace MonStacka.Core
                 if (windowRemaining <= 0f)
                 {
                     activeWindow = null;
+                    activeWindowPiece = null;
                 }
             }
         }
@@ -211,6 +216,7 @@ namespace MonStacka.Core
                 case AssistType.Sedate:
                 case AssistType.Alert:
                     activeWindow = type;
+                    activeWindowPiece = lockEvent.PieceType;
                     windowRemaining = WindowSeconds;
                     if (type == AssistType.Alert && wasInDanger)
                     {

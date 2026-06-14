@@ -28,6 +28,10 @@ namespace MonStacka.UI
 
         private readonly List<Button> pauseButtons = new();
         private readonly List<Button> settingsButtons = new();
+        private Button zanyToggleButton;
+        private Text zanyToggleLabel;
+        private bool lastZanyToggleVisible;
+        private bool lastZanyToggleState;
         private bool previousNavigateUp;
         private bool previousNavigateDown;
         private bool previousSubmit;
@@ -54,10 +58,12 @@ namespace MonStacka.UI
             controlNextButton?.onClick.AddListener(() => StepSelectedControl(1));
             controlResetButton?.onClick.AddListener(ResetControls);
             closeSettingsButton?.onClick.AddListener(CloseSettings);
+            EnsureZanyToggleButton();
             pauseButtons.Clear();
             if (settingsButton) pauseButtons.Add(settingsButton);
             if (quitButton) pauseButtons.Add(quitButton);
             if (homeButton) pauseButtons.Add(homeButton);
+            if (zanyToggleButton) pauseButtons.Add(zanyToggleButton);
             settingsButtons.Clear();
             if (musicToggleButton) settingsButtons.Add(musicToggleButton);
             if (musicDownButton) settingsButtons.Add(musicDownButton);
@@ -71,16 +77,37 @@ namespace MonStacka.UI
             if (controlNextButton) settingsButtons.Add(controlNextButton);
             if (controlResetButton) settingsButtons.Add(controlResetButton);
             if (closeSettingsButton) settingsButtons.Add(closeSettingsButton);
-            CloseSettings();
-            RefreshSettingsText();
-            if (settingsButton && EventSystem.current)
+            if (settingsPanel)
             {
-                EventSystem.current.SetSelectedGameObject(settingsButton.gameObject);
+                settingsPanel.SetActive(false);
             }
+            RefreshSettingsText();
+            RefreshZanyToggleButton();
         }
 
         private void Update()
         {
+            RefreshZanyToggleButton();
+
+            if (gameManager != null && gameManager.IsDialogueInputBlocking)
+            {
+                ClearShellSelection();
+                lastPausedState = false;
+                return;
+            }
+
+            if (gameManager != null && gameManager.IsRestartConfirmActive)
+            {
+                lastPausedState = true;
+                return;
+            }
+
+            if (gameManager != null && gameManager.IsEndRunPanelActive)
+            {
+                lastPausedState = false;
+                return;
+            }
+
             if (settingsPanel && settingsPanel.activeSelf)
             {
                 HandleSettingsInput();
@@ -95,6 +122,7 @@ namespace MonStacka.UI
             }
             else
             {
+                ClearShellSelection();
                 lastPausedState = false;
             }
         }
@@ -127,7 +155,7 @@ namespace MonStacka.UI
             }
 
             awaitingBindingAction = null;
-            gameManager?.ResumeGame();
+            gameManager?.PauseIfRunning();
             if (settingsButton && EventSystem.current)
             {
                 EventSystem.current.SetSelectedGameObject(settingsButton.gameObject);
@@ -236,6 +264,98 @@ namespace MonStacka.UI
             SetButtonLabel(controlResetButton, "Defaults");
         }
 
+        private void EnsureZanyToggleButton()
+        {
+            if (zanyToggleButton || !settingsButton)
+            {
+                return;
+            }
+
+            var template = settingsButton.GetComponent<RectTransform>();
+            var parent = template ? template.parent : settingsButton.transform.parent;
+            if (!parent)
+            {
+                return;
+            }
+
+            var go = new GameObject("TrainingZanyToggleButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            if (template)
+            {
+                rect.anchorMin = template.anchorMin;
+                rect.anchorMax = template.anchorMax;
+                rect.pivot = template.pivot;
+                rect.anchoredPosition = template.anchoredPosition + new Vector2(0f, -78f);
+                rect.sizeDelta = template.sizeDelta;
+            }
+            else
+            {
+                rect.anchorMin = new Vector2(1f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.pivot = new Vector2(1f, 1f);
+                rect.anchoredPosition = new Vector2(-26f, -260f);
+                rect.sizeDelta = new Vector2(88f, 58f);
+            }
+
+            var image = go.GetComponent<Image>();
+            image.color = new Color(0.14f, 0.34f, 0.18f, 0.82f);
+            zanyToggleButton = go.GetComponent<Button>();
+            zanyToggleButton.targetGraphic = image;
+            zanyToggleButton.onClick.AddListener(() =>
+            {
+                gameManager?.ToggleFriendlyAbilitiesAndRestart();
+                RefreshZanyToggleButton(true);
+            });
+
+            var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            labelGo.transform.SetParent(go.transform, false);
+            var labelRect = labelGo.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            zanyToggleLabel = labelGo.GetComponent<Text>();
+            zanyToggleLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            zanyToggleLabel.fontSize = 15;
+            zanyToggleLabel.fontStyle = FontStyle.Bold;
+            zanyToggleLabel.alignment = TextAnchor.MiddleCenter;
+            zanyToggleLabel.color = Color.white;
+            zanyToggleLabel.raycastTarget = false;
+            go.SetActive(false);
+        }
+
+        private void RefreshZanyToggleButton(bool force = false)
+        {
+            if (!zanyToggleButton || gameManager == null)
+            {
+                return;
+            }
+
+            var visible = gameManager.CanToggleFriendlyAbilities;
+            var enabled = gameManager.FriendlyAbilitiesEnabled;
+            if (!force && visible == lastZanyToggleVisible && enabled == lastZanyToggleState)
+            {
+                return;
+            }
+
+            lastZanyToggleVisible = visible;
+            lastZanyToggleState = enabled;
+            zanyToggleButton.gameObject.SetActive(visible);
+            if (zanyToggleLabel)
+            {
+                zanyToggleLabel.text = enabled ? "ZANY ON" : "ZANY OFF";
+            }
+
+            var image = zanyToggleButton.GetComponent<Image>();
+            if (image)
+            {
+                image.color = enabled
+                    ? new Color(0.12f, 0.58f, 0.22f, 0.9f)
+                    : new Color(0.20f, 0.23f, 0.36f, 0.9f);
+            }
+        }
+
         private static void SetButtonLabel(Button button, string value)
         {
             var label = button ? button.GetComponentInChildren<Text>() : null;
@@ -339,6 +459,41 @@ namespace MonStacka.UI
             {
                 EventSystem.current.SetSelectedGameObject(nextButton.gameObject);
             }
+        }
+
+        private void ClearShellSelection()
+        {
+            if (!EventSystem.current)
+            {
+                return;
+            }
+
+            var selected = EventSystem.current.currentSelectedGameObject;
+            if (selected && IsShellButtonSelected(selected))
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+            }
+        }
+
+        private bool IsShellButtonSelected(GameObject selected)
+        {
+            foreach (var button in pauseButtons)
+            {
+                if (button && button.gameObject == selected)
+                {
+                    return true;
+                }
+            }
+
+            foreach (var button in settingsButtons)
+            {
+                if (button && button.gameObject == selected)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void MoveSettingsSelection(int direction)

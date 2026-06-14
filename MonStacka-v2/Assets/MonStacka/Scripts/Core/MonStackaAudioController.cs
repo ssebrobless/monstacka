@@ -16,8 +16,8 @@ namespace MonStacka.Core
 
         [SerializeField] private AudioClip backgroundMusic;
         [SerializeField] private PieceAudioBank[] pieceBanks = Array.Empty<PieceAudioBank>();
-        [SerializeField] private float musicVolume = 0.34f;
-        [SerializeField] private float sfxVolume = 0.72f;
+        [SerializeField] private float musicVolume = 0.20f;
+        [SerializeField] private float sfxVolume = 0.90f;
         [SerializeField] private bool playMusicOnAwake = true;
 
         private readonly Dictionary<PieceType, PieceAudioBank> banks = new();
@@ -140,7 +140,7 @@ namespace MonStacka.Core
             if (MonStackaAppState.SfxEnabled)
             {
                 sfxSource.pitch = 1f;
-                sfxSource.PlayOneShot(CreateClickClip(), 0.45f * GetSfxVolume());
+                sfxSource.PlayOneShot(CreateClickClip(), 0.75f * GetSfxVolume());
             }
         }
 

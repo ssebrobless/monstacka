@@ -46,6 +46,10 @@ namespace MonStacka.Story
         public int TargetLines;
         public int TargetScore;
         public float TimeLimitSeconds;
+        public int BossHealthPoints;
+
+        public bool HasBossHealth => BossHealthPoints > 0;
+        public bool HasTimeLimit => TimeLimitSeconds > 0f;
 
         public static StoryObjective Lines(int lines) =>
             new() { Kind = StoryObjectiveKind.ClearLines, TargetLines = lines };
@@ -58,6 +62,20 @@ namespace MonStacka.Story
 
         public static StoryObjective TimedLines(int lines, float seconds) =>
             new() { Kind = StoryObjectiveKind.ClearLinesTimed, TargetLines = lines, TimeLimitSeconds = seconds };
+
+        public static StoryObjective Boss(int healthPoints, float seconds = 0f) =>
+            new() { Kind = StoryObjectiveKind.ReachScore, TargetScore = healthPoints, BossHealthPoints = healthPoints, TimeLimitSeconds = seconds };
+
+        public StoryObjective WithBossHealth(int healthPoints, float seconds = 0f)
+        {
+            BossHealthPoints = healthPoints;
+            if (seconds > 0f)
+            {
+                TimeLimitSeconds = seconds;
+            }
+
+            return this;
+        }
     }
 
     /// <summary>

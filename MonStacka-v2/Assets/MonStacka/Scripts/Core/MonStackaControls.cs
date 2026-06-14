@@ -238,6 +238,7 @@ namespace MonStacka.Core
                 $"{ActionLabels[MonStackaControlAction.Hard]}: {FormatKeyboardBindings(MonStackaControlAction.Hard)}\n" +
                 $"{ActionLabels[MonStackaControlAction.RotateCcw]}: {FormatKeyboardBindings(MonStackaControlAction.RotateCcw)}    {ActionLabels[MonStackaControlAction.RotateCw]}: {FormatKeyboardBindings(MonStackaControlAction.RotateCw)}\n" +
                 $"{ActionLabels[MonStackaControlAction.RotateFlip]}: {FormatKeyboardBindings(MonStackaControlAction.RotateFlip)}    {ActionLabels[MonStackaControlAction.Hold]}: {FormatKeyboardBindings(MonStackaControlAction.Hold)}\n" +
+                "Hold Queue Swap: 1 / 2 / 3\n" +
                 $"{ActionLabels[MonStackaControlAction.Pause]}: {FormatKeyboardBindings(MonStackaControlAction.Pause)}\n" +
                 $"{ActionLabels[MonStackaControlAction.Retry]}: {FormatKeyboardBindings(MonStackaControlAction.Retry)}    {ActionLabels[MonStackaControlAction.RestartPaused]}: {FormatKeyboardBindings(MonStackaControlAction.RestartPaused)}\n" +
                 "Mouse: Click menu / settings buttons\n\n" +

@@ -25,9 +25,9 @@ namespace MonStacka.Core
 
         public static bool SfxEnabled { get; set; } = true;
 
-        public static int MusicVolume { get; set; } = 35;
+        public static int MusicVolume { get; set; } = 20;
 
-        public static int SfxVolume { get; set; } = 70;
+        public static int SfxVolume { get; set; } = 90;
 
         public static string TrainingFeedbackMode { get; set; } = "show";
 
@@ -40,8 +40,8 @@ namespace MonStacka.Core
         /// <summary>Chapter id the Game scene should run when SelectedMode is Story (e.g. "1.2").</summary>
         public static string SelectedStoryChapterId { get; set; }
 
-        /// <summary>Training-only opt-in for the held-piece assist system.</summary>
-        public static bool TrainingAssistEnabled { get; set; }
+        /// <summary>Zany mode enables friendly held-piece abilities outside Story.</summary>
+        public static bool FriendlyAbilitiesEnabled { get; set; } = true;
 
         public static void ResetDefaults()
         {
@@ -52,14 +52,14 @@ namespace MonStacka.Core
             ArrSeconds = 0f;
             MusicEnabled = true;
             SfxEnabled = true;
-            MusicVolume = 35;
-            SfxVolume = 70;
+            MusicVolume = 20;
+            SfxVolume = 90;
             TrainingFeedbackMode = "show";
             VisualExtrasEnabled = true;
             DitherEnabled = true;
             RippleStage = MonStackaRippleStage.HomePreview;
             SelectedStoryChapterId = null;
-            TrainingAssistEnabled = false;
+            FriendlyAbilitiesEnabled = true;
         }
     }
 }

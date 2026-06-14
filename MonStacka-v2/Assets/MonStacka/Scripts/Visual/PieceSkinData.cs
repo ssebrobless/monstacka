@@ -27,6 +27,7 @@ namespace MonStacka.Visual
         Chatter = 5,
         Flick = 6,
         Drip = 7,
+        Flow = 8,
     }
 
     [Serializable]

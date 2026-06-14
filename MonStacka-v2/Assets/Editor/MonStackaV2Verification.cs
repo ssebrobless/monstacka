@@ -77,16 +77,39 @@ namespace MonStacka.Editor
             var beforeRotation = rotateState.ActivePiece.Rotation;
             Expect(rotateState.TryRotate(1), "T piece should rotate in an empty board.");
             Expect(rotateState.ActivePiece.Rotation != beforeRotation, "Rotation should change orientation.");
+            Expect(rotateState.CurrentPieceRotations == 1, "Successful gameplay rotations should be counted for story modifiers.");
+            var reportedRotations = -1;
+            rotateState.OnPieceLocked += lockEvent => reportedRotations = lockEvent.RotationInputs;
+            Expect(rotateState.LockPiece(), "Rotated piece should lock for rotation telemetry.");
+            Expect(reportedRotations == 1, $"Lock event should report 1 rotation input, got {reportedRotations}.");
 
             var holdState = new BoardState(new[] { PieceType.I, PieceType.T }, seed: 5);
             Expect(holdState.TryHold(), "First hold should succeed.");
             Expect(holdState.HoldUsed, "Hold should be marked used after the first hold.");
             Expect(!holdState.TryHold(), "Second hold in the same life should fail.");
 
+            var holdSwapState = new BoardState(new[] { PieceType.I, PieceType.O, PieceType.T, PieceType.S }, seed: 51);
+            Expect(holdSwapState.TryHold(), "First hold should create a held piece for queue swapping.");
+            var heldBeforeQueueSwap = holdSwapState.HoldPiece;
+            var holdUsedBeforeQueueSwap = holdSwapState.HoldUsed;
+            var activeBeforeQueueSwap = holdSwapState.ActivePiece.Type;
+            var queueBeforeSwap = holdSwapState.NextQueue.ToArray();
+            Expect(queueBeforeSwap.Length >= 3, "Queue swap test needs at least 3 upcoming pieces.");
+            Expect(holdSwapState.TrySwapHoldWithUpcoming(2), "Held piece should swap with the third upcoming queue slot.");
+            var queueAfterSwap = holdSwapState.NextQueue.ToArray();
+            Expect(holdSwapState.HoldPiece == queueBeforeSwap[2], "Hold should become the selected upcoming piece.");
+            Expect(queueAfterSwap[2] == heldBeforeQueueSwap, "Selected queue slot should receive the old held piece.");
+            Expect(holdSwapState.ActivePiece.Type == activeBeforeQueueSwap, "Queue swapping hold should not change the active falling piece.");
+            Expect(holdSwapState.HoldUsed == holdUsedBeforeQueueSwap, "Queue swapping hold should not count as using hold.");
+
             var topOutState = new BoardState(new[] { PieceType.O }, seed: 11);
             topOutState.Grid[0, 4] = (int)PieceType.I;
             Expect(!topOutState.SpawnNext(PieceType.O), "Spawning into an occupied spawn cell should top out.");
             Expect(topOutState.IsGameOver(), "Top-out should mark the board game over.");
+
+            var hiddenLockTopOutState = new BoardState(new[] { PieceType.O }, seed: 111);
+            Expect(hiddenLockTopOutState.LockPiece(), "Locking a piece in the hidden spawn rows should succeed before ending the run.");
+            Expect(hiddenLockTopOutState.IsGameOver(), "Locking a non-training piece into hidden rows should immediately top out.");
 
             var softDropState = new BoardState(new[] { PieceType.O }, seed: 12);
             Expect(softDropState.TrySoftDrop(), "Soft drop should move a falling piece.");
@@ -197,10 +220,13 @@ namespace MonStacka.Editor
             Expect(AssistEffectSystem.AssistForPiece(PieceType.T) == AssistType.Sedate, "T should map to Sedate.");
             Expect(AssistEffectSystem.AssistForPiece(PieceType.I) == AssistType.Alert, "I should map to Alert.");
 
-            Expect(AssistEffectSystem.IsEnabledFor(MonStackaMode.Ogbm), "Assists should be enabled in O.G.B.M.");
-            Expect(AssistEffectSystem.IsEnabledFor(MonStackaMode.Sprint40), "Assists should be enabled in X(4)-LINES.");
-            Expect(!AssistEffectSystem.IsEnabledFor(MonStackaMode.Training), "Assists should be disabled in Training by default.");
-            Expect(AssistEffectSystem.IsEnabledFor(MonStackaMode.Training, trainingAssistToggle: true), "Assist practice toggle should enable Training assists.");
+            Expect(!AssistEffectSystem.IsEnabledFor(MonStackaMode.Ogbm), "Classic O.G.B.M. should disable friendly assists.");
+            Expect(AssistEffectSystem.IsEnabledFor(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true), "Zany O.G.B.M. should enable friendly assists.");
+            Expect(!AssistEffectSystem.IsEnabledFor(MonStackaMode.Sprint40), "Classic X(4)-LINES should disable friendly assists.");
+            Expect(AssistEffectSystem.IsEnabledFor(MonStackaMode.Sprint40, friendlyAbilitiesEnabled: true), "Zany X(4)-LINES should enable friendly assists.");
+            Expect(!AssistEffectSystem.IsEnabledFor(MonStackaMode.Training), "Training classic toggle should disable friendly assists.");
+            Expect(AssistEffectSystem.IsEnabledFor(MonStackaMode.Training, friendlyAbilitiesEnabled: true), "Training zany toggle should enable friendly assists.");
+            Expect(AssistEffectSystem.IsEnabledFor(MonStackaMode.Story), "Story should always enable friendly assists.");
 
             var board = new BoardState(new[] { PieceType.T }, seed: 31);
             var assist = new AssistEffectSystem();
@@ -228,6 +254,23 @@ namespace MonStacka.Editor
             );
             Expect(nonHeld == null, "Non-held placements should never trigger assists.");
 
+            var planningChapter = new MonStacka.Story.StoryChapterSpec
+            {
+                Id = "test-planning",
+                Title = "Calculated Planning Test",
+                DifficultyTier = 2,
+                Modifiers = new[] { MonStacka.Story.StoryModifier.CalculatedPlanning },
+                NextPreviewCount = 5,
+            };
+            var planningBoard = new BoardState(new[] { PieceType.T }, seed: 34);
+            var planningSystem = new MonStacka.Story.StoryModifierSystem(planningChapter, planningBoard, seed: 34);
+            Expect(planningBoard.TryRotate(1), "Calculated Planning test rotation 1 should succeed.");
+            Expect(planningBoard.TryRotate(1), "Calculated Planning test rotation 2 should succeed.");
+            Expect(planningBoard.TryRotate(1), "Calculated Planning test rotation 3 should succeed.");
+            Expect(planningBoard.HardDrop(), "Calculated Planning test piece should lock.");
+            Expect(planningBoard.GetGarbageCells().Count > 0, "Calculated Planning should seed enemy cells after exceeding the safe rotation budget.");
+            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("rotations"), "Calculated Planning status should report rotation pressure.");
+
             var stitchBoard = new BoardState(new[] { PieceType.J }, seed: 32);
             var stitchBottom = PieceDefinitions.TotalRows - 1;
             stitchBoard.Grid[stitchBottom - 1, 0] = (int)PieceType.J;
@@ -237,6 +280,20 @@ namespace MonStacka.Editor
             var stitchTrigger = stitchAssist.OnPieceLocked(HeldLock(PieceType.J), stitchBoard, Award);
             Expect(stitchTrigger.HasValue && stitchTrigger.Value.Type == AssistType.Stitch, "J trigger should fire Stitch.");
             Expect(stitchBoard.Grid[stitchBottom, 0] == BoardState.GarbageCellValue, "Stitch should repair the covered hole.");
+
+            var precisionChapter = new MonStacka.Story.StoryChapterSpec
+            {
+                Id = "test-precision",
+                Title = "Precision Pressure Test",
+                DifficultyTier = 2,
+                Modifiers = new[] { MonStacka.Story.StoryModifier.PrecisionPressure },
+            };
+            var precisionBoard = new BoardState(new[] { PieceType.T }, seed: 33);
+            var precisionSystem = new MonStacka.Story.StoryModifierSystem(precisionChapter, precisionBoard, seed: 33);
+            Expect(precisionBoard.TryMove(0, 1), "Precision test should move active piece into visible space.");
+            Expect(precisionBoard.TryMove(0, 1), "Precision test should move active piece into visible space twice.");
+            Expect(precisionBoard.LockPiece(), "Precision pressure test piece should lock.");
+            Expect(precisionBoard.GetGarbageCells().Count > 0, "Precision pressure should seed enemy cells after unsupported overhang placement.");
         }
 
         private static void VerifyStoryCatalog()

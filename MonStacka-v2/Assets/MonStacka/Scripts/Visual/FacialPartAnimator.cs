@@ -149,6 +149,9 @@ namespace MonStacka.Visual
                     case FeatureMotion.Drip:
                         UpdateDrip(layer, now);
                         break;
+                    case FeatureMotion.Flow:
+                        UpdateFlow(layer, now);
+                        break;
                 }
             }
         }
@@ -249,6 +252,23 @@ namespace MonStacka.Visual
             var alpha = 0.75f + (0.25f * (0.5f + (0.5f * Mathf.Sin((now * 1.7f) + layer.Phase))));
             var color = layer.Renderer.color;
             color.a = alpha;
+            layer.Renderer.color = color;
+        }
+
+        private void UpdateFlow(FeatureLayer layer, float now)
+        {
+            var wave = Mathf.Sin((now * 2.3f) + layer.Phase);
+            var secondaryWave = Mathf.Sin((now * 3.1f) + layer.Phase + 1.4f);
+            layer.Holder.localPosition = layer.BasePosition;
+            layer.Holder.localScale = new Vector3(
+                1f + (0.028f * wave),
+                1f + (0.014f * secondaryWave),
+                1f
+            );
+            layer.Holder.localRotation = BaseRotation(layer) * Quaternion.Euler(0f, 0f, wave * 1.8f);
+
+            var color = layer.Renderer.color;
+            color.a = 0.78f + (0.22f * (0.5f + (0.5f * secondaryWave)));
             layer.Renderer.color = color;
         }
 

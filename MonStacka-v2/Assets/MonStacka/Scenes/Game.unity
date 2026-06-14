@@ -14205,8 +14205,8 @@ MonoBehaviour:
     NeutralClips:
     - {fileID: 8300000, guid: 2bb5502516e485142b12133fe066a0c7, type: 3}
     - {fileID: 8300000, guid: 7e370e409b905384e9fc3e7c32a3940e, type: 3}
-  musicVolume: 0.34
-  sfxVolume: 0.76
+  musicVolume: 0.2
+  sfxVolume: 0.9
   playMusicOnAwake: 1
 --- !u!4 &1176816928
 Transform:

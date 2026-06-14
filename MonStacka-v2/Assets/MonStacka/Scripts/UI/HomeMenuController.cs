@@ -30,6 +30,15 @@ namespace MonStacka.UI
             }
         }
 
+        private enum MonstosInfoMode
+        {
+            None,
+            Lore,
+            Rules,
+            FriendlyAbility,
+            EnemyAbility,
+        }
+
         private static readonly MonstosProfile[] Profiles =
         {
             new(PieceType.S, "SORRISOL", "Designed to clean any mess and have a constant insatiable hunger. In need of dental reconstruction, majority of mouth full of molars; too many waking up before it finishes cleaning.", "A scratchy zipper grin.", 0),
@@ -74,6 +83,16 @@ namespace MonStacka.UI
         [SerializeField] private Text monstosNameText;
         [SerializeField] private Button monstosVoiceButton;
         [SerializeField] private Button monstosLoreButton;
+        private Button monstosRulesButton;
+        private Button monstosFriendlyAbilityButton;
+        private Button monstosEnemyAbilityButton;
+        private GameObject modeVariantPromptRoot;
+        private Button zanyVariantButton;
+        private Button classicVariantButton;
+        private Button leaderboardStyleToggleButton;
+        private Text leaderboardStyleToggleLabel;
+        private Text[] homeOgbmLeaderboardTexts;
+        private Text[] homeSprintLeaderboardTexts;
         [SerializeField] private GameObject monstosLorePanel;
         [SerializeField] private Text monstosLoreText;
         [SerializeField] private Button prevButton;
@@ -110,6 +129,8 @@ namespace MonStacka.UI
         private readonly List<Button> settingsButtons = new();
         private int activeIndex = 1;
         private bool loreOpen;
+        private MonstosInfoMode activeInfoMode;
+        private bool leaderboardShowsZany;
         private AudioSource voicePreviewSource;
         private bool previousNavigateUp;
         private bool previousNavigateDown;
@@ -120,6 +141,7 @@ namespace MonStacka.UI
         private bool previousVoice;
         private bool previousLore;
         private MonStackaMode? commandLineLaunchMode;
+        private MonStackaMode pendingVariantMode;
         private int selectedControlIndex;
         private MonStackaControlAction? awaitingBindingAction;
         private int bindingCaptureFrame;
@@ -148,20 +170,30 @@ namespace MonStacka.UI
 
             if (monstosLoreText)
             {
+                monstosLoreText.supportRichText = true;
                 monstosLoreText.resizeTextForBestFit = true;
-                monstosLoreText.resizeTextMinSize = 16;
-                monstosLoreText.resizeTextMaxSize = 26;
+                monstosLoreText.resizeTextMinSize = 12;
+                monstosLoreText.resizeTextMaxSize = 22;
                 monstosLoreText.horizontalOverflow = HorizontalWrapMode.Wrap;
                 monstosLoreText.verticalOverflow = VerticalWrapMode.Truncate;
+                monstosLoreText.lineSpacing = 0.88f;
+                monstosLoreText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                var outline = monstosLoreText.GetComponent<Outline>() ?? monstosLoreText.gameObject.AddComponent<Outline>();
+                outline.effectColor = new Color(0.02f, 0.015f, 0.05f, 0.92f);
+                outline.effectDistance = new Vector2(1.4f, -1.4f);
             }
 
             prevButton?.onClick.AddListener(() => Cycle(-1));
             nextButton?.onClick.AddListener(() => Cycle(1));
+            EnsureAbilityInfoButtons();
             monstosVoiceButton?.onClick.AddListener(PlayVoicePreview);
             monstosLoreButton?.onClick.AddListener(ToggleLore);
-            startOgbmButton?.onClick.AddListener(() => StartMode(MonStackaMode.Ogbm));
-            startSprintButton?.onClick.AddListener(() => StartMode(MonStackaMode.Sprint40));
-            startTrainingButton?.onClick.AddListener(() => StartMode(MonStackaMode.Training));
+            monstosRulesButton?.onClick.AddListener(ToggleRules);
+            monstosFriendlyAbilityButton?.onClick.AddListener(ToggleFriendlyAbility);
+            monstosEnemyAbilityButton?.onClick.AddListener(ToggleEnemyAbility);
+            startOgbmButton?.onClick.AddListener(() => ShowModeVariantPrompt(MonStackaMode.Ogbm));
+            startSprintButton?.onClick.AddListener(() => ShowModeVariantPrompt(MonStackaMode.Sprint40));
+            startTrainingButton?.onClick.AddListener(StartTrainingMode);
             startStoryButton?.onClick.AddListener(OpenStorySelect);
             settingsButton?.onClick.AddListener(OpenSettings);
             musicToggleButton?.onClick.AddListener(ToggleMusic);
@@ -198,8 +230,11 @@ namespace MonStacka.UI
             if (closeSettingsButton) settingsButtons.Add(closeSettingsButton);
 
             CloseSettings();
-            SetLoreVisible(false);
+            EnsureModeVariantPrompt();
+            EnsureHomeLeaderboard();
+            SetInfoVisible(MonstosInfoMode.None);
             RebuildPreview();
+            RefreshHomeLeaderboard();
             RefreshSettingsText();
 
             if (startOgbmButton && EventSystem.current)
@@ -241,6 +276,26 @@ namespace MonStacka.UI
             SceneManager.LoadScene("Game");
         }
 
+        private void StartTrainingMode()
+        {
+            MonStackaAppState.FriendlyAbilitiesEnabled = true;
+            StartMode(MonStackaMode.Training);
+        }
+
+        private void StartVariantMode(bool zany)
+        {
+            MonStackaAppState.FriendlyAbilitiesEnabled = zany;
+            SetModeVariantPromptVisible(false);
+            StartMode(pendingVariantMode);
+        }
+
+        private void ShowModeVariantPrompt(MonStackaMode mode)
+        {
+            pendingVariantMode = mode;
+            EnsureModeVariantPrompt();
+            SetModeVariantPromptVisible(true);
+        }
+
         private void OpenStorySelect()
         {
             StopVoicePreview();
@@ -252,6 +307,7 @@ namespace MonStacka.UI
             StopVoicePreview();
             activeIndex = (activeIndex + direction + Profiles.Length) % Profiles.Length;
             RebuildPreview();
+            RefreshInfoPanelText();
         }
 
         private void RebuildPreview()
@@ -287,7 +343,7 @@ namespace MonStacka.UI
 
             if (monstosLoreText)
             {
-                monstosLoreText.text = center.Lore;
+                monstosLoreText.text = BuildInfoPanelText(center);
             }
 
             previewSkins.Add(CreatePreview("PreviewLeft", previewLeftAnchor, left, LeftPreviewSlotWorld, SidePreviewFill[left.PieceType], 0f));
@@ -348,16 +404,555 @@ namespace MonStacka.UI
 
         private void ToggleLore()
         {
-            loreOpen = !loreOpen;
-            SetLoreVisible(loreOpen);
+            SetInfoVisible(activeInfoMode == MonstosInfoMode.Lore ? MonstosInfoMode.None : MonstosInfoMode.Lore);
         }
 
-        private void SetLoreVisible(bool visible)
+        private void ToggleRules()
         {
+            SetInfoVisible(activeInfoMode == MonstosInfoMode.Rules ? MonstosInfoMode.None : MonstosInfoMode.Rules);
+        }
+
+        private void ToggleFriendlyAbility()
+        {
+            SetInfoVisible(activeInfoMode == MonstosInfoMode.FriendlyAbility ? MonstosInfoMode.None : MonstosInfoMode.FriendlyAbility);
+        }
+
+        private void ToggleEnemyAbility()
+        {
+            SetInfoVisible(activeInfoMode == MonstosInfoMode.EnemyAbility ? MonstosInfoMode.None : MonstosInfoMode.EnemyAbility);
+        }
+
+        private void SetInfoVisible(MonstosInfoMode mode)
+        {
+            activeInfoMode = mode;
+            loreOpen = mode != MonstosInfoMode.None;
+            ConfigureInfoPanelLayout();
+            RefreshInfoPanelText();
             if (monstosLorePanel)
             {
-                monstosLorePanel.SetActive(visible);
+                monstosLorePanel.SetActive(loreOpen);
             }
+        }
+
+        private void ConfigureInfoPanelLayout()
+        {
+            if (!monstosLorePanel || !monstosLoreText)
+            {
+                return;
+            }
+
+            var largeReference = activeInfoMode is MonstosInfoMode.Rules or MonstosInfoMode.FriendlyAbility or MonstosInfoMode.EnemyAbility;
+            var panelRect = monstosLorePanel.GetComponent<RectTransform>();
+            var surfaceRect = monstosLoreText.transform.parent ? monstosLoreText.transform.parent.GetComponent<RectTransform>() : null;
+            var tailRect = monstosLorePanel.transform.Find("LoreTail")?.GetComponent<RectTransform>();
+
+            if (panelRect)
+            {
+                panelRect.anchoredPosition = largeReference ? new Vector2(560f, -116f) : new Vector2(564f, -322f);
+                panelRect.sizeDelta = largeReference ? new Vector2(720f, 360f) : new Vector2(612f, 214f);
+            }
+
+            if (surfaceRect)
+            {
+                surfaceRect.anchoredPosition = largeReference ? new Vector2(0f, 0f) : new Vector2(56f, 0f);
+                surfaceRect.sizeDelta = largeReference ? new Vector2(720f, 360f) : new Vector2(486f, 152f);
+                var surfaceImage = surfaceRect.GetComponent<Image>();
+                if (surfaceImage)
+                {
+                    surfaceImage.color = largeReference
+                        ? new Color(0.045f, 0.055f, 0.105f, 0.98f)
+                        : new Color(1f, 0.996f, 0.988f, 1f);
+                }
+            }
+
+            if (tailRect)
+            {
+                tailRect.gameObject.SetActive(!largeReference);
+            }
+
+            var textRect = monstosLoreText.rectTransform;
+            textRect.anchoredPosition = largeReference ? new Vector2(28f, -24f) : new Vector2(22f, -18f);
+            textRect.sizeDelta = largeReference ? new Vector2(664f, 312f) : new Vector2(442f, 116f);
+
+            monstosLoreText.alignment = largeReference ? TextAnchor.UpperLeft : TextAnchor.MiddleCenter;
+            monstosLoreText.resizeTextForBestFit = !largeReference;
+            monstosLoreText.fontSize = largeReference ? 20 : 22;
+            monstosLoreText.resizeTextMinSize = largeReference ? 18 : 16;
+            monstosLoreText.resizeTextMaxSize = largeReference ? 20 : 24;
+            monstosLoreText.lineSpacing = largeReference ? 1.02f : 0.92f;
+            monstosLoreText.color = largeReference
+                ? new Color(0.96f, 0.96f, 0.99f, 1f)
+                : new Color(0.06f, 0.05f, 0.1f, 1f);
+            var textOutline = monstosLoreText.GetComponent<Outline>();
+            if (textOutline)
+            {
+                textOutline.enabled = !largeReference;
+            }
+        }
+
+        private void RefreshInfoPanelText()
+        {
+            if (!monstosLoreText)
+            {
+                return;
+            }
+
+            monstosLoreText.text = BuildInfoPanelText(Profiles[activeIndex]);
+        }
+
+        private string BuildInfoPanelText(MonstosProfile profile)
+        {
+            return activeInfoMode switch
+            {
+                MonstosInfoMode.Rules => BuildSharedFriendlyRulesText(),
+                MonstosInfoMode.FriendlyAbility => BuildFriendlyAbilityText(profile.PieceType),
+                MonstosInfoMode.EnemyAbility => BuildEnemyAbilityText(profile.PieceType),
+                _ => profile.Lore,
+            };
+        }
+
+        private void EnsureAbilityInfoButtons()
+        {
+            if (!monstosLoreButton)
+            {
+                return;
+            }
+
+            var loreRect = monstosLoreButton.GetComponent<RectTransform>();
+            var parent = loreRect ? loreRect.parent : monstosLoreButton.transform.parent;
+            if (!parent)
+            {
+                return;
+            }
+
+            monstosRulesButton ??= CreateInfoButton(
+                "RulesAbilityButton",
+                parent,
+                loreRect,
+                new Vector2(139f, -74f),
+                "RULES",
+                new Color(0.18f, 0.21f, 0.54f, 0.94f),
+                new Vector2(164f, 42f)
+            );
+            monstosFriendlyAbilityButton ??= CreateInfoButton(
+                "FriendlyAbilityButton",
+                parent,
+                loreRect,
+                new Vector2(96f, -126f),
+                "ALLY",
+                new Color(0.14f, 0.68f, 0.28f, 0.92f)
+            );
+            monstosEnemyAbilityButton ??= CreateInfoButton(
+                "EnemyAbilityButton",
+                parent,
+                loreRect,
+                new Vector2(182f, -126f),
+                "ENEMY",
+                new Color(0.78f, 0.12f, 0.12f, 0.92f)
+            );
+        }
+
+        private void EnsureModeVariantPrompt()
+        {
+            if (modeVariantPromptRoot)
+            {
+                return;
+            }
+
+            var parent = settingsPanel ? settingsPanel.transform.parent : transform;
+            modeVariantPromptRoot = new GameObject("ModeVariantPrompt", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            modeVariantPromptRoot.transform.SetParent(parent, false);
+            modeVariantPromptRoot.transform.SetAsLastSibling();
+            var rootRect = modeVariantPromptRoot.GetComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+
+            var blocker = modeVariantPromptRoot.GetComponent<Image>();
+            blocker.color = new Color(0.02f, 0.02f, 0.08f, 0.52f);
+            blocker.raycastTarget = true;
+
+            var panel = new GameObject("Panel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            panel.transform.SetParent(modeVariantPromptRoot.transform, false);
+            var panelRect = panel.GetComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.anchoredPosition = new Vector2(0f, 20f);
+            panelRect.sizeDelta = new Vector2(520f, 230f);
+            panel.GetComponent<Image>().color = new Color(0.06f, 0.06f, 0.16f, 0.96f);
+
+            var title = CreatePromptText(panel.transform, "Choose Style", 31, new Vector2(0f, 70f), new Vector2(460f, 44f));
+            title.fontStyle = FontStyle.Bold;
+            CreatePromptText(panel.transform, "Zany uses friendly held-block abilities. Classic has zero abilities.", 20, new Vector2(0f, 26f), new Vector2(440f, 58f));
+
+            zanyVariantButton = CreatePromptButton(panel.transform, "Zany", new Vector2(-120f, -66f), new Color(0.14f, 0.68f, 0.28f, 0.96f), () => StartVariantMode(true));
+            classicVariantButton = CreatePromptButton(panel.transform, "Classic", new Vector2(120f, -66f), new Color(0.18f, 0.23f, 0.36f, 0.96f), () => StartVariantMode(false));
+
+            SetModeVariantPromptVisible(false);
+        }
+
+        private void EnsureHomeLeaderboard()
+        {
+            if (leaderboardStyleToggleButton)
+            {
+                return;
+            }
+
+            var parent = settingsPanel ? settingsPanel.transform.parent : transform;
+
+            leaderboardStyleToggleButton = CreateLeaderboardStyleButton(parent);
+            leaderboardStyleToggleButton.onClick.AddListener(() =>
+            {
+                leaderboardShowsZany = !leaderboardShowsZany;
+                RefreshHomeLeaderboard();
+            });
+
+            homeSprintLeaderboardTexts = CreateLeaderboardColumn(parent, "Sprint", new Vector2(1050f, -826f));
+            homeOgbmLeaderboardTexts = CreateLeaderboardColumn(parent, "Ogbm", new Vector2(1190f, -826f));
+        }
+
+        private Button CreateLeaderboardStyleButton(Transform parent)
+        {
+            var go = new GameObject("LeaderboardStyleToggle", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(1132f, -572f);
+            rect.sizeDelta = new Vector2(170f, 32f);
+
+            var image = go.GetComponent<Image>();
+            image.color = new Color(0.12f, 0.16f, 0.32f, 0.92f);
+            var button = go.GetComponent<Button>();
+            button.targetGraphic = image;
+
+            var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            labelGo.transform.SetParent(go.transform, false);
+            var labelRect = labelGo.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            leaderboardStyleToggleLabel = labelGo.GetComponent<Text>();
+            leaderboardStyleToggleLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            leaderboardStyleToggleLabel.fontSize = 18;
+            leaderboardStyleToggleLabel.fontStyle = FontStyle.Bold;
+            leaderboardStyleToggleLabel.alignment = TextAnchor.MiddleCenter;
+            leaderboardStyleToggleLabel.color = Color.white;
+            leaderboardStyleToggleLabel.raycastTarget = false;
+            return button;
+        }
+
+        private static Text[] CreateLeaderboardColumn(Transform parent, string name, Vector2 startPosition)
+        {
+            var rows = new Text[MonStackaRecords.MaxEntries];
+            for (var index = 0; index < rows.Length; index += 1)
+            {
+                var go = new GameObject($"HomeLeaderboard_{name}_{index + 1}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+                go.transform.SetParent(parent, false);
+                var rect = go.GetComponent<RectTransform>();
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = startPosition + new Vector2(0f, -(index * 58f));
+                rect.sizeDelta = new Vector2(112f, 34f);
+
+                var text = go.GetComponent<Text>();
+                text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                text.fontSize = 20;
+                text.fontStyle = FontStyle.Bold;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.color = new Color(0.05f, 0.04f, 0.10f, 1f);
+                text.raycastTarget = false;
+                rows[index] = text;
+            }
+
+            return rows;
+        }
+
+        private void RefreshHomeLeaderboard()
+        {
+            if (!leaderboardStyleToggleLabel)
+            {
+                return;
+            }
+
+            leaderboardStyleToggleLabel.text = leaderboardShowsZany ? "ZANY SCORES" : "CLASSIC SCORES";
+            var buttonImage = leaderboardStyleToggleButton ? leaderboardStyleToggleButton.GetComponent<Image>() : null;
+            if (buttonImage)
+            {
+                buttonImage.color = leaderboardShowsZany
+                    ? new Color(0.12f, 0.50f, 0.22f, 0.92f)
+                    : new Color(0.12f, 0.16f, 0.32f, 0.92f);
+            }
+
+            SetLeaderboardRows(
+                homeOgbmLeaderboardTexts,
+                MonStackaRecords.GetOgbmScores(leaderboardShowsZany).Select(score => score.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToList()
+            );
+            SetLeaderboardRows(
+                homeSprintLeaderboardTexts,
+                MonStackaRecords.GetSprintTimes(leaderboardShowsZany).Select(MonStackaRecords.FormatMs).ToList()
+            );
+        }
+
+        private static void SetLeaderboardRows(Text[] textRows, IReadOnlyList<string> values)
+        {
+            if (textRows == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < textRows.Length; index += 1)
+            {
+                if (textRows[index])
+                {
+                    textRows[index].text = values != null && index < values.Count ? values[index] : "---";
+                }
+            }
+        }
+
+        private static Text CreatePromptText(Transform parent, string value, int fontSize, Vector2 position, Vector2 size)
+        {
+            var go = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+
+            var text = go.GetComponent<Text>();
+            text.text = value;
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = fontSize;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = new Color(0.95f, 0.94f, 1f, 1f);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private static Button CreatePromptButton(Transform parent, string label, Vector2 position, Color color, UnityEngine.Events.UnityAction onClick)
+        {
+            var go = new GameObject($"{label}Button", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(180f, 58f);
+
+            var image = go.GetComponent<Image>();
+            image.color = color;
+            var button = go.GetComponent<Button>();
+            button.targetGraphic = image;
+            button.onClick.AddListener(onClick);
+
+            CreatePromptText(go.transform, label, 24, Vector2.zero, rect.sizeDelta).fontStyle = FontStyle.Bold;
+            return button;
+        }
+
+        private void SetModeVariantPromptVisible(bool visible)
+        {
+            if (modeVariantPromptRoot)
+            {
+                modeVariantPromptRoot.SetActive(visible);
+            }
+
+            if (visible)
+            {
+                SetAbilityInfoButtonsVisible(false);
+                SetHomeLeaderboardVisible(false);
+                SetInfoVisible(MonstosInfoMode.None);
+                if (zanyVariantButton && EventSystem.current)
+                {
+                    EventSystem.current.SetSelectedGameObject(zanyVariantButton.gameObject);
+                }
+            }
+            else if (!(settingsPanel && settingsPanel.activeSelf))
+            {
+                SetAbilityInfoButtonsVisible(true);
+                SetHomeLeaderboardVisible(true);
+            }
+        }
+
+        private static Button CreateInfoButton(string objectName, Transform parent, RectTransform templateRect, Vector2 offset, string label, Color color, Vector2? size = null)
+        {
+            var go = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            if (templateRect)
+            {
+                rect.anchorMin = templateRect.anchorMin;
+                rect.anchorMax = templateRect.anchorMax;
+                rect.pivot = templateRect.pivot;
+                rect.anchoredPosition = templateRect.anchoredPosition + offset;
+            }
+            else
+            {
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.anchoredPosition = offset;
+            }
+
+            rect.sizeDelta = size ?? new Vector2(78f, 48f);
+
+            var image = go.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = true;
+
+            var button = go.GetComponent<Button>();
+            button.targetGraphic = image;
+
+            var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            labelGo.transform.SetParent(go.transform, false);
+            var labelRect = labelGo.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            var text = labelGo.GetComponent<Text>();
+            text.text = label;
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 17;
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.raycastTarget = false;
+            return button;
+        }
+
+        private static string BuildSharedFriendlyRulesText()
+        {
+            return
+                "<color=#8EE8FF><b>SHARED ALLY RULES</b></color>\n" +
+                "<color=#C8FF9A><b>Where enabled</b></color>\n" +
+                "- Story Mode: always on.\n" +
+                "- O.G.B.M. and X(4)-LINES: Zany on, Classic off.\n" +
+                "- Training: toggle on/off in match; toggling resets the board.\n\n" +
+                "<color=#C8FF9A><b>How to trigger</b></color>\n" +
+                "Put a block in Hold, bring that held block back out, then place it. Do that 3 total times. When the Hold box glows, the next held block placed fires its ally ability.\n\n" +
+                "<color=#FFD86B><b>Shared points</b></color>\n" +
+                "+150 base trigger points.\n" +
+                "+100 per combo step after the first trigger.\n" +
+                "+300 danger-save bonus when applicable.\n" +
+                "+200 per line during active 8-second timed windows.\n\n" +
+                "<color=#FF9A9A><b>Combo + danger</b></color>\n" +
+                "Trigger again within 6 total placements to keep the combo chain. Danger means blocks have reached the upper danger zone, about 14 visible rows high.";
+        }
+
+        private static string BuildFriendlyAbilityText(PieceType pieceType)
+        {
+            var assist = AssistEffectSystem.AssistForPiece(pieceType);
+            var label = AssistEffectSystem.LabelFor(assist);
+            var titleColor = PieceDefinitions.PieceColors.TryGetValue(pieceType, out var pieceColor)
+                ? ColorUtility.ToHtmlStringRGB(pieceColor)
+                : "FFFFFF";
+            var mechanics = assist switch
+            {
+                AssistType.GuardBreak =>
+                    "Removes up to 6 enemy junk/garbage cells. Cleanup checks low rows first, then the left and right edges.",
+                AssistType.Calculation =>
+                    "Starts an 8-second window where the Next queue shows 2 extra upcoming blocks.",
+                AssistType.EchoGuide =>
+                    "Starts an 8-second Echo Guide window for enhanced placement guidance / safer landing reads.",
+                AssistType.Stitch =>
+                    "Searches for the deepest covered hole, then fills that empty cell with a repair cell.",
+                AssistType.Digest =>
+                    "Removes up to 8 enemy junk/garbage cells and pays extra for each cell eaten.",
+                AssistType.Sedate =>
+                    "Starts an 8-second Sedate window. Falling slows and lock delay gets longer.",
+                AssistType.Alert =>
+                    "Starts an 8-second Alert window. If the stack is dangerous, clears can get extra value.",
+                _ => "Triggers this block's held-piece assist.",
+            };
+            var pointLine = assist switch
+            {
+                AssistType.GuardBreak => "+20 per junk cell removed. +300 danger-save if dangerous and at least one junk cell was removed.",
+                AssistType.Digest => "+40 per junk cell removed. +300 danger-save if dangerous and at least one junk cell was removed.",
+                AssistType.Stitch => "+120 if a covered hole was successfully repaired.",
+                AssistType.Calculation or AssistType.EchoGuide or AssistType.Sedate or AssistType.Alert =>
+                    "+200 per line cleared before the 8-second window ends.",
+                _ => "Uses shared trigger and combo scoring.",
+            };
+            var tuningLine = assist switch
+            {
+                AssistType.Calculation =>
+                    "This ability rewards planning and line clears during its window. It does not give an instant danger-save payout by itself.",
+                AssistType.EchoGuide =>
+                    "This ability rewards line clears while the guide window is active. It does not give an instant danger-save payout by itself.",
+                AssistType.Sedate =>
+                    "Gravity multiplier becomes 1.6, meaning slower falling. Lock delay gets +0.15 seconds. It does not give an instant danger-save payout by itself.",
+                AssistType.Alert =>
+                    "If already dangerous when triggered, awards +300. During the window, dangerous clears can receive a 1.5x Alert score multiplier.",
+                _ => string.Empty,
+            };
+            return
+                $"<color=#{titleColor}><b>{label}</b></color>\n" +
+                "<color=#C8FF9A><b>What it does</b></color>\n" +
+                $"{mechanics}\n\n" +
+                "<color=#FFD86B><b>Ability points</b></color>\n" +
+                $"{pointLine}\n\n" +
+                (string.IsNullOrEmpty(tuningLine)
+                    ? "<color=#A8E6FF><b>Shared rules</b></color>\nUse the Rules button for trigger, combo, and shared scoring."
+                    : $"<color=#A8E6FF><b>Runtime note</b></color>\n{tuningLine}\n\n<color=#A8E6FF><b>Shared rules</b></color>\nUse the Rules button for trigger, combo, and shared scoring.");
+        }
+
+        private static string BuildEnemyAbilityText(PieceType pieceType)
+        {
+            var titleColor = PieceDefinitions.PieceColors.TryGetValue(pieceType, out var pieceColor)
+                ? ColorUtility.ToHtmlStringRGB(pieceColor)
+                : "FFFFFF";
+            return pieceType switch
+            {
+                PieceType.Z =>
+                    $"<color=#{titleColor}><b>AGGRASO PRESSURE</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifiers</b></color>\nGuardPressure, TerritoryCells\n\n" +
+                    "<color=#FFD86B><b>Triggers</b></color>\nGuardPressure is active for the whole mission. It applies whenever a falling piece touches down and enters lock-delay behavior.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nLock delay is multiplied by 0.6, so pieces stick faster after contact. TerritoryCells seeds 4 + difficulty tier enemy cells at match start. Signal Relay can temporarily reactivate either effect.",
+                PieceType.O =>
+                    $"<color=#{titleColor}><b>CALCULATED</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifiers</b></color>\nCalculatedPlanning, PrecisionPressure\n\n" +
+                    "<color=#FFD86B><b>Triggers</b></color>\nCalculatedPlanning watches every piece you lock. PrecisionPressure watches each locked piece for unsupported overhang cells.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nCalculatedPlanning gives safer missions a longer Next preview, but each piece has only 2 safe successful rotations. Extra rotations seed 1 enemy cell each, up to 3 per piece. PrecisionPressure seeds enemy cells when a locked block leaves unsupported cells hanging over empty space, up to 3 cells per piece.",
+                PieceType.L =>
+                    $"<color=#{titleColor}><b>BLINDED</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifiers</b></color>\nGhostFlicker, EcholocationDim\n\n" +
+                    "<color=#FFD86B><b>Triggers</b></color>\nBoth effects are active for the whole mission when included.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nGhostFlicker runs on a 2.6s cycle: active piece hidden for 0.35s, then visible. EcholocationDim runs on a 3.5s cycle: board clear for 0.5s, then dimmed at 0.42 alpha. Signal Relay can temporarily reactivate GhostFlicker.",
+                PieceType.J =>
+                    $"<color=#{titleColor}><b>MUTE</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifiers</b></color>\nResilientCells, MutedHints, NoHold\n\n" +
+                    "<color=#FFD86B><b>Triggers</b></color>\nMutedHints and NoHold are whole-mission rules when included. ResilientCells triggers after line clears.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nHints can be hidden, Hold can be disabled, and line clears can regrow one enemy territory cell. Regrow chance is 30% + 3% per difficulty tier.",
+                PieceType.S =>
+                    $"<color=#{titleColor}><b>SORRISOL HUNGER</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifier</b></color>\nHungerMeter\n\n" +
+                    "<color=#FFD86B><b>Trigger</b></color>\nActive for the whole mission. Timer starts at 0 and resets whenever you clear any number of lines.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nThe hunger window is 22s minus difficulty tier, minimum 10s. If it fills, one garbage row rises from the bottom with one random open column.",
+                PieceType.T =>
+                    $"<color=#{titleColor}><b>LYSERGICADA SEDATION</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifier</b></color>\nSedationWindows\n\n" +
+                    "<color=#FFD86B><b>Trigger</b></color>\nActive for the whole mission on an 18s cycle. Warning starts 7s into the cycle and lasts 3s. Active sedation starts at 14s and lasts 4s.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nDuring active sedation, DAS/ARR input timing is multiplied by 2.4, making movement sluggish. At 18s the cycle resets.",
+                PieceType.I =>
+                    $"<color=#{titleColor}><b>BLYNDOOLIE ADRENALINE</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifiers</b></color>\nAdrenalineMonitor, SignalRelay\n\n" +
+                    "<color=#FFD86B><b>Triggers</b></color>\nAdrenaline checks stack height for the whole mission. Signal Relay waits 25s, activates for 6s, then repeats.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nIf the stack reaches about 13 visible rows high, gravity multiplier becomes 0.7, making pieces fall faster. Signal Relay randomly activates GuardPressure, TerritoryCells, GhostFlicker, or AdrenalineMonitor. Territory relay immediately seeds 3 enemy cells.",
+                _ =>
+                    $"<color=#{titleColor}><b>ENEMY ABILITY</b></color>\n" +
+                    "Story chapters can turn this monster's traits into stage pressure.",
+            };
         }
 
         private void PlayVoicePreview()
@@ -505,8 +1100,10 @@ namespace MonStacka.UI
                 settingsPanel.SetActive(true);
             }
 
-            loreOpen = false;
-            SetLoreVisible(false);
+            SetModeVariantPromptVisible(false);
+            SetAbilityInfoButtonsVisible(false);
+            SetHomeLeaderboardVisible(false);
+            SetInfoVisible(MonstosInfoMode.None);
             RefreshSettingsText();
 
             if (EventSystem.current)
@@ -527,9 +1124,56 @@ namespace MonStacka.UI
             }
 
             awaitingBindingAction = null;
+            SetAbilityInfoButtonsVisible(true);
+            SetHomeLeaderboardVisible(true);
             if (startOgbmButton && EventSystem.current)
             {
                 EventSystem.current.SetSelectedGameObject(startOgbmButton.gameObject);
+            }
+        }
+
+        private void SetAbilityInfoButtonsVisible(bool visible)
+        {
+            if (monstosRulesButton)
+            {
+                monstosRulesButton.gameObject.SetActive(visible);
+            }
+
+            if (monstosFriendlyAbilityButton)
+            {
+                monstosFriendlyAbilityButton.gameObject.SetActive(visible);
+            }
+
+            if (monstosEnemyAbilityButton)
+            {
+                monstosEnemyAbilityButton.gameObject.SetActive(visible);
+            }
+        }
+
+        private void SetHomeLeaderboardVisible(bool visible)
+        {
+            if (leaderboardStyleToggleButton)
+            {
+                leaderboardStyleToggleButton.gameObject.SetActive(visible);
+            }
+
+            SetTextRowsVisible(homeOgbmLeaderboardTexts, visible);
+            SetTextRowsVisible(homeSprintLeaderboardTexts, visible);
+        }
+
+        private static void SetTextRowsVisible(Text[] rows, bool visible)
+        {
+            if (rows == null)
+            {
+                return;
+            }
+
+            foreach (var row in rows)
+            {
+                if (row)
+                {
+                    row.gameObject.SetActive(visible);
+                }
             }
         }
 
@@ -657,6 +1301,26 @@ namespace MonStacka.UI
             var voice = IsVoiceHeld();
             var lore = IsLoreHeld();
 
+            if (modeVariantPromptRoot && modeVariantPromptRoot.activeSelf)
+            {
+                if (WasPressed(cancel, ref previousCancel))
+                {
+                    SetModeVariantPromptVisible(false);
+                }
+                else if (WasPressed(submit, ref previousSubmit))
+                {
+                    ActivateSelectedButton();
+                }
+
+                previousNavigateUp = navigateUp;
+                previousNavigateDown = navigateDown;
+                previousCycleLeft = cycleLeft;
+                previousCycleRight = cycleRight;
+                previousVoice = voice;
+                previousLore = lore;
+                return;
+            }
+
             if (settingsPanel && settingsPanel.activeSelf)
             {
                 if (HandleBindingCapture())
@@ -722,8 +1386,7 @@ namespace MonStacka.UI
             {
                 if (loreOpen)
                 {
-                    loreOpen = false;
-                    SetLoreVisible(false);
+                    SetInfoVisible(MonstosInfoMode.None);
                 }
                 else if (settingsPanel && settingsPanel.activeSelf)
                 {

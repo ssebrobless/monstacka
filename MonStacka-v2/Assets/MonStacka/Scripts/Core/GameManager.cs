@@ -4,7 +4,9 @@ using MonStacka.Story;
 using MonStacka.UI;
 using MonStacka.Visual;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace MonStacka.Core
 {
@@ -73,7 +75,6 @@ namespace MonStacka.Core
         private float pauseStartedTime;
         private float completedElapsedSeconds = -1f;
         private bool recordsSubmitted;
-        private bool anyAssistTriggered;
         private bool paused;
         private float startTime;
         private StoryChapterSpec storyChapter;
@@ -92,12 +93,27 @@ namespace MonStacka.Core
         private bool previousRotateCwHeld;
         private bool previousRotateFlipHeld;
         private bool previousHoldHeld;
+        private bool previousHoldSwapOneHeld;
+        private bool previousHoldSwapTwoHeld;
+        private bool previousHoldSwapThreeHeld;
         private bool previousRetryHeld;
         private bool previousPauseHeld;
         private bool previousRestartPausedHeld;
+        private bool previousRestartConfirmAcceptHeld = true;
+        private bool previousRestartConfirmCancelHeld = true;
         private bool previousLeftHeld;
         private bool previousRightHeld;
         private bool hasAnyGameplayPulse;
+        private bool gameplayPieceVisualsVisible = true;
+        private bool restartConfirmActive;
+        private GameObject restartConfirmRoot;
+        private Button restartConfirmAcceptButton;
+        private Button restartConfirmCancelButton;
+        private bool endRunPanelShown;
+        private GameObject endRunRoot;
+        private Text endRunTitleText;
+        private Text endRunScoreText;
+        private Button endRunHomeButton;
 
         private IReadOnlyList<PieceType> SupportedPieces =>
             useThreePieceVerticalSlice
@@ -122,7 +138,8 @@ namespace MonStacka.Core
                     ?? StoryProgress.CurrentChapter();
                 gravitySeconds = storyChapter.GravitySeconds;
                 lockDelaySeconds = storyChapter.LockDelaySeconds;
-                if (storyChapter.Objective.Kind is StoryObjectiveKind.ClearLines or StoryObjectiveKind.ClearLinesTimed)
+                if (!storyChapter.Objective.HasBossHealth &&
+                    storyChapter.Objective.Kind is StoryObjectiveKind.ClearLines or StoryObjectiveKind.ClearLinesTimed)
                 {
                     targetLines = storyChapter.Objective.TargetLines;
                 }
@@ -146,19 +163,18 @@ namespace MonStacka.Core
                 storyModifiers.OnMatchStart();
                 CreateStoryDimOverlay();
             }
-            if (AssistEffectSystem.IsEnabledFor(mode, MonStackaAppState.TrainingAssistEnabled))
+            if (AssistEffectSystem.IsEnabledFor(mode, MonStackaAppState.FriendlyAbilitiesEnabled))
             {
                 assistSystem = new AssistEffectSystem();
-                boardState.OnPieceLocked += lockEvent =>
-                {
-                    if (assistSystem.OnPieceLocked(lockEvent, boardState, boardState.AddScore).HasValue)
-                    {
-                        anyAssistTriggered = true;
-                    }
-                };
-                boardState.OnLinesCleared += lines =>
-                    assistSystem.OnLinesCleared(lines, boardState.AddScore);
             }
+            boardState.OnPieceLocked += lockEvent =>
+            {
+                assistSystem?.OnPieceLocked(lockEvent, boardState, points => boardState.AddScore(points, lockEvent.PieceType));
+            };
+            boardState.OnLinesCleared += lines =>
+                assistSystem?.OnLinesCleared(lines, points => boardState.AddScore(points, assistSystem.ActiveWindowPiece));
+            boardState.OnPointsGained += (points, sourcePiece) =>
+                hudController?.ShowPointGain(points, sourcePiece);
             boardState.OnPieceLocked += HandlePieceLocked;
             // Line clears update only the views that actually changed (no full stack rebuild).
             boardState.OnLinesCleared += _ => { SyncLockedPieceViews(); neighborMapDirty = true; audioController?.PlayUiClick(); };
@@ -171,7 +187,7 @@ namespace MonStacka.Core
             countdownRemaining = CountdownSeconds;
             startTime = Time.time + CountdownSeconds;
             hudController?.Configure(mode, storyChapter);
-            hudController?.RenderLeaderboard(MonStackaRecords.GetDisplayRows(mode));
+            hudController?.RenderLeaderboard(MonStackaRecords.GetDisplayRows(mode, MonStackaAppState.FriendlyAbilitiesEnabled));
             RebuildBoardViews();
 
             var skipDialogue = System.Array.Exists(
@@ -188,9 +204,11 @@ namespace MonStacka.Core
                 dialoguePresenter.Play(opening, () =>
                 {
                     dialogueGate = false;
+                    SetGameplayPieceVisualsVisible(true);
                     countdownRemaining = CountdownSeconds;
                     startTime = Time.time + CountdownSeconds;
                 });
+                SetGameplayPieceVisualsVisible(false);
             }
         }
 
@@ -241,6 +259,31 @@ namespace MonStacka.Core
         {
             if (dialogueGate || (dialoguePresenter && dialoguePresenter.IsActive))
             {
+                SetGameplayPieceVisualsVisible(false);
+                UpdateVisuals();
+                RememberGamepadButtonState();
+                return;
+            }
+
+            SetGameplayPieceVisualsVisible(true);
+
+            if (dialoguePresenter && dialoguePresenter.IsWaitingForAdvanceRelease)
+            {
+                UpdateVisuals();
+                RememberGamepadButtonState();
+                return;
+            }
+
+            if (restartConfirmActive)
+            {
+                HandleRestartConfirmInput();
+                UpdateVisuals();
+                RememberGamepadButtonState();
+                return;
+            }
+
+            if (endRunPanelShown)
+            {
                 UpdateVisuals();
                 RememberGamepadButtonState();
                 return;
@@ -254,12 +297,12 @@ namespace MonStacka.Core
 
             if (IsRetryPressed())
             {
-                RestartMode();
+                RequestRestart();
             }
 
             if (paused && IsRestartPausedPressed())
             {
-                RestartMode();
+                RequestRestart();
             }
 
             if (!paused && countdownRemaining > 0f)
@@ -293,7 +336,9 @@ namespace MonStacka.Core
             }
 
             var objective = storyChapter.Objective;
-            var complete = objective.Kind switch
+            var complete = objective.HasBossHealth
+                ? boardState.Score >= objective.BossHealthPoints
+                : objective.Kind switch
             {
                 StoryObjectiveKind.ClearLines => boardState.SprintComplete,
                 StoryObjectiveKind.ClearLinesTimed => boardState.SprintComplete,
@@ -308,7 +353,8 @@ namespace MonStacka.Core
                 return;
             }
 
-            if (objective.Kind == StoryObjectiveKind.ClearLinesTimed &&
+            if (objective.HasTimeLimit &&
+                !complete &&
                 ElapsedSeconds > objective.TimeLimitSeconds)
             {
                 storyMissionFailed = true;
@@ -337,6 +383,28 @@ namespace MonStacka.Core
             SceneManager.LoadScene("StorySelect");
         }
 
+        private void SetGameplayPieceVisualsVisible(bool visible)
+        {
+            if (gameplayPieceVisualsVisible == visible)
+            {
+                return;
+            }
+
+            gameplayPieceVisualsVisible = visible;
+            if (activeRoot)
+            {
+                activeRoot.gameObject.SetActive(visible);
+            }
+
+            if (stackRoot)
+            {
+                stackRoot.gameObject.SetActive(visible);
+            }
+
+            holdBoxView?.SetPreviewVisible(visible);
+            nextQueueView?.SetPreviewsVisible(visible);
+        }
+
         private void UpdateStoryVisuals()
         {
             if (storyModifiers == null)
@@ -362,10 +430,36 @@ namespace MonStacka.Core
                 }
             }
 
+            var storyStatus = storyMissionFailed
+                ? "MISSION FAILED - press R to retry"
+                : BuildStoryBossStatus();
             hudController?.RenderStoryStatus(
-                storyMissionFailed ? "MISSION FAILED - press R to retry" : storyModifiers.BuildStatusChips(),
+                storyStatus,
                 storyModifiers.HintsMuted
             );
+            hudController?.RenderStoryEnemyStatus(storyModifiers.BuildEnemyAbilityStatus());
+        }
+
+        private string BuildStoryBossStatus()
+        {
+            var chips = storyModifiers?.BuildStatusChips() ?? string.Empty;
+            if (storyChapter == null || !storyChapter.Objective.HasBossHealth)
+            {
+                return chips;
+            }
+
+            var objective = storyChapter.Objective;
+            var remainingHp = Mathf.Max(0, objective.BossHealthPoints - boardState.Score);
+            var bossStatus = $"BOSS HP {remainingHp}/{objective.BossHealthPoints}";
+            if (objective.HasTimeLimit)
+            {
+                var remainingSeconds = Mathf.Max(0, Mathf.CeilToInt(objective.TimeLimitSeconds - ElapsedSeconds));
+                bossStatus += $"  |  TIME {remainingSeconds}s";
+            }
+
+            return string.IsNullOrEmpty(chips)
+                ? bossStatus
+                : $"{bossStatus}  |  {chips}";
         }
 
         /// <summary>Elapsed run time excluding countdown, pauses, and post-completion time.</summary>
@@ -403,17 +497,18 @@ namespace MonStacka.Core
             recordsSubmitted = true;
             if (mode == MonStackaMode.Ogbm)
             {
-                MonStackaRecords.TryAddOgbmScore(boardState.Score);
+                MonStackaRecords.TryAddOgbmScore(boardState.Score, MonStackaAppState.FriendlyAbilitiesEnabled);
             }
             else if (mode == MonStackaMode.Sprint40 && boardState.SprintComplete)
             {
                 MonStackaRecords.TryAddSprintTime(
                     Mathf.RoundToInt(completedElapsedSeconds * 1000f),
-                    anyAssistTriggered
+                    MonStackaAppState.FriendlyAbilitiesEnabled
                 );
             }
 
-            hudController?.RenderLeaderboard(MonStackaRecords.GetDisplayRows(mode));
+            hudController?.RenderLeaderboard(MonStackaRecords.GetDisplayRows(mode, MonStackaAppState.FriendlyAbilitiesEnabled));
+            ShowEndRunPanel();
         }
 
         private void HandleGameplayInput()
@@ -535,7 +630,14 @@ namespace MonStacka.Core
                 }
             }
 
-            var holdAllowed = mode != MonStackaMode.Training && (storyChapter == null || storyChapter.HoldEnabled);
+            var holdAllowed = (mode != MonStackaMode.Training || assistSystem != null) && (storyChapter == null || storyChapter.HoldEnabled);
+            if (holdAllowed && IsHoldQueueSwapAllowed() && TryHandleHoldQueueSwap())
+            {
+                UpdatePreviewViews();
+                neighborMapDirty = true;
+                return;
+            }
+
             if (holdAllowed && IsPressed(MonStackaControls.IsGameplayHoldHeld(), ref previousHoldHeld))
             {
                 var hadHoldPiece = boardState.HasHoldPiece;
@@ -581,6 +683,29 @@ namespace MonStacka.Core
                 UpdateActivePieceViewPosition();
                 neighborMapDirty = true;
             }
+        }
+
+        private bool IsHoldQueueSwapAllowed() =>
+            mode == MonStackaMode.Story || assistSystem != null;
+
+        private bool TryHandleHoldQueueSwap()
+        {
+            if (IsPressed(IsHoldQueueSwapOneHeld(), ref previousHoldSwapOneHeld))
+            {
+                return boardState.TrySwapHoldWithUpcoming(0);
+            }
+
+            if (IsPressed(IsHoldQueueSwapTwoHeld(), ref previousHoldSwapTwoHeld))
+            {
+                return boardState.TrySwapHoldWithUpcoming(1);
+            }
+
+            if (IsPressed(IsHoldQueueSwapThreeHeld(), ref previousHoldSwapThreeHeld))
+            {
+                return boardState.TrySwapHoldWithUpcoming(2);
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -958,7 +1083,12 @@ namespace MonStacka.Core
         {
             if (holdBoxView)
             {
-                holdBoxView.Render(boardState.HasHoldPiece ? boardState.HoldPiece : (PieceType?)null, skinLookup, outlineMaterial, deformTuning, cellWorldSize * 0.72f);
+                var holdPiece = boardState.HasHoldPiece ? boardState.HoldPiece : (PieceType?)null;
+                var holdAbilityArmed =
+                    holdPiece.HasValue &&
+                    assistSystem != null &&
+                    assistSystem.HeldProgress >= AssistEffectSystem.TriggerEvery - 1;
+                holdBoxView.Render(holdPiece, skinLookup, outlineMaterial, deformTuning, cellWorldSize * 0.72f, holdAbilityArmed);
             }
 
             if (nextQueueView)
@@ -1163,6 +1293,17 @@ namespace MonStacka.Core
 
         public void TogglePause()
         {
+            if (endRunPanelShown)
+            {
+                return;
+            }
+
+            if (restartConfirmActive)
+            {
+                CancelRestartConfirmation();
+                return;
+            }
+
             if (paused)
             {
                 ResumeGame();
@@ -1175,6 +1316,16 @@ namespace MonStacka.Core
 
         public void ResumeGame()
         {
+            if (endRunPanelShown)
+            {
+                return;
+            }
+
+            if (restartConfirmActive)
+            {
+                return;
+            }
+
             if (paused)
             {
                 pausedAccumSeconds += Time.time - pauseStartedTime;
@@ -1186,6 +1337,11 @@ namespace MonStacka.Core
 
         public void PauseIfRunning()
         {
+            if (endRunPanelShown)
+            {
+                return;
+            }
+
             if (paused)
             {
                 return;
@@ -1198,8 +1354,344 @@ namespace MonStacka.Core
 
         public AssistEffectSystem AssistSystem => assistSystem;
 
+        public MonStackaMode CurrentMode => mode;
+
+        public bool FriendlyAbilitiesEnabled => assistSystem != null;
+
+        public bool CanToggleFriendlyAbilities => mode == MonStackaMode.Training;
+
+        public void ToggleFriendlyAbilitiesAndRestart()
+        {
+            if (!CanToggleFriendlyAbilities)
+            {
+                return;
+            }
+
+            MonStackaAppState.FriendlyAbilitiesEnabled = !MonStackaAppState.FriendlyAbilitiesEnabled;
+            assistSystem = MonStackaAppState.FriendlyAbilitiesEnabled ? new AssistEffectSystem() : null;
+            RestartMode();
+        }
+
+        public bool IsRestartConfirmActive => restartConfirmActive;
+
+        public bool IsEndRunPanelActive => endRunPanelShown;
+
+        public void RequestRestart()
+        {
+            if (mode == MonStackaMode.Training)
+            {
+                RestartMode();
+                return;
+            }
+
+            PauseIfRunning();
+            ShowRestartConfirmation();
+        }
+
+        private void ShowRestartConfirmation()
+        {
+            EnsureRestartConfirmationUi();
+            restartConfirmActive = true;
+            pauseOverlay?.SetVisible(true);
+
+            if (restartConfirmRoot)
+            {
+                restartConfirmRoot.SetActive(true);
+            }
+
+            if (restartConfirmAcceptButton && EventSystem.current)
+            {
+                EventSystem.current.SetSelectedGameObject(restartConfirmAcceptButton.gameObject);
+            }
+
+            previousRestartConfirmAcceptHeld = IsRestartConfirmAcceptHeld();
+            previousRestartConfirmCancelHeld = IsRestartConfirmCancelHeld();
+        }
+
+        private void HandleRestartConfirmInput()
+        {
+            if (WasRestartConfirmPressed(IsRestartConfirmAcceptHeld(), ref previousRestartConfirmAcceptHeld))
+            {
+                ConfirmRestart();
+                return;
+            }
+
+            if (WasRestartConfirmPressed(IsRestartConfirmCancelHeld(), ref previousRestartConfirmCancelHeld))
+            {
+                CancelRestartConfirmation();
+            }
+        }
+
+        private void ConfirmRestart()
+        {
+            HideRestartConfirmation();
+            RestartMode();
+        }
+
+        private void CancelRestartConfirmation()
+        {
+            HideRestartConfirmation();
+            PauseIfRunning();
+            pauseOverlay?.SetVisible(true);
+        }
+
+        private void HideRestartConfirmation()
+        {
+            restartConfirmActive = false;
+            if (restartConfirmRoot)
+            {
+                restartConfirmRoot.SetActive(false);
+            }
+        }
+
+        private void ShowEndRunPanel()
+        {
+            if (endRunPanelShown || mode == MonStackaMode.Training)
+            {
+                return;
+            }
+
+            EnsureEndRunUi();
+            endRunPanelShown = true;
+            paused = false;
+            pauseOverlay?.SetVisible(false);
+            HideRestartConfirmation();
+
+            if (endRunRoot)
+            {
+                endRunRoot.SetActive(true);
+                endRunRoot.transform.SetAsLastSibling();
+            }
+
+            if (endRunTitleText)
+            {
+                endRunTitleText.text = boardState.SprintComplete ? "Run Complete" : "Game Over";
+            }
+
+            if (endRunScoreText)
+            {
+                endRunScoreText.text = mode == MonStackaMode.Sprint40 && boardState.SprintComplete
+                    ? $"Time\n{MonStackaRecords.FormatMs(Mathf.RoundToInt(completedElapsedSeconds * 1000f))}"
+                    : $"Score\n{boardState.Score}";
+            }
+
+            if (endRunHomeButton && EventSystem.current)
+            {
+                EventSystem.current.SetSelectedGameObject(endRunHomeButton.gameObject);
+            }
+        }
+
+        private void EnsureEndRunUi()
+        {
+            if (endRunRoot)
+            {
+                return;
+            }
+
+            var canvas = FindFirstObjectByType<Canvas>();
+            if (!canvas)
+            {
+                return;
+            }
+
+            endRunRoot = new GameObject("EndRunOverlay", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
+            endRunRoot.transform.SetParent(canvas.transform, false);
+
+            var rootRect = (RectTransform)endRunRoot.transform;
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+
+            var blocker = endRunRoot.GetComponent<Image>();
+            blocker.color = new Color(0.02f, 0.02f, 0.08f, 0.68f);
+            blocker.raycastTarget = true;
+
+            var group = endRunRoot.GetComponent<CanvasGroup>();
+            group.blocksRaycasts = true;
+            group.interactable = true;
+
+            var panel = CreateRestartUiObject("Panel", endRunRoot.transform);
+            var panelRect = (RectTransform)panel.transform;
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(560f, 330f);
+            panelRect.anchoredPosition = Vector2.zero;
+            var panelImage = panel.AddComponent<Image>();
+            panelImage.color = new Color(0.05f, 0.05f, 0.14f, 0.97f);
+
+            endRunTitleText = CreateRestartText("Title", panel.transform, "Game Over", 38, TextAnchor.MiddleCenter);
+            SetRestartRect(endRunTitleText.rectTransform, new Vector2(0f, 104f), new Vector2(500f, 58f));
+
+            endRunScoreText = CreateRestartText("Score", panel.transform, "Score\n0", 34, TextAnchor.MiddleCenter);
+            endRunScoreText.fontStyle = FontStyle.Bold;
+            SetRestartRect(endRunScoreText.rectTransform, new Vector2(0f, 20f), new Vector2(480f, 100f));
+
+            endRunHomeButton = CreateRestartButton(panel.transform, "Home", new Vector2(0f, -102f), ReturnHome);
+
+            endRunRoot.SetActive(false);
+        }
+
+        private void EnsureRestartConfirmationUi()
+        {
+            if (restartConfirmRoot)
+            {
+                return;
+            }
+
+            var canvas = FindFirstObjectByType<Canvas>();
+            if (!canvas)
+            {
+                return;
+            }
+
+            restartConfirmRoot = new GameObject("RestartConfirmOverlay", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
+            restartConfirmRoot.transform.SetParent(canvas.transform, false);
+            restartConfirmRoot.transform.SetAsLastSibling();
+
+            var rootRect = (RectTransform)restartConfirmRoot.transform;
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+
+            var blocker = restartConfirmRoot.GetComponent<Image>();
+            blocker.color = new Color(0.02f, 0.02f, 0.08f, 0.62f);
+            blocker.raycastTarget = true;
+
+            var group = restartConfirmRoot.GetComponent<CanvasGroup>();
+            group.blocksRaycasts = true;
+            group.interactable = true;
+
+            var panel = CreateRestartUiObject("Panel", restartConfirmRoot.transform);
+            var panelRect = (RectTransform)panel.transform;
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(620f, 290f);
+            panelRect.anchoredPosition = Vector2.zero;
+            var panelImage = panel.AddComponent<Image>();
+            panelImage.color = new Color(0.05f, 0.05f, 0.14f, 0.96f);
+
+            var title = CreateRestartText("Title", panel.transform, "Restart run?", 34, TextAnchor.MiddleCenter);
+            SetRestartRect(title.rectTransform, new Vector2(0f, 82f), new Vector2(560f, 54f));
+
+            var body = CreateRestartText(
+                "Body",
+                panel.transform,
+                "This will reset the current attempt. The match is paused while you choose.",
+                22,
+                TextAnchor.MiddleCenter
+            );
+            SetRestartRect(body.rectTransform, new Vector2(0f, 26f), new Vector2(540f, 68f));
+
+            restartConfirmAcceptButton = CreateRestartButton(panel.transform, "Restart", new Vector2(-132f, -76f), ConfirmRestart);
+            restartConfirmCancelButton = CreateRestartButton(panel.transform, "Cancel", new Vector2(132f, -76f), CancelRestartConfirmation);
+
+            restartConfirmRoot.SetActive(false);
+        }
+
+        private static GameObject CreateRestartUiObject(string name, Transform parent)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            return go;
+        }
+
+        private static Text CreateRestartText(string name, Transform parent, string value, int fontSize, TextAnchor alignment)
+        {
+            var go = CreateRestartUiObject(name, parent);
+            var text = go.AddComponent<Text>();
+            text.text = value;
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.color = new Color(0.93f, 0.9f, 1f, 1f);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            return text;
+        }
+
+        private static Button CreateRestartButton(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction onClick)
+        {
+            var go = CreateRestartUiObject($"{label}Button", parent);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(210f, 58f);
+            rect.anchoredPosition = position;
+
+            var image = go.AddComponent<Image>();
+            image.color = label == "Restart"
+                ? new Color(0.42f, 0.18f, 0.50f, 0.98f)
+                : new Color(0.20f, 0.23f, 0.36f, 0.98f);
+
+            var button = go.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.onClick.AddListener(onClick);
+
+            var text = CreateRestartText("Label", go.transform, label, 24, TextAnchor.MiddleCenter);
+            SetRestartRect(text.rectTransform, Vector2.zero, rect.sizeDelta);
+            return button;
+        }
+
+        private static void SetRestartRect(RectTransform rect, Vector2 anchoredPosition, Vector2 size)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = anchoredPosition;
+        }
+
+        private static bool IsRestartConfirmAcceptHeld() =>
+            Input.GetKey(KeyCode.Return) ||
+            Input.GetKey(KeyCode.KeypadEnter) ||
+            Input.GetKey(KeyCode.JoystickButton0);
+
+        private static bool IsRestartConfirmCancelHeld() =>
+            Input.GetKey(KeyCode.Escape) ||
+            Input.GetKey(KeyCode.JoystickButton1);
+
+        private static bool IsHoldQueueSwapOneHeld() =>
+            Input.GetKey(KeyCode.Alpha1) ||
+            Input.GetKey(KeyCode.Keypad1);
+
+        private static bool IsHoldQueueSwapTwoHeld() =>
+            Input.GetKey(KeyCode.Alpha2) ||
+            Input.GetKey(KeyCode.Keypad2);
+
+        private static bool IsHoldQueueSwapThreeHeld() =>
+            Input.GetKey(KeyCode.Alpha3) ||
+            Input.GetKey(KeyCode.Keypad3);
+
+        private static bool WasRestartConfirmPressed(bool current, ref bool previous)
+        {
+            var pressed = current && !previous;
+            previous = current;
+            return pressed;
+        }
+
         public void RestartMode()
         {
+            HideRestartConfirmation();
+            endRunPanelShown = false;
+            if (endRunRoot)
+            {
+                endRunRoot.SetActive(false);
+            }
+
+            if (AssistEffectSystem.IsEnabledFor(mode, MonStackaAppState.FriendlyAbilitiesEnabled))
+            {
+                assistSystem ??= new AssistEffectSystem();
+            }
+            else
+            {
+                assistSystem = null;
+            }
+
             boardState.Reset();
             assistSystem?.Reset();
             storyMissionComplete = false;
@@ -1214,11 +1706,10 @@ namespace MonStacka.Core
             pausedAccumSeconds = 0f;
             completedElapsedSeconds = -1f;
             recordsSubmitted = false;
-            anyAssistTriggered = false;
             paused = false;
             pauseOverlay?.SetVisible(false);
             startTime = Time.time + CountdownSeconds;
-            hudController?.RenderLeaderboard(MonStackaRecords.GetDisplayRows(mode));
+            hudController?.RenderLeaderboard(MonStackaRecords.GetDisplayRows(mode, MonStackaAppState.FriendlyAbilitiesEnabled));
             RebuildBoardViews();
         }
 
@@ -1233,6 +1724,10 @@ namespace MonStacka.Core
         }
 
         public bool IsPaused => paused;
+
+        public bool IsDialogueInputBlocking =>
+            dialogueGate ||
+            (dialoguePresenter && (dialoguePresenter.IsActive || dialoguePresenter.IsWaitingForAdvanceRelease));
 
         public bool IsGameOver => boardState?.IsGameOver() ?? false;
 
@@ -1317,6 +1812,9 @@ namespace MonStacka.Core
             previousRotateCwHeld = MonStackaControls.IsGameplayRotateCwHeld();
             previousRotateFlipHeld = MonStackaControls.IsGameplayRotateFlipHeld();
             previousHoldHeld = MonStackaControls.IsGameplayHoldHeld();
+            previousHoldSwapOneHeld = IsHoldQueueSwapOneHeld();
+            previousHoldSwapTwoHeld = IsHoldQueueSwapTwoHeld();
+            previousHoldSwapThreeHeld = IsHoldQueueSwapThreeHeld();
             previousPauseHeld = MonStackaControls.IsPauseHeld();
             previousRetryHeld = MonStackaControls.IsRetryHeld();
             previousRestartPausedHeld = MonStackaControls.IsRestartPausedHeld();

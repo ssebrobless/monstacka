@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MonStacka.Core;
 using UnityEngine;
 
@@ -11,8 +12,8 @@ namespace MonStacka.Story
     /// the time/board behaviors.
     ///
     /// Notes against the handoff:
-    /// - CalculatedPlanning's "stricter rotation budget" is intentionally not
-    ///   enforced yet (extra preview from spec only) - flagged for tuning review.
+    /// - CalculatedPlanning is enforced as a per-piece rotation budget.
+    /// - PrecisionPressure is enforced as an unsupported-overhang check on lock.
     /// - ResilientCells is implemented as regrowth: each line clear has a chance
     ///   to reseed one territory cell ("the flesh regrows"), rather than a second
     ///   grid cell type, to keep clear rules deterministic and readable.
@@ -28,6 +29,9 @@ namespace MonStacka.Story
         private const float FlickerCycleSeconds = 2.6f;
         private const float FlickerOffSeconds = 0.35f;
         private const int AdrenalineHeightRows = 13;
+        private const int CalculatedPlanningRotationBudget = 2;
+        private const int CalculatedPlanningMaxPenaltyCells = 3;
+        private const int PrecisionPressureMaxPenaltyCells = 3;
 
         private readonly StoryChapterSpec spec;
         private readonly BoardState board;
@@ -39,6 +43,8 @@ namespace MonStacka.Story
         private float flickerTimer;
         private bool relayActive;
         private StoryModifier relayedModifier;
+        private string lastCalculatedPlanningStatus = "safe";
+        private string lastPrecisionPressureStatus = "safe";
 
         public StoryModifierSystem(StoryChapterSpec chapterSpec, BoardState boardState, int? seed = null)
         {
@@ -46,6 +52,7 @@ namespace MonStacka.Story
             board = boardState;
             rng = seed.HasValue ? new System.Random(seed.Value) : new System.Random();
             board.OnLinesCleared += HandleLinesCleared;
+            board.OnPieceLocked += HandlePieceLocked;
         }
 
         public bool Has(StoryModifier modifier)
@@ -150,6 +157,123 @@ namespace MonStacka.Story
             return chips.ToString();
         }
 
+        /// <summary>Detailed story-mode enemy readout for the right HUD panel.</summary>
+        public string BuildEnemyAbilityStatus()
+        {
+            var status = new System.Text.StringBuilder();
+
+            if (Has(StoryModifier.GuardPressure))
+            {
+                AppendStatus(status, "Guard Pressure", $"{RelayTag(StoryModifier.GuardPressure)}lock delay x0.6");
+            }
+
+            if (Has(StoryModifier.TerritoryCells))
+            {
+                var seedCount = HasDeclared(StoryModifier.TerritoryCells)
+                    ? 4 + spec.DifficultyTier
+                    : 3;
+                AppendStatus(status, "Territory Cells", $"{RelayTag(StoryModifier.TerritoryCells)}{seedCount} cells seeded");
+            }
+
+            if (Has(StoryModifier.CalculatedPlanning))
+            {
+                var previewDelta = Mathf.Max(0, spec.NextPreviewCount - 3);
+                var rotationPressure = board.CurrentPieceRotations <= CalculatedPlanningRotationBudget
+                    ? $"rotations {board.CurrentPieceRotations}/{CalculatedPlanningRotationBudget}"
+                    : $"rotations {board.CurrentPieceRotations}/{CalculatedPlanningRotationBudget}: penalty armed";
+                var previewStatus = previewDelta > 0
+                    ? $"+{previewDelta} next; {rotationPressure}; last {lastCalculatedPlanningStatus}"
+                    : $"{rotationPressure}; last {lastCalculatedPlanningStatus}";
+                AppendStatus(status, "Calculated Planning", previewStatus);
+            }
+
+            if (Has(StoryModifier.PrecisionPressure))
+            {
+                AppendStatus(status, "Precision Pressure", $"avoid unsupported overhangs; last {lastPrecisionPressureStatus}");
+            }
+
+            if (Has(StoryModifier.GhostFlicker))
+            {
+                var phase = flickerTimer % FlickerCycleSeconds;
+                var flickerStatus = phase < FlickerOffSeconds
+                    ? $"hidden {Seconds(FlickerOffSeconds - phase)}"
+                    : $"next blink {Seconds(FlickerCycleSeconds - phase)}";
+                AppendStatus(status, "Ghost Flicker", $"{RelayTag(StoryModifier.GhostFlicker)}{flickerStatus}");
+            }
+
+            if (Has(StoryModifier.EcholocationDim))
+            {
+                var phase = Time.time % 3.5f;
+                var echoStatus = phase < 0.5f
+                    ? $"clear {Seconds(0.5f - phase)}"
+                    : $"next flash {Seconds(3.5f - phase)}";
+                AppendStatus(status, "Echolocation Dim", echoStatus);
+            }
+
+            if (Has(StoryModifier.ResilientCells))
+            {
+                var chance = Mathf.RoundToInt((0.3f + (spec.DifficultyTier * 0.03f)) * 100f);
+                AppendStatus(status, "Resilient Cells", $"on clear: {chance}% regrow");
+            }
+
+            if (Has(StoryModifier.MutedHints))
+            {
+                AppendStatus(status, "Muted Hints", "assist hints hidden");
+            }
+
+            if (Has(StoryModifier.HungerMeter))
+            {
+                var remaining = HungerWindowSeconds - hungerTimer;
+                AppendStatus(status, "Hunger Meter", $"garbage in {Seconds(remaining)}");
+            }
+
+            if (Has(StoryModifier.SedationWindows))
+            {
+                var activeStart = SedationCycleSeconds - SedationActiveSeconds;
+                var warningStart = activeStart - SedationWarningSeconds;
+                if (SedationActive)
+                {
+                    AppendStatus(status, "Sedation", $"active {Seconds(SedationCycleSeconds - sedationTimer)}");
+                }
+                else if (SedationWarning)
+                {
+                    AppendStatus(status, "Sedation", $"starts in {Seconds(activeStart - sedationTimer)}");
+                }
+                else
+                {
+                    AppendStatus(status, "Sedation", $"warning in {Seconds(warningStart - sedationTimer)}");
+                }
+            }
+
+            if (Has(StoryModifier.AdrenalineMonitor))
+            {
+                var adrenalineStatus = IsStackHigh()
+                    ? $"{RelayTag(StoryModifier.AdrenalineMonitor)}active: gravity x0.7"
+                    : $"{RelayTag(StoryModifier.AdrenalineMonitor)}armed at high stack";
+                AppendStatus(status, "Adrenaline Monitor", adrenalineStatus);
+            }
+
+            if (HasDeclared(StoryModifier.SignalRelay))
+            {
+                var relayStatus = relayActive
+                    ? $"{ModifierLabel(relayedModifier)} for {Seconds(SignalRelayActiveSeconds - relayTimer)}"
+                    : $"next relay in {Seconds(SignalRelayCycleSeconds - relayTimer)}";
+                AppendStatus(status, "Signal Relay", relayStatus);
+            }
+
+            if (Has(StoryModifier.ReducedPreview))
+            {
+                AppendStatus(status, "Reduced Preview", $"{spec.NextPreviewCount} next shown");
+            }
+
+            if (Has(StoryModifier.NoHold))
+            {
+                AppendStatus(status, "No Hold", "hold disabled");
+            }
+
+            return status.Length > 0 ? status.ToString() : "No enemy modifiers";
+        }
+
         public void OnMatchStart()
         {
             if (Has(StoryModifier.TerritoryCells))
@@ -162,6 +286,8 @@ namespace MonStacka.Story
             relayTimer = 0f;
             flickerTimer = 0f;
             relayActive = false;
+            lastCalculatedPlanningStatus = "safe";
+            lastPrecisionPressureStatus = "safe";
         }
 
         public void Tick(float deltaTime)
@@ -252,6 +378,65 @@ namespace MonStacka.Story
             }
         }
 
+        private void HandlePieceLocked(PieceLockEvent lockEvent)
+        {
+            if (Has(StoryModifier.CalculatedPlanning))
+            {
+                var extraRotations = Mathf.Max(0, lockEvent.RotationInputs - CalculatedPlanningRotationBudget);
+                if (extraRotations > 0)
+                {
+                    var penaltyCells = Mathf.Min(CalculatedPlanningMaxPenaltyCells, extraRotations);
+                    board.SeedTerritoryCells(penaltyCells);
+                    lastCalculatedPlanningStatus = $"+{penaltyCells} cells after {lockEvent.RotationInputs} rotations";
+                }
+                else
+                {
+                    lastCalculatedPlanningStatus = $"{lockEvent.RotationInputs}/{CalculatedPlanningRotationBudget} rotations";
+                }
+            }
+
+            if (Has(StoryModifier.PrecisionPressure))
+            {
+                var unsupportedCells = CountUnsupportedCells(lockEvent.Cells);
+                if (unsupportedCells > 0)
+                {
+                    var penaltyCells = Mathf.Min(PrecisionPressureMaxPenaltyCells, unsupportedCells);
+                    board.SeedTerritoryCells(penaltyCells);
+                    lastPrecisionPressureStatus = $"+{penaltyCells} cells from {unsupportedCells} overhangs";
+                }
+                else
+                {
+                    lastPrecisionPressureStatus = "clean lock";
+                }
+            }
+        }
+
+        private int CountUnsupportedCells(IReadOnlyList<Vector2Int> cells)
+        {
+            var lockedCells = new HashSet<Vector2Int>(cells);
+            var unsupported = 0;
+            foreach (var cell in cells)
+            {
+                if (cell.x < 0 || cell.x >= PieceDefinitions.Columns || cell.y < 0 || cell.y >= PieceDefinitions.TotalRows - 1)
+                {
+                    continue;
+                }
+
+                var below = new Vector2Int(cell.x, cell.y + 1);
+                if (lockedCells.Contains(below))
+                {
+                    continue;
+                }
+
+                if (board.Grid[below.y, below.x] == 0)
+                {
+                    unsupported += 1;
+                }
+            }
+
+            return unsupported;
+        }
+
         private bool IsStackHigh()
         {
             var dangerRow = PieceDefinitions.TotalRows - AdrenalineHeightRows;
@@ -278,5 +463,43 @@ namespace MonStacka.Story
 
             builder.Append(chip);
         }
+
+        private string RelayTag(StoryModifier modifier) =>
+            relayActive && relayedModifier == modifier && !HasDeclared(modifier) ? "relay: " : string.Empty;
+
+        private static void AppendStatus(System.Text.StringBuilder builder, string name, string detail)
+        {
+            if (builder.Length > 0)
+            {
+                builder.AppendLine();
+            }
+
+            builder.Append(name);
+            builder.Append(": ");
+            builder.Append(detail);
+        }
+
+        private static string Seconds(float seconds) =>
+            $"{Mathf.CeilToInt(Mathf.Max(0f, seconds))}s";
+
+        private static string ModifierLabel(StoryModifier modifier) =>
+            modifier switch
+            {
+                StoryModifier.GuardPressure => "Guard Pressure",
+                StoryModifier.TerritoryCells => "Territory Cells",
+                StoryModifier.CalculatedPlanning => "Calculated Planning",
+                StoryModifier.PrecisionPressure => "Precision Pressure",
+                StoryModifier.GhostFlicker => "Ghost Flicker",
+                StoryModifier.EcholocationDim => "Echolocation Dim",
+                StoryModifier.ResilientCells => "Resilient Cells",
+                StoryModifier.MutedHints => "Muted Hints",
+                StoryModifier.HungerMeter => "Hunger Meter",
+                StoryModifier.SedationWindows => "Sedation",
+                StoryModifier.AdrenalineMonitor => "Adrenaline Monitor",
+                StoryModifier.SignalRelay => "Signal Relay",
+                StoryModifier.ReducedPreview => "Reduced Preview",
+                StoryModifier.NoHold => "No Hold",
+                _ => modifier.ToString(),
+            };
     }
 }

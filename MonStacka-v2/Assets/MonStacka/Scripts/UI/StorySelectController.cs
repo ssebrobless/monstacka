@@ -130,6 +130,7 @@ namespace MonStacka.UI
             }
 
             MonStackaAppState.SelectedMode = MonStackaMode.Story;
+            MonStackaAppState.FriendlyAbilitiesEnabled = true;
             MonStackaAppState.SelectedStoryChapterId = chapterId;
             MonStackaAppState.GravitySeconds = chapter.GravitySeconds;
             MonStackaAppState.LockDelaySeconds = chapter.LockDelaySeconds;
