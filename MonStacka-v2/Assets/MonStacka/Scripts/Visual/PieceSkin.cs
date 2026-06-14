@@ -81,7 +81,7 @@ namespace MonStacka.Visual
             foreach (Transform child in transform)
             {
                 child.gameObject.SetActive(false);
-                Destroy(child.gameObject);
+                DestroyGameObject(child.gameObject);
             }
 
             var bodyRoot = new GameObject("Body");
@@ -317,6 +317,23 @@ namespace MonStacka.Visual
             foreach (var renderer in GetComponentsInChildren<SpriteRenderer>(true))
             {
                 renderer.maskInteraction = interaction;
+            }
+        }
+
+        private static void DestroyGameObject(GameObject go)
+        {
+            if (!go)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(go);
+            }
+            else
+            {
+                DestroyImmediate(go);
             }
         }
     }

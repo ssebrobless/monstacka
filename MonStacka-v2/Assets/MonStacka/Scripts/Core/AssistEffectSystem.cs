@@ -74,6 +74,8 @@ namespace MonStacka.Core
 
         /// <summary>0..TriggerEvery-1 progress shown in the HUD ("Held Assist: 2/3").</summary>
         public int HeldProgress => TriggerEvery - piecesUntilTrigger;
+        public int HeldPlacementsUntilTrigger => piecesUntilTrigger;
+        public bool NextHeldPlacementWillTrigger => piecesUntilTrigger <= 1;
         public AssistType? ActiveWindow => windowRemaining > 0f ? activeWindow : null;
         public PieceType? ActiveWindowPiece => windowRemaining > 0f ? activeWindowPiece : null;
         public float WindowRemaining => Mathf.Max(0f, windowRemaining);

@@ -136,7 +136,7 @@ namespace MonStacka.UI
             if (previews[index])
             {
                 previews[index].gameObject.SetActive(false);
-                Destroy(previews[index].gameObject);
+                DestroyGameObject(previews[index].gameObject);
             }
 
             var go = new GameObject($"Next_{index}_{piece}");
@@ -159,6 +159,23 @@ namespace MonStacka.UI
             previews[index] = skin;
             previewSlots[index] = piece;
             return skin;
+        }
+
+        private static void DestroyGameObject(GameObject go)
+        {
+            if (!go)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(go);
+            }
+            else
+            {
+                DestroyImmediate(go);
+            }
         }
     }
 }

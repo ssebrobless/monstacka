@@ -89,6 +89,13 @@ namespace MonStacka.UI
         {
             RefreshZanyToggleButton();
 
+            if (gameManager != null && gameManager.IsSceneTransitioning)
+            {
+                ClearShellSelection();
+                lastPausedState = false;
+                return;
+            }
+
             if (gameManager != null && gameManager.IsDialogueInputBlocking)
             {
                 ClearShellSelection();
@@ -136,6 +143,7 @@ namespace MonStacka.UI
 
             RefreshSettingsText();
             gameManager?.PauseIfRunning();
+            gameManager?.SetPauseOverlaySuppressed(true);
 
             if (EventSystem.current)
             {
@@ -156,6 +164,7 @@ namespace MonStacka.UI
 
             awaitingBindingAction = null;
             gameManager?.PauseIfRunning();
+            gameManager?.SetPauseOverlaySuppressed(false);
             if (settingsButton && EventSystem.current)
             {
                 EventSystem.current.SetSelectedGameObject(settingsButton.gameObject);

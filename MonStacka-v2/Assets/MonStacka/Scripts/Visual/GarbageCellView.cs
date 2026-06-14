@@ -12,8 +12,8 @@ namespace MonStacka.Visual
     /// </summary>
     public sealed class GarbageCellView : MonoBehaviour
     {
-        private static readonly Color GarbageColor = new(0.32f, 0.3f, 0.36f, 1f);
-        private static readonly Color GarbageEdgeTint = new(0.21f, 0.2f, 0.25f, 1f);
+        private static readonly Color GarbageColor = new(0.58f, 0.16f, 0.25f, 1f);
+        private static readonly Color GarbageEdgeTint = new(0.36f, 0.08f, 0.16f, 1f);
 
         private readonly List<SpriteRenderer> pool = new();
         private Transform cellRoot;
@@ -76,8 +76,9 @@ namespace MonStacka.Visual
                 var renderer = pool[index];
                 var visibleY = cell.y - PieceDefinitions.HiddenRows;
                 renderer.transform.localPosition = new Vector3(cell.x * cellWorldSize, -visibleY * cellWorldSize, 0f);
-                renderer.transform.localScale = new Vector3(cellWorldSize * 0.94f, cellWorldSize * 0.94f, 1f);
-                renderer.color = (cell.x + cell.y) % 2 == 0 ? GarbageColor : GarbageEdgeTint;
+                renderer.transform.localScale = new Vector3(cellWorldSize * 0.88f, cellWorldSize * 0.88f, 1f);
+                var shade = 0.55f + ((((cell.x * 31) + (cell.y * 17)) % 100) / 220f);
+                renderer.color = Color.Lerp(GarbageEdgeTint, GarbageColor, shade);
                 renderer.gameObject.SetActive(visibleY >= 0);
             }
 
@@ -95,7 +96,7 @@ namespace MonStacka.Visual
                 go.transform.SetParent(cellRoot, worldPositionStays: false);
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = cellSprite;
-                renderer.sortingOrder = 4;
+                renderer.sortingOrder = 18;
                 renderer.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
                 pool.Add(renderer);
             }

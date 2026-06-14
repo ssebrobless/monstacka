@@ -81,6 +81,7 @@ namespace MonStacka.Core
         private float completedElapsedSeconds = -1f;
         private bool recordsSubmitted;
         private bool paused;
+        private bool pauseOverlaySuppressed;
         private float startTime;
         private StoryChapterSpec storyChapter;
         private StoryModifierSystem storyModifiers;
@@ -111,6 +112,7 @@ namespace MonStacka.Core
         private bool hasAnyGameplayPulse;
         private bool gameplayPieceVisualsVisible = true;
         private bool restartConfirmActive;
+        private bool sceneTransitioning;
         private GameObject restartConfirmRoot;
         private Button restartConfirmAcceptButton;
         private Button restartConfirmCancelButton;
@@ -176,7 +178,11 @@ namespace MonStacka.Core
             }
             boardState.OnPieceLocked += lockEvent =>
             {
-                assistSystem?.OnPieceLocked(lockEvent, boardState, points => boardState.AddScore(points, lockEvent.PieceType));
+                var trigger = assistSystem?.OnPieceLocked(lockEvent, boardState, points => boardState.AddScore(points, lockEvent.PieceType));
+                if (trigger.HasValue)
+                {
+                    hudController?.ShowAssistTrigger(trigger.Value);
+                }
             };
             boardState.OnLinesCleared += lines =>
                 assistSystem?.OnLinesCleared(lines, points => boardState.AddScore(points, assistSystem.ActiveWindowPiece));
@@ -265,6 +271,12 @@ namespace MonStacka.Core
 
         private void Update()
         {
+            if (sceneTransitioning)
+            {
+                RememberGamepadButtonState();
+                return;
+            }
+
             if (dialogueGate || (dialoguePresenter && dialoguePresenter.IsActive))
             {
                 SetGameplayPieceVisualsVisible(false);
@@ -742,6 +754,14 @@ namespace MonStacka.Core
 
             if (!boardState.HasActivePiece)
             {
+                if (!boardState.IsGameOver() && !storyMissionComplete && !storyMissionFailed && boardState.EnsureActivePiece())
+                {
+                    lockTimer = 0f;
+                    gravityTimer = 0f;
+                    RebuildActivePieceView();
+                    UpdatePreviewViews();
+                }
+
                 return;
             }
 
@@ -890,6 +910,11 @@ namespace MonStacka.Core
 
             if (hudController)
             {
+                if (boardState.HasActivePiece && (!activePieceView || !activePieceView.gameObject.activeSelf))
+                {
+                    RebuildActivePieceView();
+                }
+
                 hudController.Render(
                     mode,
                     boardState.Score,
@@ -922,7 +947,7 @@ namespace MonStacka.Core
                 if (existing)
                 {
                     existing.gameObject.SetActive(false);
-                    Destroy(existing.gameObject);
+                    DestroyGameObject(existing.gameObject);
                 }
             }
             stackViews.Clear();
@@ -931,7 +956,7 @@ namespace MonStacka.Core
             foreach (Transform child in activeRoot)
             {
                 child.gameObject.SetActive(false);
-                Destroy(child.gameObject);
+                DestroyGameObject(child.gameObject);
             }
             activePieceView = null;
             activeViewPool.Clear();
@@ -972,7 +997,7 @@ namespace MonStacka.Core
                     }
 
                     view.gameObject.SetActive(false);
-                    Destroy(view.gameObject);
+                    DestroyGameObject(view.gameObject);
                     stackViews.Remove(record.PieceId);
                     stackViewSignatures.Remove(record.PieceId);
                 }
@@ -987,10 +1012,27 @@ namespace MonStacka.Core
                 if (view)
                 {
                     view.gameObject.SetActive(false);
-                    Destroy(view.gameObject);
+                    DestroyGameObject(view.gameObject);
                 }
                 stackViews.Remove(id);
                 stackViewSignatures.Remove(id);
+            }
+        }
+
+        private static void DestroyGameObject(GameObject go)
+        {
+            if (!go)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(go);
+            }
+            else
+            {
+                DestroyImmediate(go);
             }
         }
 
@@ -1008,8 +1050,8 @@ namespace MonStacka.Core
                 false,
                 record.PieceId,
                 renderData.UseFullBoxSprite,
-                isWholePiece ? GetLockedPulseScale() : 0f,
-                shouldAnimateBody: isWholePiece,
+                isWholePiece ? GetLockedPulseScale() : GetLockedPulseScale() * 0.7f,
+                shouldAnimateBody: true,
                 shouldEnableFeatures: isWholePiece
             );
             pieceView.transform.localPosition = BoardToWorld(renderData.Origin.x, renderData.Origin.y);
@@ -1107,7 +1149,7 @@ namespace MonStacka.Core
                 var holdAbilityArmed =
                     holdPiece.HasValue &&
                     assistSystem != null &&
-                    assistSystem.HeldProgress >= AssistEffectSystem.TriggerEvery - 1;
+                    assistSystem.NextHeldPlacementWillTrigger;
                 holdBoxView.Render(holdPiece, skinLookup, outlineMaterial, deformTuning, cellWorldSize * 0.72f, holdAbilityArmed);
             }
 
@@ -1386,6 +1428,7 @@ namespace MonStacka.Core
             }
 
             paused = false;
+            pauseOverlaySuppressed = false;
             pauseOverlay?.SetVisible(false);
         }
 
@@ -1403,7 +1446,16 @@ namespace MonStacka.Core
 
             paused = true;
             pauseStartedTime = Time.time;
-            pauseOverlay?.SetVisible(true);
+            pauseOverlay?.SetVisible(!pauseOverlaySuppressed);
+        }
+
+        public void SetPauseOverlaySuppressed(bool suppressed)
+        {
+            pauseOverlaySuppressed = suppressed;
+            if (pauseOverlay)
+            {
+                pauseOverlay.SetVisible(paused && !pauseOverlaySuppressed);
+            }
         }
 
         public AssistEffectSystem AssistSystem => assistSystem;
@@ -1514,6 +1566,7 @@ namespace MonStacka.Core
             EnsureEndRunUi();
             endRunPanelShown = true;
             paused = false;
+            pauseOverlaySuppressed = false;
             pauseOverlay?.SetVisible(false);
             HideRestartConfirmation();
 
@@ -1775,21 +1828,59 @@ namespace MonStacka.Core
 
         public void ReturnHome()
         {
-            SceneManager.LoadScene(homeSceneName);
+            if (sceneTransitioning)
+            {
+                return;
+            }
+
+            sceneTransitioning = true;
+            HideRestartConfirmation();
+            if (endRunRoot)
+            {
+                endRunRoot.SetActive(false);
+            }
+
+            pauseOverlay?.SetVisible(false);
+            if (EventSystem.current)
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+            }
+
+            LoadScene(homeSceneName);
         }
 
         public void QuitGame()
         {
+            if (sceneTransitioning)
+            {
+                return;
+            }
+
+            sceneTransitioning = true;
             Application.Quit();
         }
 
         public bool IsPaused => paused;
+
+        public bool IsSceneTransitioning => sceneTransitioning;
 
         public bool IsDialogueInputBlocking =>
             dialogueGate ||
             (dialoguePresenter && (dialoguePresenter.IsActive || dialoguePresenter.IsWaitingForAdvanceRelease));
 
         public bool IsGameOver => boardState?.IsGameOver() ?? false;
+
+        private static void LoadScene(string sceneName)
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.OpenScene($"Assets/MonStacka/Scenes/{sceneName}.unity");
+                return;
+            }
+#endif
+            SceneManager.LoadScene(sceneName);
+        }
 
         private bool IsGamepadLeftHeld()
         {

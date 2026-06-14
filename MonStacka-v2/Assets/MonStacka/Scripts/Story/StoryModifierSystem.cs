@@ -164,7 +164,7 @@ namespace MonStacka.Story
 
             if (Has(StoryModifier.GuardPressure))
             {
-                AppendStatus(status, "Guard Pressure", $"{RelayTag(StoryModifier.GuardPressure)}lock delay x0.6");
+                AppendStatus(status, "Guard Pressure", "ON", $"{RelayTag(StoryModifier.GuardPressure)}every piece locks faster: delay x0.6");
             }
 
             if (Has(StoryModifier.TerritoryCells))
@@ -172,7 +172,7 @@ namespace MonStacka.Story
                 var seedCount = HasDeclared(StoryModifier.TerritoryCells)
                     ? 4 + spec.DifficultyTier
                     : 3;
-                AppendStatus(status, "Territory Cells", $"{RelayTag(StoryModifier.TerritoryCells)}{seedCount} cells seeded");
+                AppendStatus(status, "Territory Cells", "SETUP", $"{RelayTag(StoryModifier.TerritoryCells)}{seedCount} enemy cells seeded at match start");
             }
 
             if (Has(StoryModifier.CalculatedPlanning))
@@ -184,12 +184,12 @@ namespace MonStacka.Story
                 var previewStatus = previewDelta > 0
                     ? $"+{previewDelta} next; {rotationPressure}; last {lastCalculatedPlanningStatus}"
                     : $"{rotationPressure}; last {lastCalculatedPlanningStatus}";
-                AppendStatus(status, "Calculated Planning", previewStatus);
+                AppendStatus(status, "Calculated Planning", "LOCK", previewStatus);
             }
 
             if (Has(StoryModifier.PrecisionPressure))
             {
-                AppendStatus(status, "Precision Pressure", $"avoid unsupported overhangs; last {lastPrecisionPressureStatus}");
+                AppendStatus(status, "Precision Pressure", "LOCK", $"unsupported overhangs seed cells; last {lastPrecisionPressureStatus}");
             }
 
             if (Has(StoryModifier.GhostFlicker))
@@ -198,7 +198,7 @@ namespace MonStacka.Story
                 var flickerStatus = phase < FlickerOffSeconds
                     ? $"hidden {Seconds(FlickerOffSeconds - phase)}"
                     : $"next blink {Seconds(FlickerCycleSeconds - phase)}";
-                AppendStatus(status, "Ghost Flicker", $"{RelayTag(StoryModifier.GhostFlicker)}{flickerStatus}");
+                AppendStatus(status, "Ghost Flicker", "TIMER", $"{RelayTag(StoryModifier.GhostFlicker)}{flickerStatus}");
             }
 
             if (Has(StoryModifier.EcholocationDim))
@@ -207,24 +207,24 @@ namespace MonStacka.Story
                 var echoStatus = phase < 0.5f
                     ? $"clear {Seconds(0.5f - phase)}"
                     : $"next flash {Seconds(3.5f - phase)}";
-                AppendStatus(status, "Echolocation Dim", echoStatus);
+                AppendStatus(status, "Echolocation Dim", "TIMER", echoStatus);
             }
 
             if (Has(StoryModifier.ResilientCells))
             {
                 var chance = Mathf.RoundToInt((0.3f + (spec.DifficultyTier * 0.03f)) * 100f);
-                AppendStatus(status, "Resilient Cells", $"on clear: {chance}% regrow");
+                AppendStatus(status, "Resilient Cells", "CLEAR", $"line clears have {chance}% regrow chance");
             }
 
             if (Has(StoryModifier.MutedHints))
             {
-                AppendStatus(status, "Muted Hints", "assist hints hidden");
+                AppendStatus(status, "Muted Hints", "ON", "assist hints hidden");
             }
 
             if (Has(StoryModifier.HungerMeter))
             {
                 var remaining = HungerWindowSeconds - hungerTimer;
-                AppendStatus(status, "Hunger Meter", $"garbage in {Seconds(remaining)}");
+                AppendStatus(status, "Hunger Meter", "TIMER", $"garbage row in {Seconds(remaining)} unless you clear a line");
             }
 
             if (Has(StoryModifier.SedationWindows))
@@ -233,15 +233,15 @@ namespace MonStacka.Story
                 var warningStart = activeStart - SedationWarningSeconds;
                 if (SedationActive)
                 {
-                    AppendStatus(status, "Sedation", $"active {Seconds(SedationCycleSeconds - sedationTimer)}");
+                    AppendStatus(status, "Sedation", "ACTIVE", $"sluggish controls for {Seconds(SedationCycleSeconds - sedationTimer)}");
                 }
                 else if (SedationWarning)
                 {
-                    AppendStatus(status, "Sedation", $"starts in {Seconds(activeStart - sedationTimer)}");
+                    AppendStatus(status, "Sedation", "WARNING", $"sluggish controls start in {Seconds(activeStart - sedationTimer)}");
                 }
                 else
                 {
-                    AppendStatus(status, "Sedation", $"warning in {Seconds(warningStart - sedationTimer)}");
+                    AppendStatus(status, "Sedation", "TIMER", $"warning in {Seconds(warningStart - sedationTimer)}");
                 }
             }
 
@@ -250,7 +250,7 @@ namespace MonStacka.Story
                 var adrenalineStatus = IsStackHigh()
                     ? $"{RelayTag(StoryModifier.AdrenalineMonitor)}active: gravity x0.7"
                     : $"{RelayTag(StoryModifier.AdrenalineMonitor)}armed at high stack";
-                AppendStatus(status, "Adrenaline Monitor", adrenalineStatus);
+                AppendStatus(status, "Adrenaline Monitor", IsStackHigh() ? "ACTIVE" : "ARMED", adrenalineStatus);
             }
 
             if (HasDeclared(StoryModifier.SignalRelay))
@@ -258,17 +258,17 @@ namespace MonStacka.Story
                 var relayStatus = relayActive
                     ? $"{ModifierLabel(relayedModifier)} for {Seconds(SignalRelayActiveSeconds - relayTimer)}"
                     : $"next relay in {Seconds(SignalRelayCycleSeconds - relayTimer)}";
-                AppendStatus(status, "Signal Relay", relayStatus);
+                AppendStatus(status, "Signal Relay", relayActive ? "ACTIVE" : "TIMER", relayStatus);
             }
 
             if (Has(StoryModifier.ReducedPreview))
             {
-                AppendStatus(status, "Reduced Preview", $"{spec.NextPreviewCount} next shown");
+                AppendStatus(status, "Reduced Preview", "ON", $"{spec.NextPreviewCount} next shown");
             }
 
             if (Has(StoryModifier.NoHold))
             {
-                AppendStatus(status, "No Hold", "hold disabled");
+                AppendStatus(status, "No Hold", "ON", "hold disabled");
             }
 
             return status.Length > 0 ? status.ToString() : "No enemy modifiers";
@@ -467,15 +467,18 @@ namespace MonStacka.Story
         private string RelayTag(StoryModifier modifier) =>
             relayActive && relayedModifier == modifier && !HasDeclared(modifier) ? "relay: " : string.Empty;
 
-        private static void AppendStatus(System.Text.StringBuilder builder, string name, string detail)
+        private static void AppendStatus(System.Text.StringBuilder builder, string name, string state, string detail)
         {
             if (builder.Length > 0)
             {
                 builder.AppendLine();
             }
 
+            builder.Append("<color=#ffcf74>");
             builder.Append(name);
-            builder.Append(": ");
+            builder.Append("</color> [");
+            builder.Append(state);
+            builder.Append("] ");
             builder.Append(detail);
         }
 

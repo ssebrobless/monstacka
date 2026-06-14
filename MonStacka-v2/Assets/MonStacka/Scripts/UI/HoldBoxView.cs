@@ -36,7 +36,7 @@ namespace MonStacka.UI
             if (currentSkin)
             {
                 currentSkin.gameObject.SetActive(false);
-                Destroy(currentSkin.gameObject);
+                DestroyGameObject(currentSkin.gameObject);
                 currentSkin = null;
             }
 
@@ -203,6 +203,23 @@ namespace MonStacka.UI
                 heightWorld * 0.5f,
                 0f
             );
+        }
+
+        private static void DestroyGameObject(GameObject go)
+        {
+            if (!go)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(go);
+            }
+            else
+            {
+                DestroyImmediate(go);
+            }
         }
     }
 }

@@ -33,7 +33,10 @@ namespace MonStacka.UI
 
         private void OnValidate()
         {
-            EnsureFullScreenRect();
+            if (Application.isPlaying)
+            {
+                EnsureFullScreenRect();
+            }
         }
 
         private void Awake()

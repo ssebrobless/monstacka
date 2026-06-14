@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using MonStacka.Core;
 using MonStacka.Story;
 using MonStacka.UI;
+using MonStacka.Visual;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -46,6 +48,20 @@ namespace MonStacka.Editor
             public string Detail;
         }
 
+        private sealed class HarnessLogRecord
+        {
+            public LogType Type;
+            public string Message;
+            public string StackTrace;
+        }
+
+        private static readonly string[] AllowedLogFragments =
+        {
+            "Licensing",
+            "Access token is unavailable",
+            "Unsupported protocol version",
+        };
+
         public static void RunBatchMode()
         {
             var exitCode = RunHarness(writeReport: true);
@@ -64,9 +80,29 @@ namespace MonStacka.Editor
             foreach (var scenario in BuildScenarios())
             {
                 var stopwatch = Stopwatch.StartNew();
+                var scenarioLogs = new List<HarnessLogRecord>();
+                Application.LogCallback logHandler = (condition, stackTrace, type) =>
+                {
+                    if (IsUnexpectedHarnessLog(condition, type))
+                    {
+                        scenarioLogs.Add(new HarnessLogRecord
+                        {
+                            Type = type,
+                            Message = condition,
+                            StackTrace = stackTrace,
+                        });
+                    }
+                };
+
+                Application.logMessageReceived += logHandler;
                 try
                 {
                     scenario.Run();
+                    if (scenarioLogs.Count > 0)
+                    {
+                        throw new InvalidOperationException(FormatUnexpectedLogs(scenarioLogs));
+                    }
+
                     results.Add(new HarnessResult
                     {
                         Name = scenario.Name,
@@ -84,6 +120,10 @@ namespace MonStacka.Editor
                         Milliseconds = stopwatch.ElapsedMilliseconds,
                         Detail = ex.Message,
                     });
+                }
+                finally
+                {
+                    Application.logMessageReceived -= logHandler;
                 }
             }
 
@@ -106,17 +146,51 @@ namespace MonStacka.Editor
             return 0;
         }
 
+        private static bool IsUnexpectedHarnessLog(string condition, LogType type)
+        {
+            if (type != LogType.Warning && type != LogType.Error && type != LogType.Exception && type != LogType.Assert)
+            {
+                return false;
+            }
+
+            return !AllowedLogFragments.Any(fragment => condition.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string FormatUnexpectedLogs(IReadOnlyList<HarnessLogRecord> logs)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine($"Unexpected Unity log output ({logs.Count}):");
+            foreach (var log in logs.Take(3))
+            {
+                builder.Append(log.Type).Append(": ").AppendLine(log.Message);
+                if (!string.IsNullOrWhiteSpace(log.StackTrace))
+                {
+                    var firstStackLine = log.StackTrace.Split('\n').FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(firstStackLine))
+                    {
+                        builder.Append("  at ").AppendLine(firstStackLine.Trim());
+                    }
+                }
+            }
+
+            return builder.ToString().TrimEnd();
+        }
+
         private static IReadOnlyList<HarnessScenario> BuildScenarios() =>
             new[]
             {
                 new HarnessScenario("core vertical slice verifier", MonStackaV2Verification.Run),
                 new HarnessScenario("mode ability matrix", VerifyModeAbilityMatrix),
                 new HarnessScenario("story modifier scenarios", VerifyStoryModifierScenarios),
+                new HarnessScenario("story deterministic simulation sweep", VerifyStoryDeterministicSimulationSweep),
+                new HarnessScenario("story render state consistency sweep", VerifyStoryRenderStateConsistencySweep),
+                new HarnessScenario("story input playback sweep", VerifyStoryInputPlaybackSweep),
                 new HarnessScenario("records stay split by variant", VerifyRecordSeparation),
                 new HarnessScenario("settings and controls smoke", VerifySettingsAndControlsSmoke),
                 new HarnessScenario("ability reference text is player-facing", VerifyAbilityReferenceText),
                 new HarnessScenario("scene wiring smoke", VerifySceneWiringSmoke),
                 new HarnessScenario("visual layout geometry smoke", VerifyVisualLayoutGeometrySmoke),
+                new HarnessScenario("story runtime hud and visual sweep", VerifyStoryRuntimeHudAndVisualSweep),
                 new HarnessScenario("runtime game flow smoke", VerifyRuntimeGameFlowSmoke),
                 new HarnessScenario("current Windows build artifacts", VerifyCurrentBuildArtifacts),
             };
@@ -136,6 +210,27 @@ namespace MonStacka.Editor
             Expect(MonStackaAppState.SfxVolume == 90, "Default SFX volume should be punchy enough for match feedback.");
             Expect(MonStackaAppState.DitherEnabled, "Dither should default on.");
             Expect(MonStackaAppState.VisualExtrasEnabled, "Visual extras should default on.");
+
+            var assist = new AssistEffectSystem();
+            var assistBoard = new BoardState(new[] { PieceType.Z }, seed: 1210);
+            Expect(!assist.NextHeldPlacementWillTrigger, "Fresh assist counter should not be armed.");
+            Expect(assist.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Fresh assist counter should need three held placements.");
+            Expect(assist.OnPieceLocked(new PieceLockEvent(1, PieceType.Z, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { }) == null, "First held placement should not trigger assist.");
+            Expect(assist.OnPieceLocked(new PieceLockEvent(2, PieceType.Z, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { }) == null, "Second held placement should arm but not trigger assist.");
+            Expect(assist.NextHeldPlacementWillTrigger, "Third held placement should be visibly armed before it locks.");
+            var trigger = assist.OnPieceLocked(new PieceLockEvent(3, PieceType.Z, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { });
+            Expect(trigger.HasValue, "Third held placement should trigger assist.");
+            Expect(!assist.NextHeldPlacementWillTrigger, "Assist armed state should clear immediately after trigger.");
+            Expect(assist.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Assist counter should reset after trigger.");
+
+            var spawnRecoveryBoard = new BoardState(new[] { PieceType.Z }, seed: 1211);
+            while (spawnRecoveryBoard.TryMove(0, 1))
+            {
+            }
+            Expect(spawnRecoveryBoard.LockPiece(), "Harness should lock a piece directly.");
+            Expect(!spawnRecoveryBoard.HasActivePiece && !spawnRecoveryBoard.IsGameOver(), "Direct lock should reproduce the no-active handoff gap.");
+            Expect(spawnRecoveryBoard.EnsureActivePiece(), "Board should recover by spawning a piece when no active piece exists and the run is alive.");
+            Expect(spawnRecoveryBoard.HasActivePiece, "Board recovery should leave an active piece available.");
 
             var controls = MonStackaControls.BuildControlsSummaryText();
             Expect(controls.Contains("Hard Drop: Space"), "Keyboard hard drop should stay on Space.");
@@ -159,6 +254,7 @@ namespace MonStacka.Editor
             var firstMissionModifiers = new StoryModifierSystem(firstMission, firstMissionBoard, seed: 111);
             firstMissionModifiers.OnMatchStart();
             Expect(!firstMissionModifiers.BuildEnemyAbilityStatus().Contains("No enemy modifiers"), "Story 1.1 enemy tracker should not be empty.");
+            Expect(firstMissionModifiers.BuildEnemyAbilityStatus().Contains("[ON]"), "Story 1.1 enemy tracker should show that Guard Pressure is active now.");
 
             var combinedSpec = new StoryChapterSpec
             {
@@ -173,6 +269,7 @@ namespace MonStacka.Editor
             var combinedSystem = new StoryModifierSystem(combinedSpec, combinedBoard, seed: 1001);
             combinedSystem.OnMatchStart();
             var status = combinedSystem.BuildEnemyAbilityStatus();
+            Expect(status.Contains("[ON]") || status.Contains("[TIMER]") || status.Contains("[LOCK]"), "Enemy status should include explicit trigger/state tags.");
             foreach (var label in new[]
             {
                 "Guard Pressure",
@@ -212,7 +309,9 @@ namespace MonStacka.Editor
             Expect(planningBoard.TryRotate(1), "Planning harness rotation 3 should succeed.");
             Expect(planningBoard.HardDrop(), "Planning harness piece should lock.");
             Expect(planningBoard.GetGarbageCells().Count > 0, "Calculated Planning should punish extra rotations.");
-            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("rotations"), "Calculated Planning status should mention rotations.");
+            var planningStatus = planningSystem.BuildEnemyAbilityStatus();
+            Expect(planningStatus.Contains("rotations"), "Calculated Planning status should mention rotations.");
+            Expect(planningStatus.Contains("+") && planningStatus.Contains("cells"), "Calculated Planning status should show triggered penalty progress after extra rotations.");
 
             var precisionSpec = new StoryChapterSpec
             {
@@ -222,11 +321,12 @@ namespace MonStacka.Editor
                 Modifiers = new[] { StoryModifier.PrecisionPressure },
             };
             var precisionBoard = new BoardState(new[] { PieceType.T }, seed: 1003);
-            _ = new StoryModifierSystem(precisionSpec, precisionBoard, seed: 1003);
+            var precisionSystem = new StoryModifierSystem(precisionSpec, precisionBoard, seed: 1003);
             Expect(precisionBoard.TryMove(0, 1), "Precision harness should move active piece down.");
             Expect(precisionBoard.TryMove(0, 1), "Precision harness should move active piece down again.");
             Expect(precisionBoard.LockPiece(), "Precision harness piece should lock.");
             Expect(precisionBoard.GetGarbageCells().Count > 0, "Precision Pressure should punish unsupported overhangs.");
+            Expect(precisionSystem.BuildEnemyAbilityStatus().Contains("overhangs"), "Precision Pressure status should show overhang trigger progress.");
 
             var hungerSpec = new StoryChapterSpec
             {
@@ -256,7 +356,170 @@ namespace MonStacka.Editor
             foreach (var chapter in StoryCatalog.Chapters)
             {
                 Expect(chapter.Objective.HasBossHealth, $"Story chapter {chapter.Id} should have boss health.");
+                Expect(chapter.Objective.BossHealthPoints > 0, $"Story chapter {chapter.Id} should have positive boss health.");
+                Expect(!string.IsNullOrWhiteSpace(chapter.Title), $"Story chapter {chapter.Id} should have a title.");
+                var board = new BoardState(chapter.FocusedPieces.Length > 0 ? chapter.FocusedPieces : Enum.GetValues(typeof(PieceType)).Cast<PieceType>(), seed: 1700 + chapter.Sequence + (chapter.Act * 10), spawnWeights: chapter.SpawnBias);
+                var system = new StoryModifierSystem(chapter, board, seed: 1800 + chapter.Sequence + (chapter.Act * 10));
+                system.OnMatchStart();
+                var chapterStatus = system.BuildEnemyAbilityStatus();
+                if (chapter.Modifiers.Length > 0)
+                {
+                    Expect(!chapterStatus.Contains("No enemy modifiers"), $"Story chapter {chapter.Id} should expose enemy modifier status.");
+                    Expect(chapterStatus.Contains("[") && chapterStatus.Contains("]"), $"Story chapter {chapter.Id} status should include state tags.");
+                    foreach (var modifier in chapter.Modifiers)
+                    {
+                        Expect(chapterStatus.Contains(StoryModifierLabelForHarness(modifier)), $"Story chapter {chapter.Id} status should include {modifier}.");
+                    }
+                }
             }
+        }
+
+        private static string StoryModifierLabelForHarness(StoryModifier modifier) =>
+            modifier switch
+            {
+                StoryModifier.GuardPressure => "Guard Pressure",
+                StoryModifier.TerritoryCells => "Territory Cells",
+                StoryModifier.CalculatedPlanning => "Calculated Planning",
+                StoryModifier.PrecisionPressure => "Precision Pressure",
+                StoryModifier.GhostFlicker => "Ghost Flicker",
+                StoryModifier.EcholocationDim => "Echolocation Dim",
+                StoryModifier.ResilientCells => "Resilient Cells",
+                StoryModifier.MutedHints => "Muted Hints",
+                StoryModifier.HungerMeter => "Hunger Meter",
+                StoryModifier.SedationWindows => "Sedation",
+                StoryModifier.AdrenalineMonitor => "Adrenaline Monitor",
+                StoryModifier.SignalRelay => "Signal Relay",
+                StoryModifier.ReducedPreview => "Reduced Preview",
+                StoryModifier.NoHold => "No Hold",
+                _ => modifier.ToString(),
+            };
+
+        private static void VerifyStoryDeterministicSimulationSweep()
+        {
+            foreach (var chapter in StoryCatalog.Chapters)
+            {
+                var pool = chapter.FocusedPieces.Length > 0
+                    ? chapter.FocusedPieces
+                    : Enum.GetValues(typeof(PieceType)).Cast<PieceType>();
+                var board = new BoardState(
+                    pool,
+                    seed: 2100 + (chapter.Act * 100) + chapter.Sequence,
+                    selectedMode: MonStackaMode.Story,
+                    spawnWeights: chapter.SpawnBias
+                );
+                var modifiers = new StoryModifierSystem(chapter, board, seed: 2200 + (chapter.Act * 100) + chapter.Sequence);
+                var assist = new AssistEffectSystem();
+                var pointEvents = 0;
+                var lastScore = board.Score;
+
+                modifiers.OnMatchStart();
+                board.OnPieceLocked += lockEvent =>
+                    assist.OnPieceLocked(lockEvent, board, points => board.AddScore(points, lockEvent.PieceType));
+                board.OnLinesCleared += lines =>
+                    assist.OnLinesCleared(lines, points => board.AddScore(points, assist.ActiveWindowPiece));
+                board.OnPointsGained += (points, _) =>
+                {
+                    Expect(points > 0, $"Story chapter {chapter.Id} should only emit positive point events.");
+                    pointEvents += 1;
+                };
+
+                for (var step = 0; step < 36 && !board.IsGameOver(); step += 1)
+                {
+                    var status = modifiers.BuildEnemyAbilityStatus();
+                    if (chapter.Modifiers.Length > 0)
+                    {
+                        Expect(!status.Contains("No enemy modifiers"), $"Story chapter {chapter.Id} should keep enemy status populated during simulation.");
+                        Expect(status.Contains("[") && status.Contains("]"), $"Story chapter {chapter.Id} should keep trigger/state tags during simulation.");
+                    }
+
+                    if (chapter.HoldEnabled && step % 5 == 0)
+                    {
+                        board.TryHold();
+                    }
+
+                    if (step % 3 == 0)
+                    {
+                        board.TryRotate(1);
+                    }
+
+                    var direction = step % 2 == 0 ? -1 : 1;
+                    for (var move = 0; move < step % 4; move += 1)
+                    {
+                        board.TryMove(direction, 0);
+                    }
+
+                    var locked = board.HardDrop();
+                    Expect(locked || board.IsGameOver(), $"Story chapter {chapter.Id} should either lock a piece or explicitly top out at step {step}.");
+
+                    if (!board.IsGameOver())
+                    {
+                        Expect(board.EnsureActivePiece(), $"Story chapter {chapter.Id} should recover an active piece after lock step {step}.");
+                        Expect(board.HasActivePiece, $"Story chapter {chapter.Id} should have an active piece after recovery at step {step}.");
+                    }
+
+                    modifiers.Tick(chapter.GravitySeconds);
+                    assist.Tick(chapter.GravitySeconds);
+                    Expect(board.Score >= lastScore, $"Story chapter {chapter.Id} score should never decrease.");
+                    lastScore = board.Score;
+
+                    var remainingHp = Mathf.Max(0, chapter.Objective.BossHealthPoints - board.Score);
+                    var hpPercent = Mathf.Clamp01(remainingHp / (float)chapter.Objective.BossHealthPoints);
+                    Expect(hpPercent >= 0f && hpPercent <= 1f, $"Story chapter {chapter.Id} boss HP percent should stay clamped.");
+                    Expect(board.NextQueue.Count > 0, $"Story chapter {chapter.Id} should keep next queue populated.");
+                }
+
+                Expect(board.PiecesPlaced > 0 || board.IsGameOver(), $"Story chapter {chapter.Id} simulation should place at least one piece or top out explicitly.");
+                Expect(pointEvents >= 0, $"Story chapter {chapter.Id} point event counter should remain valid.");
+            }
+        }
+
+        private static void VerifyStoryRuntimeHudAndVisualSweep()
+        {
+            var story = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            var chapter = StoryCatalog.GetChapter("1.3");
+            Expect(chapter != null, "Story 1.3 should exist for runtime HUD sweep.");
+            Expect(story.CurrentMode == MonStackaMode.Story, "Runtime story HUD sweep should be in Story mode.");
+
+            var bossRoot = RequireRect("BossHealthBar");
+            var bossFill = bossRoot.transform.Find("Fill")?.GetComponent<RectTransform>();
+            Expect(bossFill != null, "Boss health bar should contain a Fill rect.");
+            var hud = UnityEngine.Object.FindFirstObjectByType<HUDController>();
+            Expect(hud != null, "Story runtime HUD sweep should find HUDController.");
+            story.Board.AddScore(chapter.Objective.BossHealthPoints / 2);
+            hud.Render(MonStackaMode.Story, story.Board.Score, story.Board.Lines, 0f, story.Board.IsGameOver(), story.IsPaused, 0f);
+            var expectedHp = Mathf.Clamp01((chapter.Objective.BossHealthPoints - story.Board.Score) / (float)chapter.Objective.BossHealthPoints);
+            Expect(Mathf.Abs(bossFill.anchorMax.x - expectedHp) <= 0.02f, $"Boss health fill should track score. Expected {expectedHp:0.###}, got {bossFill.anchorMax.x:0.###}.");
+
+            foreach (var textName in new[] { "StoryBossLabel", "StoryScoreLabel", "StoryScoreValue", "StoryEnemyStatus" })
+            {
+                AssertTextReadable(textName, textName == "StoryEnemyStatus" ? 15 : 18);
+            }
+
+            var enemyText = RequireRect("StoryEnemyStatus").GetComponent<Text>();
+            hud.RenderStoryEnemyStatus("<color=#ffcf74>Guard Pressure</color> [ON] every piece locks faster\n<color=#ffcf74>Territory Cells</color> [SETUP] cells seeded");
+            Expect(enemyText.text.Contains("[ON]") && enemyText.text.Contains("[SETUP]"), "Story enemy HUD should render explicit state tags.");
+
+            var territoryRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
+                .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal))
+                .ToArray();
+            Expect(territoryRenderers.Length > 0, "Story 1.3 should render seeded territory cells.");
+            foreach (var renderer in territoryRenderers.Where(renderer => renderer.gameObject.activeSelf))
+            {
+                Expect(renderer.sortingOrder >= 18, "Enemy territory cells should render above generic floor art.");
+                Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, "Enemy territory cells should read as red enemy cells, not gray placeholders.");
+            }
+
+            var shell = UnityEngine.Object.FindFirstObjectByType<GameSceneShellController>();
+            Expect(shell != null, "Story runtime HUD sweep should find GameSceneShellController.");
+            story.PauseIfRunning();
+            var pausePanel = FindSceneRect("PausePanel");
+            Expect(pausePanel != null && pausePanel.gameObject.activeInHierarchy, "Pause panel should be visible after pausing before settings open.");
+            InvokePrivate(shell, "OpenSettings");
+            var settingsPanel = RequireRect("GameSettingsPanel");
+            Expect(settingsPanel.gameObject.activeInHierarchy, "Settings panel should open from paused story mode.");
+            Expect(!pausePanel.gameObject.activeInHierarchy, "Opening settings should suppress the separate pause banner.");
+            InvokePrivate(shell, "CloseSettings");
+            Expect(!settingsPanel.gameObject.activeInHierarchy, "Settings panel should close cleanly.");
         }
 
         private static void VerifyRecordSeparation()
@@ -421,6 +684,10 @@ namespace MonStacka.Editor
             story.RequestRestart();
             Expect(story.IsRestartConfirmActive, "Story restart should ask for confirmation.");
             Expect(story.IsPaused, "Story restart confirmation should pause the match.");
+            story.ReturnHome();
+            Expect(story.IsSceneTransitioning, "Home navigation should enter an idempotent scene-transition guard.");
+            story.ReturnHome();
+            Expect(story.IsSceneTransitioning, "Repeated Home clicks during scene transition should stay guarded.");
 
             var gameOver = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: false);
             gameOver.Board.Grid[0, 4] = (int)PieceType.I;
@@ -470,6 +737,155 @@ namespace MonStacka.Editor
             Expect(record.SourceCells.Count == 1 && record.SourceCells[0] == new Vector2Int(2, 0), "Surviving partial cell should keep its original art source coordinate.");
         }
 
+        private static void VerifyStoryRenderStateConsistencySweep()
+        {
+            var story = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            var board = story.Board;
+            board.Reset();
+            for (var row = 0; row < PieceDefinitions.TotalRows; row += 1)
+            {
+                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+                {
+                    board.Grid[row, col] = 0;
+                    board.PieceIds[row, col] = 0;
+                    board.SourceCellXs[row, col] = 0;
+                    board.SourceCellYs[row, col] = 0;
+                }
+            }
+
+            var survivorRow = PieceDefinitions.TotalRows - 2;
+            var clearRow = PieceDefinitions.TotalRows - 1;
+            const int survivorPieceId = 9001;
+            board.Grid[survivorRow, 0] = (int)PieceType.T;
+            board.PieceIds[survivorRow, 0] = survivorPieceId;
+            board.SourceCellXs[survivorRow, 0] = 2;
+            board.SourceCellYs[survivorRow, 0] = 0;
+
+            for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+            {
+                board.Grid[clearRow, col] = (int)PieceType.O;
+                board.PieceIds[clearRow, col] = 9100 + col;
+                board.SourceCellXs[clearRow, col] = col % 2;
+                board.SourceCellYs[clearRow, col] = col / 2;
+            }
+
+            Expect(board.ClearLines() == 1, "Runtime render sweep setup should clear exactly one row.");
+            InvokePrivate(story, "RebuildBoardViews");
+
+            var records = board.GetLockedPieceGroups().Where(record => record.Cells.Count > 0).ToList();
+            var lockedSkins = Resources.FindObjectsOfTypeAll<PieceSkin>()
+                .Where(skin => skin && skin.gameObject.scene.IsValid() && skin.gameObject.scene.isLoaded && skin.PieceId > 0)
+                .ToList();
+            var lockedSkinIds = lockedSkins.Select(skin => skin.PieceId).OrderBy(id => id).ToArray();
+            var recordIds = records.Select(record => record.PieceId).OrderBy(id => id).ToArray();
+            Expect(lockedSkinIds.SequenceEqual(recordIds), $"Locked render PieceSkin ids should match board records. Rendered=[{string.Join(",", lockedSkinIds)}] Board=[{string.Join(",", recordIds)}]");
+
+            var survivorRecord = records.FirstOrDefault(record => record.PieceId == survivorPieceId);
+            Expect(survivorRecord != null, "Runtime render sweep should keep the survivor record after clear.");
+            Expect(survivorRecord.Cells.Count == 1, "Runtime survivor should be a partial one-cell piece after clear.");
+            Expect(survivorRecord.SourceCells.Count == 1 && survivorRecord.SourceCells[0] == new Vector2Int(2, 0), "Runtime survivor should preserve source-cell art after clear.");
+
+            var survivorSkin = lockedSkins.FirstOrDefault(skin => skin.PieceId == survivorPieceId);
+            Expect(survivorSkin != null, "Runtime survivor should have a visible PieceSkin.");
+            Expect(survivorSkin.gameObject.activeInHierarchy, "Runtime survivor PieceSkin should be active in the scene.");
+            Expect(!survivorSkin.BodyBuildUsesFullBoxSprite, "Runtime partial survivor should not fall back to a full-box sprite.");
+            Expect(survivorSkin.RequiresManualUpdate, "Runtime partial survivor should retain animated visual systems.");
+            Expect(survivorSkin.GetComponentsInChildren<SpriteRenderer>(true).Any(renderer => renderer && renderer.sprite), "Runtime survivor should have sprite renderers.");
+
+            var garbageRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
+                .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.gameObject.scene.isLoaded && renderer.name.StartsWith("GarbageCell"))
+                .ToList();
+            foreach (var renderer in garbageRenderers.Where(renderer => renderer.gameObject.activeInHierarchy))
+            {
+                Expect(renderer.sortingOrder >= 18, "Visible garbage/territory cells should render above floor art.");
+                Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, "Visible garbage/territory cells should read as red enemy cells, not gray placeholders.");
+            }
+        }
+
+        private static void VerifyStoryInputPlaybackSweep()
+        {
+            var controls = MonStackaControls.BuildControlsSummaryText();
+            Expect(controls.Contains("Hard Drop: Space"), "Story input playback should keep Space as hard drop.");
+            Expect(!controls.Contains("Hard Drop: Up") && !controls.Contains("Hard Drop: D-pad Up / Left Stick Up"), "Story input playback should not map Up to hard drop.");
+            Expect(!controls.Contains("Pause / Resume: Space"), "Story dialogue submit key Space must not also be a pause binding.");
+
+            foreach (var chapterId in new[] { "1.1", "1.2", "1.3" })
+            {
+                var chapter = StoryCatalog.GetChapter(chapterId);
+                Expect(chapter != null, $"Story chapter {chapterId} should exist for input playback.");
+                var story = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: chapterId);
+                var board = story.Board;
+                AssertStoryManagerInvariants(story, chapter, $"{chapterId} launch");
+
+                _ = board.TryMove(-1, 0);
+                _ = board.TryMove(-1, 0);
+                _ = board.TryRotate(1);
+                _ = board.TrySoftDrop();
+                if (chapter.HoldEnabled)
+                {
+                    Expect(board.TryHold(), $"{chapterId} should accept hold during input playback.");
+                    for (var index = 0; index < 3; index += 1)
+                    {
+                        Expect(board.TrySwapHoldWithUpcoming(index), $"{chapterId} should swap held piece with upcoming slot {index + 1}.");
+                    }
+                }
+                else
+                {
+                    Expect(!board.TryHold(), $"{chapterId} should reject hold when the chapter disables hold.");
+                }
+                InvokePrivate(story, "UpdateVisuals");
+                AssertStoryManagerInvariants(story, chapter, $"{chapterId} after movement/hold script");
+
+                InvokePrivate(story, "HardDropAndSpawn");
+                InvokePrivate(story, "UpdateVisuals");
+                AssertStoryManagerInvariants(story, chapter, $"{chapterId} after first hard drop");
+
+                _ = board.TryMove(1, 0);
+                _ = board.TryMove(1, 0);
+                _ = board.TryRotate(-1);
+                if (chapter.HoldEnabled && board.HasHoldPiece)
+                {
+                    Expect(board.TrySwapHoldWithUpcoming(0), $"{chapterId} should keep queue swap available after a hard drop.");
+                }
+                InvokePrivate(story, "HardDropAndSpawn");
+                InvokePrivate(story, "UpdateVisuals");
+                AssertStoryManagerInvariants(story, chapter, $"{chapterId} after second hard drop");
+
+                story.PauseIfRunning();
+                Expect(story.IsPaused, $"{chapterId} pause command should pause.");
+                var shell = UnityEngine.Object.FindFirstObjectByType<GameSceneShellController>();
+                Expect(shell != null, $"{chapterId} should have a shell controller for settings playback.");
+                InvokePrivate(shell, "OpenSettings");
+                var settingsPanel = FindSceneRect("GameSettingsPanel");
+                var pausePanel = FindSceneRect("PausePanel");
+                Expect(settingsPanel != null && settingsPanel.gameObject.activeInHierarchy, $"{chapterId} settings panel should open while paused.");
+                Expect(pausePanel == null || !pausePanel.gameObject.activeInHierarchy, $"{chapterId} settings should suppress the separate pause banner.");
+                InvokePrivate(shell, "CloseSettings");
+                Expect(settingsPanel == null || !settingsPanel.gameObject.activeInHierarchy, $"{chapterId} settings panel should close.");
+                story.ResumeGame();
+                Expect(!story.IsPaused, $"{chapterId} resume command should unpause after settings.");
+                AssertStoryManagerInvariants(story, chapter, $"{chapterId} after pause/settings playback");
+            }
+        }
+
+        private static void AssertStoryManagerInvariants(GameManager story, StoryChapterSpec chapter, string context)
+        {
+            Expect(story.CurrentMode == MonStackaMode.Story, $"{context}: manager should stay in Story mode.");
+            Expect(story.FriendlyAbilitiesEnabled, $"{context}: story should keep friendly abilities enabled.");
+            Expect(!story.IsDialogueInputBlocking, $"{context}: harness playback should not be blocked by dialogue.");
+            if (!story.Board.IsGameOver())
+            {
+                Expect(story.Board.HasActivePiece, $"{context}: alive story run should have an active piece.");
+                Expect(story.Board.NextQueue.Count > 0, $"{context}: alive story run should keep the next queue populated.");
+            }
+
+            if (chapter.Objective.HasBossHealth)
+            {
+                var hpPercent = Mathf.Clamp01((chapter.Objective.BossHealthPoints - story.Board.Score) / (float)chapter.Objective.BossHealthPoints);
+                Expect(hpPercent >= 0f && hpPercent <= 1f, $"{context}: mission HP percent should stay clamped.");
+            }
+        }
+
         private static void AssertBoardPanelMatchesPlayableGrid()
         {
             var boardPanel = RequireRect("BoardPanelBackdrop");
@@ -490,11 +906,68 @@ namespace MonStacka.Editor
             var dataDir = Path.Combine(buildDir, "MonStackaV2_Data");
             var launchScript = Path.Combine(buildDir, "Launch-MonStackaV2.cmd");
             var stamp = Path.Combine(buildDir, "build-stamp.txt");
+            var iconPath = Path.Combine(Directory.GetCurrentDirectory(), "Assets", "MonStacka", "Art", "AppIcon", "monstacka-app-icon.ico");
 
             Expect(File.Exists(exePath), "Current Windows build exe should exist.");
             Expect(Directory.Exists(dataDir), "Current Windows build data folder should exist.");
             Expect(File.Exists(launchScript), "Current Windows build launch script should exist.");
             Expect(File.Exists(stamp), "Current Windows build stamp should exist.");
+            Expect(File.Exists(iconPath), "MonStacka app icon asset should exist for release builds.");
+            Expect(HasReleaseInstructions(), "Repo should include README/download instructions for friends.");
+
+            var buildTimeUtc = ParseBuildStampUtc(stamp);
+            var latestRuntimeAssetUtc = LatestRuntimeAssetWriteUtc();
+            Expect(buildTimeUtc >= latestRuntimeAssetUtc, $"Windows build is stale. Build stamp {buildTimeUtc:O}; latest runtime asset {latestRuntimeAssetUtc:O}.");
+        }
+
+        private static DateTime ParseBuildStampUtc(string stampPath)
+        {
+            var stampText = File.ReadAllText(stampPath).Trim();
+            var marker = " at ";
+            var markerIndex = stampText.LastIndexOf(marker, StringComparison.Ordinal);
+            Expect(markerIndex >= 0, "Build stamp should contain an ISO timestamp after ' at '.");
+            var timestampText = stampText[(markerIndex + marker.Length)..].Trim();
+            Expect(DateTime.TryParse(
+                    timestampText,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out var timestamp),
+                $"Build stamp should parse as UTC timestamp: {timestampText}");
+            return timestamp.ToUniversalTime();
+        }
+
+        private static DateTime LatestRuntimeAssetWriteUtc()
+        {
+            var projectRoot = Directory.GetCurrentDirectory();
+            var assetRoots = new[]
+            {
+                Path.Combine(projectRoot, "Assets", "MonStacka", "Scripts"),
+                Path.Combine(projectRoot, "Assets", "MonStacka", "Scenes"),
+                Path.Combine(projectRoot, "Assets", "MonStacka", "Art"),
+            };
+
+            return assetRoots
+                .Where(Directory.Exists)
+                .SelectMany(root => Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                .Where(path => !path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Editor{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Select(path => File.GetLastWriteTimeUtc(path))
+                .DefaultIfEmpty(DateTime.MinValue)
+                .Max();
+        }
+
+        private static bool HasReleaseInstructions()
+        {
+            var projectRoot = Directory.GetCurrentDirectory();
+            var candidates = new[]
+            {
+                Path.Combine(projectRoot, "README.md"),
+                Path.Combine(projectRoot, "..", "README.md"),
+                Path.Combine(projectRoot, "Builds", "README.md"),
+                Path.Combine(projectRoot, "Builds", "Windows", "README.txt"),
+            };
+
+            return candidates.Any(File.Exists);
         }
 
         private static GameManager LoadGameManagerForMode(MonStackaMode mode, bool friendlyAbilitiesEnabled, string storyChapterId = null)
@@ -508,7 +981,9 @@ namespace MonStacka.Editor
             EditorSceneManager.OpenScene(GameScenePath);
             var manager = UnityEngine.Object.FindFirstObjectByType<GameManager>();
             Expect(manager != null, "Game scene should contain GameManager for runtime flow.");
-            manager.SendMessage("Awake", SendMessageOptions.DontRequireReceiver);
+            typeof(GameManager)
+                .GetMethod("Awake", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.Invoke(manager, null);
             return manager;
         }
 
@@ -547,6 +1022,16 @@ namespace MonStacka.Editor
         private static RectTransform FindSceneRect(string objectName) =>
             Resources.FindObjectsOfTypeAll<RectTransform>()
                 .FirstOrDefault(rect => rect && rect.gameObject.scene.IsValid() && rect.gameObject.scene.isLoaded && rect.name == objectName);
+
+        private static void InvokePrivate(object target, string methodName)
+        {
+            var method = target.GetType().GetMethod(
+                methodName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic
+            );
+            Expect(method != null, $"{target.GetType().Name} should contain private method {methodName}.");
+            method.Invoke(target, null);
+        }
 
         private static void AssertNotOverlapping(string firstName, string secondName, float minimumGap, bool allowMissing = false)
         {

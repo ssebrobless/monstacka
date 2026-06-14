@@ -478,9 +478,34 @@ namespace MonStacka.UI
         private string lastAssistDisplay;
 
         private bool assistMuted;
+        private float assistFlashUntil;
+        private Color assistBaseColor;
+        private bool hasAssistBaseColor;
         private int lastAssistProgress = -1;
+        private int lastAssistUntilTrigger = -1;
         private int lastAssistWindowSeconds = -1;
         private AssistType? lastAssistWindowType;
+
+        public void ShowAssistTrigger(AssistTrigger trigger)
+        {
+            if (!assistText || assistMuted)
+            {
+                return;
+            }
+
+            EnsureAssistBaseColor();
+            assistFlashUntil = Time.time + 1.45f;
+            lastAssistDisplay = $"{trigger.Label} +{trigger.ScoreAwarded}";
+            assistText.text = lastAssistDisplay;
+            assistText.fontStyle = FontStyle.Bold;
+            assistText.color = PieceDefinitions.PieceColors.TryGetValue(trigger.Piece, out var pieceColor)
+                ? pieceColor
+                : new Color(0.96f, 0.92f, 0.72f, 1f);
+            lastAssistWindowType = null;
+            lastAssistWindowSeconds = int.MinValue;
+            lastAssistProgress = int.MinValue;
+            lastAssistUntilTrigger = int.MinValue;
+        }
 
         /// <summary>Held-assist progress and active effect (handoff UI requirement).</summary>
         public void RenderAssist(AssistEffectSystem assist)
@@ -488,6 +513,22 @@ namespace MonStacka.UI
             if (!assistText || assistMuted)
             {
                 return;
+            }
+
+            EnsureAssistBaseColor();
+            if (Time.time < assistFlashUntil)
+            {
+                return;
+            }
+
+            if (assistText.fontStyle != FontStyle.Normal)
+            {
+                assistText.fontStyle = FontStyle.Normal;
+            }
+
+            if (assistText.color != assistBaseColor)
+            {
+                assistText.color = assistBaseColor;
             }
 
             if (assist == null)
@@ -504,7 +545,11 @@ namespace MonStacka.UI
             var windowType = assist.ActiveWindow;
             var windowSeconds = windowType.HasValue ? Mathf.CeilToInt(assist.WindowRemaining) : -1;
             var progress = windowType.HasValue ? -1 : assist.HeldProgress;
-            if (windowType == lastAssistWindowType && windowSeconds == lastAssistWindowSeconds && progress == lastAssistProgress)
+            var untilTrigger = windowType.HasValue ? -1 : assist.HeldPlacementsUntilTrigger;
+            if (windowType == lastAssistWindowType &&
+                windowSeconds == lastAssistWindowSeconds &&
+                progress == lastAssistProgress &&
+                untilTrigger == lastAssistUntilTrigger)
             {
                 return;
             }
@@ -512,10 +557,22 @@ namespace MonStacka.UI
             lastAssistWindowType = windowType;
             lastAssistWindowSeconds = windowSeconds;
             lastAssistProgress = progress;
+            lastAssistUntilTrigger = untilTrigger;
             lastAssistDisplay = windowType.HasValue
                 ? $"{AssistEffectSystem.LabelFor(windowType.Value)} {windowSeconds}s"
-                : $"ASSIST {progress}/{AssistEffectSystem.TriggerEvery}";
+                : assist.NextHeldPlacementWillTrigger
+                    ? "ASSIST READY"
+                    : $"ASSIST {progress}/{AssistEffectSystem.TriggerEvery}";
             assistText.text = lastAssistDisplay;
+        }
+
+        private void EnsureAssistBaseColor()
+        {
+            if (!hasAssistBaseColor && assistText)
+            {
+                assistBaseColor = assistText.color;
+                hasAssistBaseColor = true;
+            }
         }
 
         private static string FormatTime(float elapsedSeconds)

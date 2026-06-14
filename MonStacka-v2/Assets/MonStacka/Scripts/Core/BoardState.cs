@@ -199,6 +199,16 @@ namespace MonStacka.Core
             return true;
         }
 
+        public bool EnsureActivePiece()
+        {
+            if (HasActivePiece)
+            {
+                return true;
+            }
+
+            return !GameOver && SpawnNext();
+        }
+
         public bool TryMove(int dx, int dy)
         {
             if (!HasActivePiece || GameOver)
