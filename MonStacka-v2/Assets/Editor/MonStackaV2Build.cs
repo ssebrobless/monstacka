@@ -11,8 +11,10 @@ namespace MonStacka.Editor
 {
     public static class MonStackaV2Build
     {
-        private const string OutputRoot = "Builds/Windows";
-        private const string ExeName = "MonStackaV2.exe";
+        private const string WindowsOutputRoot = "Builds/Windows";
+        private const string MacOutputRoot = "Builds/Mac";
+        private const string WindowsExeName = "MonStackaV2.exe";
+        private const string MacAppName = "MonStackaV2.app";
         private const string AppIconAssetPath = "Assets/MonStacka/Art/AppIcon/monstacka-app-icon.png";
         private const string AppIconFilePath = "Assets/MonStacka/Art/AppIcon/monstacka-app-icon.ico";
 
@@ -20,7 +22,36 @@ namespace MonStacka.Editor
         public static void BuildWindowsPlayer()
         {
             var projectRoot = Directory.GetCurrentDirectory();
-            var outputDir = Path.GetFullPath(Path.Combine(projectRoot, OutputRoot));
+            var outputDir = Path.GetFullPath(Path.Combine(projectRoot, WindowsOutputRoot));
+            var outputPath = BuildPlayer(BuildTarget.StandaloneWindows64, outputDir, WindowsExeName, "Windows");
+            File.WriteAllText(
+                Path.Combine(outputDir, "Launch-MonStackaV2.cmd"),
+                "@echo off\r\ncd /d \"%~dp0\"\r\nstart \"\" \"%~dp0MonStackaV2.exe\"\r\n"
+            );
+            RemoveKnownLegacyBuilds(projectRoot);
+            UpdateCurrentBuildShortcuts(outputPath, outputDir, Path.GetFullPath(Path.Combine(projectRoot, AppIconFilePath)));
+            UnityEngine.Debug.Log($"MonStacka v2 Windows build complete: {outputPath}");
+        }
+
+        [MenuItem("MonStacka/Build macOS Player")]
+        public static void BuildMacPlayer()
+        {
+            var projectRoot = Directory.GetCurrentDirectory();
+            var outputDir = Path.GetFullPath(Path.Combine(projectRoot, MacOutputRoot));
+            var outputPath = BuildPlayer(BuildTarget.StandaloneOSX, outputDir, MacAppName, "macOS");
+            File.WriteAllText(
+                Path.Combine(outputDir, "README-Mac.txt"),
+                "MonStacka v2 macOS playtest build\n\n" +
+                "1. Extract the whole zip.\n" +
+                "2. Open MonStackaV2.app.\n" +
+                "3. If macOS blocks the unsigned app, Control-click the app, choose Open, then confirm.\n\n" +
+                "This playtest build is not Apple-notarized yet.\n"
+            );
+            UnityEngine.Debug.Log($"MonStacka v2 macOS build complete: {outputPath}");
+        }
+
+        private static string BuildPlayer(BuildTarget target, string outputDir, string outputName, string platformLabel)
+        {
             Directory.CreateDirectory(outputDir);
 
             var enabledScenes = EditorBuildSettings.scenes
@@ -35,12 +66,12 @@ namespace MonStacka.Editor
 
             ConfigureStandaloneAppIcon();
 
-            var outputPath = Path.GetFullPath(Path.Combine(outputDir, ExeName));
+            var outputPath = Path.GetFullPath(Path.Combine(outputDir, outputName));
             var options = new BuildPlayerOptions
             {
                 scenes = enabledScenes,
                 locationPathName = outputPath,
-                target = BuildTarget.StandaloneWindows64,
+                target = target,
                 options = BuildOptions.None,
             };
 
@@ -48,21 +79,16 @@ namespace MonStacka.Editor
             if (report.summary.result != BuildResult.Succeeded)
             {
                 throw new InvalidOperationException(
-                    $"Windows build failed: {report.summary.result} ({report.summary.totalErrors} errors, {report.summary.totalWarnings} warnings)."
+                    $"{platformLabel} build failed: {report.summary.result} ({report.summary.totalErrors} errors, {report.summary.totalWarnings} warnings)."
                 );
             }
 
             File.WriteAllText(
                 Path.Combine(outputDir, "build-stamp.txt"),
-                $"MonStacka v2 build completed at {DateTime.UtcNow:O}"
+                $"MonStacka v2 {platformLabel} build completed at {DateTime.UtcNow:O}"
             );
-            File.WriteAllText(
-                Path.Combine(outputDir, "Launch-MonStackaV2.cmd"),
-                "@echo off\r\ncd /d \"%~dp0\"\r\nstart \"\" \"%~dp0MonStackaV2.exe\"\r\n"
-            );
-            RemoveKnownLegacyBuilds(projectRoot);
-            UpdateCurrentBuildShortcuts(outputPath, outputDir, Path.GetFullPath(Path.Combine(projectRoot, AppIconFilePath)));
-            UnityEngine.Debug.Log($"MonStacka v2 Windows build complete: {outputPath}");
+
+            return outputPath;
         }
 
         private static void ConfigureStandaloneAppIcon()
@@ -246,6 +272,20 @@ foreach ($shortcutPath in $shortcutPaths)
             catch (Exception ex)
             {
                 UnityEngine.Debug.LogError($"MonStacka v2 Windows build failed: {ex}");
+                EditorApplication.Exit(1);
+            }
+        }
+
+        public static void BuildMacPlayerBatchMode()
+        {
+            try
+            {
+                BuildMacPlayer();
+                EditorApplication.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"MonStacka v2 macOS build failed: {ex}");
                 EditorApplication.Exit(1);
             }
         }

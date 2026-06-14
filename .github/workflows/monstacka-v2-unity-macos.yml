@@ -1,0 +1,63 @@
+name: monstacka-v2-unity-macos
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/monstacka-next
+    paths:
+      - '.github/workflows/monstacka-v2-unity-macos.yml'
+      - 'MonStacka-v2/Assets/**'
+      - 'MonStacka-v2/Packages/**'
+      - 'MonStacka-v2/ProjectSettings/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: Build MonStacka v2 macOS
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: MonStacka-v2/Library
+          key: MonStacka-v2-Library-StandaloneOSX-${{ hashFiles('MonStacka-v2/Packages/packages-lock.json', 'MonStacka-v2/ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: |
+            MonStacka-v2-Library-StandaloneOSX-
+
+      - name: Build macOS player
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: MonStacka-v2
+          targetPlatform: StandaloneOSX
+          buildMethod: MonStacka.Editor.MonStackaV2Build.BuildMacPlayer
+          allowDirtyBuild: true
+          cacheUnityInstallationOnMac: true
+
+      - name: Zip macOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd MonStacka-v2/Builds/Mac
+          ditto -c -k --sequesterRsrc --keepParent MonStackaV2.app ../../../MonStackaV2-macOS.zip
+          zip -j ../../../MonStackaV2-macOS.zip README-Mac.txt build-stamp.txt
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MonStackaV2-macOS
+          path: MonStackaV2-macOS.zip
+          if-no-files-found: error

@@ -18,7 +18,27 @@ Do not run `MonStackaV2.exe` from inside the zip preview. Windows needs the extr
 Current platform status:
 
 - Windows: supported by the current downloadable build.
-- macOS: not packaged yet for MonStacka v2. The Unity project should be portable in principle, but a proper Mac `.app` build still needs to be produced and tested.
+- macOS: build automation is wired through the `monstacka-v2-unity-macos` GitHub Actions workflow, but it needs Unity license secrets before it can produce a downloadable `.app` zip.
+
+### Build MonStacka v2 for macOS
+
+The Mac build is produced by `.github/workflows/monstacka-v2-unity-macos.yml`.
+
+Required GitHub Actions secrets:
+
+- `UNITY_LICENSE`
+- `UNITY_EMAIL`
+- `UNITY_PASSWORD`
+
+After those secrets are configured:
+
+1. Open the Actions tab.
+2. Run `monstacka-v2-unity-macos`.
+3. Download the `MonStackaV2-macOS` artifact.
+4. Extract `MonStackaV2-macOS.zip`.
+5. Open `MonStackaV2.app`.
+
+This playtest app is not Apple-notarized yet. If macOS blocks it, Control-click the app, choose `Open`, then confirm.
 
 ```text
 ╔══════════════ Launch Flow ══════════════╗
