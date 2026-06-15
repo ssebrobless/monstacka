@@ -181,7 +181,10 @@ namespace MonStacka.Editor
             {
                 new HarnessScenario("core vertical slice verifier", MonStackaV2Verification.Run),
                 new HarnessScenario("mode ability matrix", VerifyModeAbilityMatrix),
+                new HarnessScenario("mode simulated playthrough sweep", VerifyModeSimulatedPlaythroughSweep),
+                new HarnessScenario("friendly ability mechanic scenarios", VerifyFriendlyAbilityMechanicScenarios),
                 new HarnessScenario("story modifier scenarios", VerifyStoryModifierScenarios),
+                new HarnessScenario("enemy ability focused trigger matrix", VerifyEnemyAbilityFocusedTriggerMatrix),
                 new HarnessScenario("story deterministic simulation sweep", VerifyStoryDeterministicSimulationSweep),
                 new HarnessScenario("story render state consistency sweep", VerifyStoryRenderStateConsistencySweep),
                 new HarnessScenario("story input playback sweep", VerifyStoryInputPlaybackSweep),
@@ -193,6 +196,7 @@ namespace MonStacka.Editor
                 new HarnessScenario("story runtime hud and visual sweep", VerifyStoryRuntimeHudAndVisualSweep),
                 new HarnessScenario("runtime game flow smoke", VerifyRuntimeGameFlowSmoke),
                 new HarnessScenario("current Windows build artifacts", VerifyCurrentBuildArtifacts),
+                new HarnessScenario("built player screenshot smoke", VerifyBuiltPlayerScreenshotSmoke),
             };
 
         private static void VerifyModeAbilityMatrix()
@@ -243,6 +247,124 @@ namespace MonStacka.Editor
             }
 
             VerifyLineClearPreservesPieceArtSources();
+        }
+
+        private static void VerifyModeSimulatedPlaythroughSweep()
+        {
+            var scenarios = new[]
+            {
+                (name: "O.G.B.M. classic", mode: MonStackaMode.Ogbm, zany: false, chapter: (string)null),
+                (name: "O.G.B.M. zany", mode: MonStackaMode.Ogbm, zany: true, chapter: (string)null),
+                (name: "X(4)-LINES classic", mode: MonStackaMode.Sprint40, zany: false, chapter: (string)null),
+                (name: "X(4)-LINES zany", mode: MonStackaMode.Sprint40, zany: true, chapter: (string)null),
+                (name: "Training classic", mode: MonStackaMode.Training, zany: false, chapter: (string)null),
+                (name: "Training zany", mode: MonStackaMode.Training, zany: true, chapter: (string)null),
+                (name: "Story 1.3", mode: MonStackaMode.Story, zany: false, chapter: "1.3"),
+            };
+
+            foreach (var scenario in scenarios)
+            {
+                var manager = LoadGameManagerForMode(scenario.mode, scenario.zany, scenario.chapter);
+                var board = manager.Board;
+                Expect(board != null, $"{scenario.name}: board should exist.");
+                Expect(board.HasActivePiece || board.IsGameOver(), $"{scenario.name}: run should start with an active piece or explicit game over.");
+                Expect(board.NextQueue.Count > 0, $"{scenario.name}: next queue should start populated.");
+                Expect(manager.FriendlyAbilitiesEnabled == AssistEffectSystem.IsEnabledFor(scenario.mode, scenario.zany), $"{scenario.name}: friendly ability state should match mode rules.");
+
+                var lastScore = board.Score;
+                var startingPieces = board.PiecesPlaced;
+                for (var step = 0; step < 10 && !board.IsGameOver(); step += 1)
+                {
+                    if (step % 2 == 0)
+                    {
+                        board.TryMove(-1, 0);
+                    }
+                    else
+                    {
+                        board.TryMove(1, 0);
+                    }
+
+                    if (step % 3 == 0)
+                    {
+                        board.TryRotate(1);
+                    }
+
+                    if (step % 4 == 0)
+                    {
+                        board.TrySoftDrop();
+                    }
+
+                    if (scenario.mode != MonStackaMode.Training && step % 5 == 0)
+                    {
+                        board.TryHold();
+                    }
+
+                    InvokePrivate(manager, "HardDropAndSpawn");
+                    InvokePrivate(manager, "UpdateVisuals");
+                    Expect(board.Score >= lastScore, $"{scenario.name}: score should never decrease during simulated play.");
+                    lastScore = board.Score;
+
+                    if (!board.IsGameOver())
+                    {
+                        Expect(board.HasActivePiece, $"{scenario.name}: active piece should recover after lock step {step}.");
+                        Expect(board.NextQueue.Count > 0, $"{scenario.name}: next queue should remain populated after lock step {step}.");
+                    }
+
+                    AssertVisibleRuntimePieceState($"{scenario.name} step {step}");
+                }
+
+                Expect(board.PiecesPlaced > startingPieces || board.IsGameOver(), $"{scenario.name}: simulated run should place at least one piece or explicitly top out.");
+                manager.PauseIfRunning();
+                Expect(manager.IsPaused, $"{scenario.name}: pause should work after simulated play.");
+                manager.ResumeGame();
+                Expect(!manager.IsPaused, $"{scenario.name}: resume should work after simulated play.");
+            }
+
+            var trainingToggle = LoadGameManagerForMode(MonStackaMode.Training, friendlyAbilitiesEnabled: false);
+            Expect(trainingToggle.CanToggleFriendlyAbilities, "Training playthrough should expose zany toggle.");
+            trainingToggle.ToggleFriendlyAbilitiesAndRestart();
+            Expect(trainingToggle.FriendlyAbilitiesEnabled, "Training playthrough zany toggle should enable assists.");
+            Expect(trainingToggle.Board.PiecesPlaced == 0 && trainingToggle.Board.HasActivePiece, "Training zany toggle should restart to a fresh active board.");
+        }
+
+        private static void VerifyFriendlyAbilityMechanicScenarios()
+        {
+            foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
+            {
+                var board = new BoardState(new[] { pieceType }, seed: 3100 + (int)pieceType);
+                PrepareBoardForAssist(pieceType, board);
+                var assist = new AssistEffectSystem();
+                var trigger = TriggerHeldAssist(pieceType, board, assist, out var awarded);
+                var expectedType = AssistEffectSystem.AssistForPiece(pieceType);
+                Expect(trigger.Type == expectedType, $"{pieceType}: friendly assist should trigger {expectedType}.");
+                Expect(trigger.ScoreAwarded == awarded, $"{pieceType}: trigger score should match award callback.");
+                Expect(trigger.ScoreAwarded >= 150, $"{pieceType}: friendly assist should award at least the base trigger bonus.");
+
+                switch (expectedType)
+                {
+                    case AssistType.GuardBreak:
+                        Expect(board.GetGarbageCells().Count == 0, "Guard Break should remove seeded enemy cells.");
+                        break;
+                    case AssistType.Digest:
+                        Expect(board.GetGarbageCells().Count == 0, "Digest should eat seeded enemy cells.");
+                        break;
+                    case AssistType.Stitch:
+                        Expect(board.GetGarbageCells().Count > 0, "Stitch should repair a covered hole with a junk/repair cell.");
+                        break;
+                    case AssistType.Calculation:
+                        Expect(assist.ActiveWindow == AssistType.Calculation && assist.ExtraPreviewCount == 2, "Calculation should open the extra-preview assist window.");
+                        break;
+                    case AssistType.EchoGuide:
+                        Expect(assist.ActiveWindow == AssistType.EchoGuide && assist.EchoGuideActive, "Echo Guide should open the enhanced guidance window.");
+                        break;
+                    case AssistType.Sedate:
+                        Expect(assist.ActiveWindow == AssistType.Sedate && assist.GravityMultiplier > 1f && assist.LockDelayBonusSeconds > 0f, "Sedate should slow gravity and extend lock delay.");
+                        break;
+                    case AssistType.Alert:
+                        Expect(assist.ActiveWindow == AssistType.Alert && assist.AlertScoreMultiplier(board) > 1f, "Alert should boost scoring while the stack is dangerous.");
+                        break;
+                }
+            }
         }
 
         private static void VerifyStoryModifierScenarios()
@@ -372,6 +494,101 @@ namespace MonStacka.Editor
                     }
                 }
             }
+        }
+
+        private static void VerifyEnemyAbilityFocusedTriggerMatrix()
+        {
+            var guardSpec = ModifierSpec("harness-guard", 2, StoryModifier.GuardPressure);
+            var guardBoard = new BoardState(new[] { PieceType.Z }, seed: 4101);
+            var guardSystem = new StoryModifierSystem(guardSpec, guardBoard, seed: 4101);
+            Expect(guardSystem.LockDelayMultiplier < 1f, "Guard Pressure should reduce lock delay multiplier.");
+            Expect(guardSystem.BuildEnemyAbilityStatus().Contains("[ON]"), "Guard Pressure should report ON status.");
+
+            var territorySpec = ModifierSpec("harness-territory", 4, StoryModifier.TerritoryCells);
+            var territoryBoard = new BoardState(new[] { PieceType.Z }, seed: 4102);
+            var territorySystem = new StoryModifierSystem(territorySpec, territoryBoard, seed: 4102);
+            territorySystem.OnMatchStart();
+            Expect(territoryBoard.GetGarbageCells().Count >= 4, "Territory Cells should seed enemy cells at match start.");
+            Expect(territorySystem.BuildEnemyAbilityStatus().Contains("[SETUP]"), "Territory Cells should report setup status.");
+
+            var planningSpec = ModifierSpec("harness-planning-focused", 3, StoryModifier.CalculatedPlanning);
+            planningSpec.NextPreviewCount = 5;
+            var planningBoard = new BoardState(new[] { PieceType.T }, seed: 4103);
+            var planningSystem = new StoryModifierSystem(planningSpec, planningBoard, seed: 4103);
+            planningBoard.TryRotate(1);
+            planningBoard.TryRotate(1);
+            planningBoard.TryRotate(1);
+            Expect(planningBoard.LockPiece(), "Calculated Planning focused matrix should lock a rotated piece.");
+            Expect(planningBoard.GetGarbageCells().Count > 0, "Calculated Planning should seed penalty cells after extra rotations.");
+            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("penalty") || planningSystem.BuildEnemyAbilityStatus().Contains("+"), "Calculated Planning should report penalty progress.");
+
+            var precisionSpec = ModifierSpec("harness-precision-focused", 3, StoryModifier.PrecisionPressure);
+            var precisionBoard = new BoardState(new[] { PieceType.T }, seed: 4104);
+            var precisionSystem = new StoryModifierSystem(precisionSpec, precisionBoard, seed: 4104);
+            precisionBoard.TryMove(0, 1);
+            precisionBoard.TryMove(0, 1);
+            Expect(precisionBoard.LockPiece(), "Precision Pressure focused matrix should lock an unsupported piece.");
+            Expect(precisionBoard.GetGarbageCells().Count > 0, "Precision Pressure should seed cells from unsupported overhangs.");
+            Expect(precisionSystem.BuildEnemyAbilityStatus().Contains("overhangs"), "Precision Pressure should report overhang trigger progress.");
+
+            var ghostSpec = ModifierSpec("harness-ghost", 2, StoryModifier.GhostFlicker);
+            var ghostSystem = new StoryModifierSystem(ghostSpec, new BoardState(new[] { PieceType.L }, seed: 4105), seed: 4105);
+            ghostSystem.Tick(0.1f);
+            Expect(ghostSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Ghost Flicker should expose timer status.");
+
+            var echoSpec = ModifierSpec("harness-echo", 2, StoryModifier.EcholocationDim);
+            var echoSystem = new StoryModifierSystem(echoSpec, new BoardState(new[] { PieceType.L }, seed: 4106), seed: 4106);
+            Expect(echoSystem.BoardDimAlpha >= 0f, "Echolocation Dim should expose a valid board dim alpha.");
+            Expect(echoSystem.BuildEnemyAbilityStatus().Contains("Echolocation Dim"), "Echolocation Dim should appear in enemy status.");
+
+            var resilientSpec = ModifierSpec("harness-resilient", 30, StoryModifier.ResilientCells);
+            var resilientBoard = new BoardState(new[] { PieceType.J }, seed: 4107);
+            var resilientSystem = new StoryModifierSystem(resilientSpec, resilientBoard, seed: 4107);
+            FillBottomLine(resilientBoard, PieceType.J, pieceIdStart: 5000);
+            Expect(resilientBoard.ClearLines() == 1, "Resilient Cells focused matrix should clear a prepared line.");
+            Expect(resilientBoard.GetGarbageCells().Count > 0, "Resilient Cells should regrow a territory cell after line clear at high difficulty.");
+            Expect(resilientSystem.BuildEnemyAbilityStatus().Contains("[CLEAR]"), "Resilient Cells should report clear-trigger status.");
+
+            var mutedSpec = ModifierSpec("harness-muted", 2, StoryModifier.MutedHints);
+            var mutedSystem = new StoryModifierSystem(mutedSpec, new BoardState(new[] { PieceType.J }, seed: 4108), seed: 4108);
+            Expect(mutedSystem.HintsMuted, "Muted Hints should hide assist/status hints.");
+            Expect(mutedSystem.BuildEnemyAbilityStatus().Contains("[ON]"), "Muted Hints should report ON status.");
+
+            var hungerSpec = ModifierSpec("harness-hunger-focused", 12, StoryModifier.HungerMeter);
+            var hungerBoard = new BoardState(new[] { PieceType.S }, seed: 4109);
+            var hungerSystem = new StoryModifierSystem(hungerSpec, hungerBoard, seed: 4109);
+            hungerSystem.Tick(20f);
+            Expect(hungerBoard.GetGarbageCells().Count > 0, "Hunger Meter should insert garbage when its timer fills.");
+            Expect(hungerSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Hunger Meter should report timer status.");
+
+            var sedationSpec = ModifierSpec("harness-sedation", 2, StoryModifier.SedationWindows);
+            var sedationSystem = new StoryModifierSystem(sedationSpec, new BoardState(new[] { PieceType.T }, seed: 4110), seed: 4110);
+            sedationSystem.Tick(15f);
+            Expect(sedationSystem.SedationActive && sedationSystem.InputSluggishMultiplier > 1f, "Sedation should become active late in its cycle and slow inputs.");
+            Expect(sedationSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Sedation should report ACTIVE status.");
+
+            var adrenalineSpec = ModifierSpec("harness-adrenaline-focused", 4, StoryModifier.AdrenalineMonitor);
+            var adrenalineBoard = new BoardState(new[] { PieceType.I }, seed: 4111);
+            adrenalineBoard.Grid[PieceDefinitions.TotalRows - 14, 0] = (int)PieceType.I;
+            var adrenalineSystem = new StoryModifierSystem(adrenalineSpec, adrenalineBoard, seed: 4111);
+            Expect(adrenalineSystem.GravityMultiplier < 1f, "Adrenaline Monitor should accelerate gravity when stack is high.");
+            Expect(adrenalineSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Adrenaline Monitor should report ACTIVE status at high stack.");
+
+            var relaySpec = ModifierSpec("harness-relay-focused", 5, StoryModifier.SignalRelay);
+            var relayBoard = new BoardState(new[] { PieceType.I }, seed: 4112);
+            var relaySystem = new StoryModifierSystem(relaySpec, relayBoard, seed: 4112);
+            relaySystem.Tick(25f);
+            Expect(relaySystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Signal Relay should activate after its timer fills.");
+
+            var reducedPreviewSpec = ModifierSpec("harness-reduced-preview", 2, StoryModifier.ReducedPreview);
+            reducedPreviewSpec.NextPreviewCount = 1;
+            var reducedPreviewSystem = new StoryModifierSystem(reducedPreviewSpec, new BoardState(new[] { PieceType.I }, seed: 4113), seed: 4113);
+            Expect(reducedPreviewSystem.BuildEnemyAbilityStatus().Contains("1 next shown"), "Reduced Preview should report the reduced next queue count.");
+
+            var noHoldSpec = ModifierSpec("harness-no-hold", 2, StoryModifier.NoHold);
+            noHoldSpec.HoldEnabled = false;
+            var noHoldSystem = new StoryModifierSystem(noHoldSpec, new BoardState(new[] { PieceType.I }, seed: 4114), seed: 4114);
+            Expect(noHoldSystem.BuildEnemyAbilityStatus().Contains("[ON]"), "No Hold should report ON status.");
         }
 
         private static string StoryModifierLabelForHarness(StoryModifier modifier) =>
@@ -507,6 +724,7 @@ namespace MonStacka.Editor
             {
                 Expect(renderer.sortingOrder >= 18, "Enemy territory cells should render above generic floor art.");
                 Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, "Enemy territory cells should read as red enemy cells, not gray placeholders.");
+                Expect(renderer.sprite != null && renderer.sprite.texture != Texture2D.whiteTexture, "Enemy territory cells should use authored/procedural cell art, not a stretched white placeholder.");
             }
 
             var shell = UnityEngine.Object.FindFirstObjectByType<GameSceneShellController>();
@@ -799,6 +1017,7 @@ namespace MonStacka.Editor
             {
                 Expect(renderer.sortingOrder >= 18, "Visible garbage/territory cells should render above floor art.");
                 Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, "Visible garbage/territory cells should read as red enemy cells, not gray placeholders.");
+                Expect(renderer.sprite != null && renderer.sprite.texture != Texture2D.whiteTexture, "Visible garbage/territory cells should use cell art, not a stretched white placeholder.");
             }
         }
 
@@ -920,6 +1139,157 @@ namespace MonStacka.Editor
             Expect(buildTimeUtc >= latestRuntimeAssetUtc, $"Windows build is stale. Build stamp {buildTimeUtc:O}; latest runtime asset {latestRuntimeAssetUtc:O}.");
         }
 
+        private static void VerifyBuiltPlayerScreenshotSmoke()
+        {
+            var buildDir = Path.Combine(Directory.GetCurrentDirectory(), "Builds", "Windows");
+            var exePath = Path.Combine(buildDir, "MonStackaV2.exe");
+            Expect(File.Exists(exePath), "Built-player smoke needs the Windows player exe.");
+
+            var visualReportDir = Path.Combine(ReportDir, "VisualSmoke");
+            Directory.CreateDirectory(visualReportDir);
+
+            var launches = new[]
+            {
+                new PlayerSmokeLaunch("ogbm-zany", "-monstacka-mode ogbm"),
+                new PlayerSmokeLaunch("story-1-3", "-monstacka-mode story -monstacka-chapter 1.3 -monstacka-skip-dialogue"),
+            };
+
+            foreach (var launch in launches)
+            {
+                var screenshotPath = Path.Combine(visualReportDir, $"{launch.Name}.png");
+                var smokeReportPath = Path.Combine(visualReportDir, $"{launch.Name}.txt");
+                var playerLogPath = Path.Combine(visualReportDir, $"{launch.Name}.log");
+                DeleteIfExists(screenshotPath);
+                DeleteIfExists(smokeReportPath);
+                DeleteIfExists(playerLogPath);
+
+                var arguments =
+                    $"-screen-width 1280 -screen-height 720 -screen-fullscreen 0 " +
+                    $"{launch.ModeArguments} " +
+                    $"-monstacka-capture {QuoteArg(screenshotPath)} " +
+                    $"-monstacka-smoke-report {QuoteArg(smokeReportPath)} " +
+                    "-monstacka-smoke-quit " +
+                    $"-logFile {QuoteArg(playerLogPath)}";
+
+                using var process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    Arguments = arguments,
+                    WorkingDirectory = buildDir,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                });
+
+                Expect(process != null, $"{launch.Name}: player process should start.");
+                if (!process.WaitForExit(45000))
+                {
+                    try
+                    {
+                        process.Kill();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Process exited between timeout and kill.
+                    }
+
+                    throw new InvalidOperationException($"{launch.Name}: built player did not finish smoke test within 45 seconds.");
+                }
+
+                Expect(File.Exists(smokeReportPath), $"{launch.Name}: runtime smoke report should exist. Player log: {playerLogPath}");
+                var smokeReport = File.ReadAllText(smokeReportPath);
+                Expect(smokeReport.Contains($"{RuntimeSmokeLogPrefix} RESULT: PASS", StringComparison.Ordinal), $"{launch.Name}: runtime smoke should pass. Report: {smokeReport.Replace(Environment.NewLine, " ")}");
+                Expect(process.ExitCode == 0, $"{launch.Name}: player should exit 0 after PASS. Exit={process.ExitCode}");
+                AssertScreenshotLooksRendered(screenshotPath, launch.Name);
+            }
+        }
+
+        private const string RuntimeSmokeLogPrefix = "[MonStackaSmoke]";
+
+        private readonly struct PlayerSmokeLaunch
+        {
+            public PlayerSmokeLaunch(string name, string modeArguments)
+            {
+                Name = name;
+                ModeArguments = modeArguments;
+            }
+
+            public string Name { get; }
+            public string ModeArguments { get; }
+        }
+
+        private static void AssertScreenshotLooksRendered(string screenshotPath, string context)
+        {
+            Expect(File.Exists(screenshotPath), $"{context}: screenshot should exist.");
+            var bytes = File.ReadAllBytes(screenshotPath);
+            Expect(bytes.Length > 4096, $"{context}: screenshot should not be tiny or empty.");
+
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                Expect(ImageConversion.LoadImage(texture, bytes), $"{context}: screenshot PNG should decode.");
+                Expect(texture.width >= 800 && texture.height >= 450, $"{context}: screenshot should be at least 800x450, got {texture.width}x{texture.height}.");
+
+                var pixels = texture.GetPixels32();
+                var stride = Mathf.Max(1, pixels.Length / 12000);
+                var sampled = 0;
+                var blueish = 0;
+                var dark = 0;
+                var light = 0;
+                var saturated = 0;
+                var buckets = new HashSet<int>();
+
+                for (var index = 0; index < pixels.Length; index += stride)
+                {
+                    var pixel = pixels[index];
+                    sampled += 1;
+                    var max = Mathf.Max(pixel.r, Mathf.Max(pixel.g, pixel.b));
+                    var min = Mathf.Min(pixel.r, Mathf.Min(pixel.g, pixel.b));
+                    if (pixel.b > pixel.r + 12 && pixel.b > pixel.g + 4)
+                    {
+                        blueish += 1;
+                    }
+
+                    if (max < 55)
+                    {
+                        dark += 1;
+                    }
+
+                    if (max > 170)
+                    {
+                        light += 1;
+                    }
+
+                    if (max - min > 35)
+                    {
+                        saturated += 1;
+                    }
+
+                    buckets.Add(((pixel.r / 16) << 8) | ((pixel.g / 16) << 4) | (pixel.b / 16));
+                }
+
+                Expect(sampled > 0, $"{context}: screenshot sampler should inspect pixels.");
+                Expect(buckets.Count >= 24, $"{context}: screenshot should have varied color buckets, got {buckets.Count}.");
+                Expect(blueish >= sampled * 0.15f, $"{context}: screenshot should contain the blue scene background.");
+                Expect(dark >= sampled * 0.04f, $"{context}: screenshot should contain dark panel/outline pixels.");
+                Expect(light >= sampled * 0.005f, $"{context}: screenshot should contain readable bright UI/text pixels.");
+                Expect(saturated >= sampled * 0.08f, $"{context}: screenshot should contain saturated block/UI colors.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static string QuoteArg(string value) => $"\"{value.Replace("\"", "\\\"")}\"";
+
+        private static void DeleteIfExists(string path)
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+
         private static DateTime ParseBuildStampUtc(string stampPath)
         {
             var stampText = File.ReadAllText(stampPath).Trim();
@@ -968,6 +1338,87 @@ namespace MonStacka.Editor
             };
 
             return candidates.Any(File.Exists);
+        }
+
+        private static void AssertVisibleRuntimePieceState(string context)
+        {
+            var skins = Resources.FindObjectsOfTypeAll<PieceSkin>()
+                .Where(skin => skin && skin.gameObject.scene.IsValid() && skin.gameObject.scene.isLoaded && skin.gameObject.activeInHierarchy)
+                .ToList();
+            Expect(skins.Count > 0, $"{context}: runtime should have at least one visible PieceSkin.");
+            Expect(skins.Any(skin => skin.GetComponentsInChildren<SpriteRenderer>(true).Any(renderer => renderer && renderer.sprite)), $"{context}: visible PieceSkin objects should contain sprite renderers.");
+
+            var garbageRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
+                .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.gameObject.scene.isLoaded && renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal) && renderer.gameObject.activeInHierarchy)
+                .ToList();
+            foreach (var renderer in garbageRenderers)
+            {
+                Expect(renderer.sprite != null && renderer.sprite.texture != Texture2D.whiteTexture, $"{context}: active enemy cells should not render as stretched placeholders.");
+                Expect(renderer.sortingOrder >= 18, $"{context}: active enemy cells should render above floor art.");
+            }
+        }
+
+        private static void PrepareBoardForAssist(PieceType pieceType, BoardState board)
+        {
+            switch (AssistEffectSystem.AssistForPiece(pieceType))
+            {
+                case AssistType.GuardBreak:
+                case AssistType.Digest:
+                    board.SeedTerritoryCells(6, seed: 500 + (int)pieceType);
+                    Expect(board.GetGarbageCells().Count > 0, $"{pieceType}: assist setup should seed enemy cells.");
+                    break;
+                case AssistType.Stitch:
+                {
+                    var bottom = PieceDefinitions.TotalRows - 1;
+                    board.Grid[bottom - 1, 0] = (int)PieceType.J;
+                    break;
+                }
+                case AssistType.Alert:
+                    board.Grid[PieceDefinitions.TotalRows - 14, 0] = (int)PieceType.I;
+                    Expect(AssistEffectSystem.IsInDanger(board), "Alert assist setup should create a dangerous stack.");
+                    break;
+            }
+        }
+
+        private static AssistTrigger TriggerHeldAssist(PieceType pieceType, BoardState board, AssistEffectSystem assist, out int awarded)
+        {
+            var totalAwarded = 0;
+            AssistTrigger? trigger = null;
+            for (var index = 0; index < AssistEffectSystem.TriggerEvery; index += 1)
+            {
+                trigger = assist.OnPieceLocked(
+                    new PieceLockEvent(7000 + index, pieceType, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true),
+                    board,
+                    points => totalAwarded += points
+                );
+            }
+
+            awarded = totalAwarded;
+            Expect(trigger.HasValue, $"{pieceType}: third held placement should trigger a friendly assist.");
+            return trigger.Value;
+        }
+
+        private static StoryChapterSpec ModifierSpec(string id, int difficultyTier, params StoryModifier[] modifiers) =>
+            new()
+            {
+                Id = id,
+                Title = id,
+                DifficultyTier = difficultyTier,
+                NextPreviewCount = 3,
+                HoldEnabled = true,
+                Modifiers = modifiers,
+            };
+
+        private static void FillBottomLine(BoardState board, PieceType type, int pieceIdStart)
+        {
+            var bottom = PieceDefinitions.TotalRows - 1;
+            for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+            {
+                board.Grid[bottom, col] = (int)type;
+                board.PieceIds[bottom, col] = pieceIdStart + col;
+                board.SourceCellXs[bottom, col] = col % 2;
+                board.SourceCellYs[bottom, col] = col / 2;
+            }
         }
 
         private static GameManager LoadGameManagerForMode(MonStackaMode mode, bool friendlyAbilitiesEnabled, string storyChapterId = null)

@@ -89,9 +89,9 @@ Objective: StoryObjective.Lines(8)
 [INTRO / PRE-BOARD]
 PA System: Welcome to Floor-A1!
 PA System: Believe it or not, even at Portentum, Success doesn't happen overnight!
-PA System: Before managaing to create the healthy experiments you saw a moment ago, we went through a rigorous time of trial and error.
+PA System: Before managing to create the healthy experiments you saw a moment ago, we went through a rigorous time of trial and error.
 Player: Those things did not look healthy...
-PA System: You migght be asking, So what exactly was the problem a company this advanced couldn't figure out?
+PA System: You might be asking, so what exactly was the problem a company this advanced couldn't figure out?
 Player (thought): Ethics?
 PA System: Goop! Our Experiments kept turning into a sort of Cytoplasm and would fall apart shortly after being made.
 Player: Um...okay....

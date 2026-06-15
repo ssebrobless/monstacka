@@ -81,9 +81,9 @@ namespace MonStacka.Story
         {
             D.Pa("Welcome to Floor-A1!"),
             D.Pa("Believe it or not, even at Portentum, Success doesn't happen overnight!"),
-            D.Pa("Before managaing to create the healthy experiments you saw a moment ago, we went through a rigorous time of trial and error."),
+            D.Pa("Before managing to create the healthy experiments you saw a moment ago, we went through a rigorous time of trial and error."),
             D.P("Those things did not look healthy..."),
-            D.Pa("You migght be asking, So what exactly was the problem a company this advanced couldn't figure out?"),
+            D.Pa("You might be asking, so what exactly was the problem a company this advanced couldn't figure out?"),
             D.Pt("Ethics?"),
             D.Pa("Goop! Our Experiments kept turning into a sort of Cytoplasm and would fall apart shortly after being made."),
             D.P("Um...okay...."),

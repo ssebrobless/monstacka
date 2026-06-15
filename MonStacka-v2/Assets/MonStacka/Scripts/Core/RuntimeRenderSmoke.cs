@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO;
 using System.Reflection;
 using System.Text;
 using UnityEngine;
@@ -21,6 +22,8 @@ namespace MonStacka.Core
 
         private float lastSampledPieceY = float.MinValue;
         private bool sawGravityProgress;
+        private bool finalPassed;
+        private string finalReportText;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Install()
@@ -81,23 +84,87 @@ namespace MonStacka.Core
             {
                 Application.runInBackground = true;
                 yield return new WaitForEndOfFrame();
+                EnsureParentDirectory(capturePath);
                 ScreenCapture.CaptureScreenshot(capturePath);
                 Debug.Log($"{LogPrefix} capture requested -> {capturePath}");
+
+                for (var waitFrames = 0; waitFrames < 60; waitFrames += 1)
+                {
+                    if (File.Exists(capturePath) && new FileInfo(capturePath).Length > 0)
+                    {
+                        break;
+                    }
+
+                    yield return new WaitForSecondsRealtime(0.1f);
+                }
+            }
+
+            WriteSmokeReport();
+
+            if (HasArgument("-monstacka-smoke-quit"))
+            {
+                Application.Quit(finalPassed ? 0 : 1);
             }
         }
 
         private static string GetCapturePath()
         {
+            return GetArgumentValue("-monstacka-capture");
+        }
+
+        private static string GetReportPath()
+        {
+            return GetArgumentValue("-monstacka-smoke-report");
+        }
+
+        private static string GetArgumentValue(string name)
+        {
             var args = System.Environment.GetCommandLineArgs();
             for (var index = 0; index < args.Length - 1; index += 1)
             {
-                if (args[index] == "-monstacka-capture")
+                if (string.Equals(args[index], name, System.StringComparison.OrdinalIgnoreCase))
                 {
                     return args[index + 1];
                 }
             }
 
             return null;
+        }
+
+        private static bool HasArgument(string name)
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            for (var index = 0; index < args.Length; index += 1)
+            {
+                if (string.Equals(args[index], name, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void EnsureParentDirectory(string path)
+        {
+            var parent = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(parent))
+            {
+                Directory.CreateDirectory(parent);
+            }
+        }
+
+        private void WriteSmokeReport()
+        {
+            var reportPath = GetReportPath();
+            if (string.IsNullOrEmpty(reportPath))
+            {
+                return;
+            }
+
+            EnsureParentDirectory(reportPath);
+            File.WriteAllText(reportPath, finalReportText ?? $"{LogPrefix} RESULT: FAIL - final sample did not run.");
+            Debug.Log($"{LogPrefix} report requested -> {reportPath}");
         }
 
         private void Sample(string label, bool final)
@@ -109,6 +176,10 @@ namespace MonStacka.Core
             if (!manager)
             {
                 report.AppendLine($"{LogPrefix} FAIL: no GameManager in Game scene.");
+                if (final)
+                {
+                    CompleteFinalReport(report, passed: false, " no-GameManager;");
+                }
                 Debug.Log(report.ToString());
                 return;
             }
@@ -215,12 +286,19 @@ namespace MonStacka.Core
                     failures.Append(" skin-lookup-empty;");
                 }
 
-                report.AppendLine(failures.Length == 0
-                    ? $"{LogPrefix} RESULT: PASS - active piece is live and visibly rendered."
-                    : $"{LogPrefix} RESULT: FAIL -{failures}");
+                CompleteFinalReport(report, failures.Length == 0, failures.ToString());
             }
 
             Debug.Log(report.ToString());
+        }
+
+        private void CompleteFinalReport(StringBuilder report, bool passed, string failureDetails)
+        {
+            finalPassed = passed;
+            report.AppendLine(passed
+                ? $"{LogPrefix} RESULT: PASS - active piece is live and visibly rendered."
+                : $"{LogPrefix} RESULT: FAIL -{failureDetails}");
+            finalReportText = report.ToString();
         }
 
         private bool DescribeActiveView(StringBuilder report, MonoBehaviour activeView, Camera camera)
