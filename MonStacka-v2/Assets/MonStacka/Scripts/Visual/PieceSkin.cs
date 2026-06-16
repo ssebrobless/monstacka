@@ -117,6 +117,7 @@ namespace MonStacka.Visual
                 pieceType,
                 rotation,
                 localCells,
+                sourceCells,
                 cellWorldSize,
                 bodyBuild.UsesFullBoxSprite,
                 enableFacialAnimation

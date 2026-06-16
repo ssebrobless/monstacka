@@ -240,6 +240,7 @@ namespace MonStacka.Editor
                 new HarnessScenario("friendly ability mechanic scenarios", VerifyFriendlyAbilityMechanicScenarios),
                 new HarnessScenario("story modifier scenarios", VerifyStoryModifierScenarios),
                 new HarnessScenario("enemy ability focused trigger matrix", VerifyEnemyAbilityFocusedTriggerMatrix),
+                new HarnessScenario("ability feedback visual state", VerifyAbilityFeedbackVisualState),
                 new HarnessScenario("story deterministic simulation sweep", VerifyStoryDeterministicSimulationSweep),
                 new HarnessScenario("story render state consistency sweep", VerifyStoryRenderStateConsistencySweep),
                 new HarnessScenario("story input playback sweep", VerifyStoryInputPlaybackSweep),
@@ -998,7 +999,7 @@ namespace MonStacka.Editor
 
             board.Grid[survivorRow, 0] = (int)PieceType.T;
             board.PieceIds[survivorRow, 0] = survivorPieceId;
-            board.SourceCellXs[survivorRow, 0] = 2;
+            board.SourceCellXs[survivorRow, 0] = 1;
             board.SourceCellYs[survivorRow, 0] = 0;
 
             for (var col = 0; col < PieceDefinitions.Columns; col += 1)
@@ -1013,7 +1014,7 @@ namespace MonStacka.Editor
             var record = board.GetLockedPieceGroups().FirstOrDefault(group => group.PieceId == survivorPieceId);
             Expect(record != null, "Surviving partial piece should be rebuilt after line clear.");
             Expect(record.Cells.Count == 1 && record.Cells[0] == new Vector2Int(0, clearRow), "Surviving partial cell should drop into the cleared row.");
-            Expect(record.SourceCells.Count == 1 && record.SourceCells[0] == new Vector2Int(2, 0), "Surviving partial cell should keep its original art source coordinate.");
+            Expect(record.SourceCells.Count == 1 && record.SourceCells[0] == new Vector2Int(1, 0), "Surviving partial cell should keep its original art source coordinate.");
         }
 
         private static void VerifyStoryRenderStateConsistencySweep()
@@ -1037,7 +1038,7 @@ namespace MonStacka.Editor
             const int survivorPieceId = 9001;
             board.Grid[survivorRow, 0] = (int)PieceType.T;
             board.PieceIds[survivorRow, 0] = survivorPieceId;
-            board.SourceCellXs[survivorRow, 0] = 2;
+            board.SourceCellXs[survivorRow, 0] = 1;
             board.SourceCellYs[survivorRow, 0] = 0;
 
             for (var col = 0; col < PieceDefinitions.Columns; col += 1)
@@ -1062,7 +1063,7 @@ namespace MonStacka.Editor
             var survivorRecord = records.FirstOrDefault(record => record.PieceId == survivorPieceId);
             Expect(survivorRecord != null, "Runtime render sweep should keep the survivor record after clear.");
             Expect(survivorRecord.Cells.Count == 1, "Runtime survivor should be a partial one-cell piece after clear.");
-            Expect(survivorRecord.SourceCells.Count == 1 && survivorRecord.SourceCells[0] == new Vector2Int(2, 0), "Runtime survivor should preserve source-cell art after clear.");
+            Expect(survivorRecord.SourceCells.Count == 1 && survivorRecord.SourceCells[0] == new Vector2Int(1, 0), "Runtime survivor should preserve source-cell art after clear.");
 
             var survivorSkin = lockedSkins.FirstOrDefault(skin => skin.PieceId == survivorPieceId);
             Expect(survivorSkin != null, "Runtime survivor should have a visible PieceSkin.");
@@ -1070,6 +1071,7 @@ namespace MonStacka.Editor
             Expect(!survivorSkin.BodyBuildUsesFullBoxSprite, "Runtime partial survivor should not fall back to a full-box sprite.");
             Expect(survivorSkin.RequiresManualUpdate, "Runtime partial survivor should retain animated visual systems.");
             Expect(survivorSkin.GetComponentsInChildren<SpriteRenderer>(true).Any(renderer => renderer && renderer.sprite), "Runtime survivor should have sprite renderers.");
+            Expect(survivorSkin.GetComponentsInChildren<FacialPartAnimator>(true).Any(animator => animator && animator.Animates), "Runtime partial survivor should keep animated monster feature layers after line clear.");
 
             var garbageRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
                 .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.gameObject.scene.isLoaded && renderer.name.StartsWith("GarbageCell"))
@@ -1080,6 +1082,39 @@ namespace MonStacka.Editor
                 Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, "Visible garbage/territory cells should read as red enemy cells, not gray placeholders.");
                 Expect(renderer.sprite != null && renderer.sprite.texture != Texture2D.whiteTexture, "Visible garbage/territory cells should use cell art, not a stretched white placeholder.");
             }
+        }
+
+        private static void VerifyAbilityFeedbackVisualState()
+        {
+            var manager = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true);
+            var board = manager.Board;
+
+            ArmNextHeldAssistWithoutCommit(manager, "Ability feedback visual state");
+            InvokePrivate(manager, "UpdatePreviewViews");
+            Expect(manager.AssistSystem.NextHeldPlacementWillTrigger, "Ability feedback should arm the next held placement before visual checks.");
+            Expect(IsSceneObjectActive("AbilityReadyInnerGlow"), "Hold box should glow while an armed assist is still waiting in hold.");
+            Expect(!IsSceneObjectActive("AssistBoardActivationCue"), "Board ability cue should stay hidden until the armed held piece is deployed.");
+
+            Expect(board.TrySwapHoldWithUpcoming(0), "Ability feedback should allow swapping an armed hold with the next queue slot.");
+            InvokePrivate(manager, "UpdatePreviewViews");
+            Expect(manager.AssistSystem.NextHeldPlacementWillTrigger, "Hold queue swap should not consume the armed assist charge.");
+            Expect(IsSceneObjectActive("AbilityReadyInnerGlow"), "Hold glow should survive queue swapping while the ability is still held.");
+
+            Expect(board.TryHold(), "Ability feedback should deploy the armed held piece.");
+            InvokePrivate(manager, "UpdatePreviewViews");
+            InvokePrivate(manager, "UpdateVisuals");
+            Expect(manager.AssistSystem.NextHeldPlacementWillTrigger, "Deploying the armed held piece should preserve the assist charge until lock.");
+            Expect(!IsSceneObjectActive("AbilityReadyInnerGlow"), "Hold glow should clear from the replacement hold piece once the armed piece is on the board.");
+            Expect(IsSceneObjectActive("AssistBoardActivationCue"), "Board ability cue should appear when the armed held piece is deployed.");
+
+            var scoreBeforeLock = board.Score;
+            InvokePrivate(manager, "HardDropAndSpawn");
+            InvokePrivate(manager, "UpdateVisuals");
+            Expect(!manager.AssistSystem.NextHeldPlacementWillTrigger, "Assist glow/counter should clear after the armed held piece locks.");
+            Expect(manager.AssistSystem.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Assist counter should reset after the board commit.");
+            Expect(board.Score > scoreBeforeLock, "Board commit should award friendly assist points.");
+            Expect(!IsSceneObjectActive("AbilityReadyInnerGlow"), "Hold glow should remain clear after assist commit.");
+            Expect(IsSceneObjectActive("AssistBoardActivationCue"), "Board ability cue should linger briefly after assist commit.");
         }
 
         private static void VerifyStoryInputPlaybackSweep()
@@ -1590,6 +1625,29 @@ namespace MonStacka.Editor
             Expect(manager.AssistSystem.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, $"{context}: assist counter should reset after trigger.");
             Expect(!manager.AssistSystem.NextHeldPlacementWillTrigger, $"{context}: assist glow/counter should clear after trigger.");
             Expect(board.Score > startingScore, $"{context}: friendly assist trigger should award points through the runtime event path.");
+        }
+
+        private static void ArmNextHeldAssistWithoutCommit(GameManager manager, string context)
+        {
+            Expect(manager.AssistSystem != null, $"{context}: arming assist requires friendly abilities.");
+            var board = manager.Board;
+
+            if (!board.HasHoldPiece)
+            {
+                Expect(board.TryHold(), $"{context}: should fill hold before arming assist.");
+                InvokePrivate(manager, "HardDropAndSpawn");
+            }
+
+            for (var heldPlacement = 1; heldPlacement < AssistEffectSystem.TriggerEvery; heldPlacement += 1)
+            {
+                Expect(board.HasHoldPiece, $"{context}: should have a hold piece before arming step {heldPlacement}.");
+                Expect(board.TryHold(), $"{context}: should deploy held piece for arming step {heldPlacement}.");
+                InvokePrivate(manager, "HardDropAndSpawn");
+                InvokePrivate(manager, "UpdateVisuals");
+            }
+
+            Expect(manager.AssistSystem.NextHeldPlacementWillTrigger, $"{context}: next held placement should now be armed.");
+            Expect(board.HasHoldPiece, $"{context}: armed assist should still have a held piece available.");
         }
 
         private static void ForceRuntimeGameOver(GameManager manager, string context)
@@ -2198,6 +2256,14 @@ namespace MonStacka.Editor
         private static RectTransform FindSceneRect(string objectName) =>
             Resources.FindObjectsOfTypeAll<RectTransform>()
                 .FirstOrDefault(rect => rect && rect.gameObject.scene.IsValid() && rect.gameObject.scene.isLoaded && rect.name == objectName);
+
+        private static bool IsSceneObjectActive(string objectName) =>
+            Resources.FindObjectsOfTypeAll<Transform>()
+                .Any(transform => transform &&
+                    transform.gameObject.scene.IsValid() &&
+                    transform.gameObject.scene.isLoaded &&
+                    transform.name == objectName &&
+                    transform.gameObject.activeInHierarchy);
 
         private static void InvokePrivate(object target, string methodName)
         {

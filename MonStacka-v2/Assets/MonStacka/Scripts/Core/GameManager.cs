@@ -113,6 +113,10 @@ namespace MonStacka.Core
         private bool gameplayPieceVisualsVisible = true;
         private bool restartConfirmActive;
         private bool sceneTransitioning;
+        private SpriteRenderer assistBoardCueRenderer;
+        private float assistBoardCueUntil;
+        private Color assistBoardCueColor = Color.white;
+        private bool assistBoardCueTracksActivePiece;
         private GameObject restartConfirmRoot;
         private Button restartConfirmAcceptButton;
         private Button restartConfirmCancelButton;
@@ -181,6 +185,7 @@ namespace MonStacka.Core
                 var trigger = assistSystem?.OnPieceLocked(lockEvent, boardState, points => boardState.AddScore(points, lockEvent.PieceType));
                 if (trigger.HasValue)
                 {
+                    ShowAssistBoardCue(lockEvent.Cells, trigger.Value.Piece, tracksActivePiece: false);
                     hudController?.ShowAssistTrigger(trigger.Value);
                 }
             };
@@ -903,6 +908,8 @@ namespace MonStacka.Core
                 holdBoxView.ManualUpdate(now);
             }
 
+            UpdateAssistBoardCue(now);
+
             if (nextQueueView)
             {
                 nextQueueView.ManualUpdate(now);
@@ -926,6 +933,89 @@ namespace MonStacka.Core
                 );
                 hudController.RenderAssist(assistSystem);
             }
+        }
+
+        private void UpdateAssistBoardCue(float now)
+        {
+            if (boardState != null &&
+                boardState.HasActivePiece &&
+                boardState.ActivePieceCameFromHold &&
+                assistSystem != null &&
+                assistSystem.NextHeldPlacementWillTrigger)
+            {
+                ShowAssistBoardCue(PieceDefinitions.GetAbsoluteCells(boardState.ActivePiece), boardState.ActivePiece.Type, tracksActivePiece: true);
+            }
+
+            if (!assistBoardCueRenderer)
+            {
+                return;
+            }
+
+            if (now >= assistBoardCueUntil)
+            {
+                assistBoardCueRenderer.gameObject.SetActive(false);
+                assistBoardCueTracksActivePiece = false;
+                return;
+            }
+
+            var pulse = 0.5f + (0.5f * Mathf.Sin(now * 8.2f));
+            var color = assistBoardCueColor;
+            color.a = assistBoardCueTracksActivePiece
+                ? Mathf.Lerp(0.14f, 0.28f, pulse)
+                : Mathf.Lerp(0.24f, 0.42f, pulse);
+            assistBoardCueRenderer.color = color;
+        }
+
+        private void ShowAssistBoardCue(IReadOnlyList<Vector2Int> absoluteCells, PieceType pieceType, bool tracksActivePiece)
+        {
+            if (absoluteCells == null || absoluteCells.Count == 0)
+            {
+                return;
+            }
+
+            EnsureAssistBoardCueRenderer();
+            if (!assistBoardCueRenderer)
+            {
+                return;
+            }
+
+            assistBoardCueTracksActivePiece = tracksActivePiece;
+            assistBoardCueUntil = Time.time + (tracksActivePiece ? 0.18f : 1.2f);
+            assistBoardCueColor = PieceDefinitions.PieceColors.TryGetValue(pieceType, out var pieceColor)
+                ? pieceColor
+                : Color.white;
+            PositionAssistBoardCue(absoluteCells);
+            assistBoardCueRenderer.gameObject.SetActive(true);
+        }
+
+        private void EnsureAssistBoardCueRenderer()
+        {
+            if (assistBoardCueRenderer)
+            {
+                return;
+            }
+
+            var parent = activeRoot ? activeRoot : boardRoot ? boardRoot : transform;
+            var go = new GameObject("AssistBoardActivationCue");
+            go.transform.SetParent(parent, false);
+            assistBoardCueRenderer = go.AddComponent<SpriteRenderer>();
+            assistBoardCueRenderer.sprite = CreateWhiteSprite();
+            assistBoardCueRenderer.sortingOrder = -24;
+            assistBoardCueRenderer.color = Color.clear;
+            go.SetActive(false);
+        }
+
+        private void PositionAssistBoardCue(IReadOnlyList<Vector2Int> absoluteCells)
+        {
+            var minX = absoluteCells.Min(cell => cell.x);
+            var maxX = absoluteCells.Max(cell => cell.x);
+            var minY = absoluteCells.Min(cell => cell.y);
+            var maxY = absoluteCells.Max(cell => cell.y);
+            var width = (maxX - minX + 1) * cellWorldSize;
+            var height = (maxY - minY + 1) * cellWorldSize;
+            var topLeft = BoardToWorld(minX, minY);
+            assistBoardCueRenderer.transform.localPosition = topLeft + new Vector3(width * 0.5f, height * -0.5f, 0.08f);
+            assistBoardCueRenderer.transform.localScale = new Vector3(width + (cellWorldSize * 0.34f), height + (cellWorldSize * 0.34f), 1f);
         }
 
         private void RebuildBoardViews()
@@ -1052,7 +1142,7 @@ namespace MonStacka.Core
                 renderData.UseFullBoxSprite,
                 isWholePiece ? GetLockedPulseScale() : GetLockedPulseScale() * 0.7f,
                 shouldAnimateBody: true,
-                shouldEnableFeatures: isWholePiece
+                shouldEnableFeatures: true
             );
             pieceView.transform.localPosition = BoardToWorld(renderData.Origin.x, renderData.Origin.y);
             stackViews[record.PieceId] = pieceView;
@@ -1149,7 +1239,8 @@ namespace MonStacka.Core
                 var holdAbilityArmed =
                     holdPiece.HasValue &&
                     assistSystem != null &&
-                    assistSystem.NextHeldPlacementWillTrigger;
+                    assistSystem.NextHeldPlacementWillTrigger &&
+                    !(boardState.HasActivePiece && boardState.ActivePieceCameFromHold);
                 holdBoxView.Render(holdPiece, skinLookup, outlineMaterial, deformTuning, cellWorldSize * 0.72f, holdAbilityArmed);
             }
 

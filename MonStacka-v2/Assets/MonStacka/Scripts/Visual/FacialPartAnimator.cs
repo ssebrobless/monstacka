@@ -40,6 +40,7 @@ namespace MonStacka.Visual
             PieceType pieceType,
             int rotation,
             IReadOnlyCollection<Vector2Int> localCells,
+            IReadOnlyCollection<Vector2Int> sourceCells,
             float worldCellSize,
             bool useFullBoxCoordinates,
             bool animate)
@@ -57,19 +58,16 @@ namespace MonStacka.Visual
                 return;
             }
 
-            if (!ConnectedBodyBuilder.MatchesFullDefinition(pieceType, rotation, localCells))
-            {
-                return;
-            }
-
             pixelsPerCell = skinData.pixelsPerCell;
             cellWorldSize = worldCellSize;
             var boxPx = skinData.boxSize * skinData.pixelsPerCell;
             var turns = ConnectedBodyBuilder.GetTextureTurns(skinData, pieceType, rotation);
             var rotatedDefinition = PieceDefinitions.GetCells(pieceType, rotation);
+            var isFullDefinition = ConnectedBodyBuilder.MatchesFullDefinition(pieceType, rotation, localCells);
+            var sourceToLocal = BuildSourceToLocalMap(localCells, sourceCells);
             var offsetX = 0;
             var offsetY = 0;
-            if (!useFullBoxCoordinates)
+            if (!useFullBoxCoordinates && isFullDefinition)
             {
                 offsetX = rotatedDefinition.Min(cell => cell.x) * skinData.pixelsPerCell;
                 offsetY = rotatedDefinition.Min(cell => cell.y) * skinData.pixelsPerCell;
@@ -86,11 +84,23 @@ namespace MonStacka.Visual
                     center = new Vector2(boxPx - center.y, center.x);
                 }
 
+                var localCenter = isFullDefinition
+                    ? new Vector2(
+                        (center.x - offsetX) / pixelsPerCell * cellWorldSize,
+                        -((center.y - offsetY) / pixelsPerCell) * cellWorldSize)
+                    : TryMapPartialFeatureCenter(center, sourceToLocal, out var mappedCenter)
+                        ? mappedCenter
+                        : (Vector2?)null;
+                if (!localCenter.HasValue)
+                {
+                    continue;
+                }
+
                 var holder = new GameObject($"Feature_{seed.featureName}");
                 holder.transform.SetParent(transform, false);
                 holder.transform.localPosition = new Vector3(
-                    (center.x - offsetX) / pixelsPerCell * cellWorldSize,
-                    -((center.y - offsetY) / pixelsPerCell) * cellWorldSize,
+                    localCenter.Value.x,
+                    localCenter.Value.y,
                     -0.01f - (index * 0.0008f));
                 holder.transform.localRotation = Quaternion.Euler(0f, 0f, -90f * turns);
 
@@ -115,6 +125,50 @@ namespace MonStacka.Visual
             }
 
             Animates = animate && layers.Any(layer => layer.Motion != FeatureMotion.Static);
+        }
+
+        private static Dictionary<Vector2Int, Vector2Int> BuildSourceToLocalMap(
+            IReadOnlyCollection<Vector2Int> localCells,
+            IReadOnlyCollection<Vector2Int> sourceCells)
+        {
+            var map = new Dictionary<Vector2Int, Vector2Int>();
+            if (localCells == null)
+            {
+                return map;
+            }
+
+            var localList = localCells.ToList();
+            var sourceList = sourceCells != null && sourceCells.Count == localList.Count
+                ? sourceCells.ToList()
+                : localList;
+            for (var index = 0; index < localList.Count; index += 1)
+            {
+                map[sourceList[index]] = localList[index];
+            }
+
+            return map;
+        }
+
+        private bool TryMapPartialFeatureCenter(
+            Vector2 center,
+            IReadOnlyDictionary<Vector2Int, Vector2Int> sourceToLocal,
+            out Vector2 mappedCenter)
+        {
+            var sourceCell = new Vector2Int(
+                Mathf.FloorToInt(center.x / pixelsPerCell),
+                Mathf.FloorToInt(center.y / pixelsPerCell));
+            if (!sourceToLocal.TryGetValue(sourceCell, out var localCell))
+            {
+                mappedCenter = default;
+                return false;
+            }
+
+            var localX = (center.x - (sourceCell.x * pixelsPerCell)) / pixelsPerCell;
+            var localY = (center.y - (sourceCell.y * pixelsPerCell)) / pixelsPerCell;
+            mappedCenter = new Vector2(
+                (localCell.x + localX) * cellWorldSize,
+                -(localCell.y + localY) * cellWorldSize);
+            return true;
         }
 
         public void ManualUpdate(float now)
