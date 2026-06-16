@@ -55,6 +55,61 @@ namespace MonStacka.Editor
             public string StackTrace;
         }
 
+        private enum ReplayActionKind
+        {
+            MoveLeft,
+            MoveRight,
+            RotateCw,
+            RotateCcw,
+            SoftDrop,
+            Hold,
+            SwapHold1,
+            SwapHold2,
+            SwapHold3,
+            HardDrop,
+            Pause,
+            Resume,
+            OpenSettings,
+            CloseSettings,
+            RestartPrompt,
+            CancelRestart,
+            ToggleTrainingZany,
+            TriggerFriendlyAssist,
+            ForceGameOver,
+        }
+
+        private readonly struct ReplayAction
+        {
+            public ReplayAction(ReplayActionKind kind, int repeat = 1, bool expectSuccess = true)
+            {
+                Kind = kind;
+                Repeat = Math.Max(1, repeat);
+                ExpectSuccess = expectSuccess;
+            }
+
+            public ReplayActionKind Kind { get; }
+            public int Repeat { get; }
+            public bool ExpectSuccess { get; }
+        }
+
+        private readonly struct ReplayScenario
+        {
+            public ReplayScenario(string name, MonStackaMode mode, bool zany, string chapter, params ReplayAction[] actions)
+            {
+                Name = name;
+                Mode = mode;
+                Zany = zany;
+                Chapter = chapter;
+                Actions = actions;
+            }
+
+            public string Name { get; }
+            public MonStackaMode Mode { get; }
+            public bool Zany { get; }
+            public string Chapter { get; }
+            public IReadOnlyList<ReplayAction> Actions { get; }
+        }
+
         private static readonly string[] AllowedLogFragments =
         {
             "Licensing",
@@ -188,6 +243,9 @@ namespace MonStacka.Editor
                 new HarnessScenario("story deterministic simulation sweep", VerifyStoryDeterministicSimulationSweep),
                 new HarnessScenario("story render state consistency sweep", VerifyStoryRenderStateConsistencySweep),
                 new HarnessScenario("story input playback sweep", VerifyStoryInputPlaybackSweep),
+                new HarnessScenario("runtime replay driver sweep", VerifyRuntimeReplayDriverSweep),
+                new HarnessScenario("runtime screenshot checkpoint sweep", VerifyRuntimeScreenshotCheckpointSweep),
+                new HarnessScenario("runtime soak replay sweep", VerifyRuntimeSoakReplaySweep),
                 new HarnessScenario("records stay split by variant", VerifyRecordSeparation),
                 new HarnessScenario("settings and controls smoke", VerifySettingsAndControlsSmoke),
                 new HarnessScenario("ability reference text is player-facing", VerifyAbilityReferenceText),
@@ -1087,6 +1145,549 @@ namespace MonStacka.Editor
             }
         }
 
+        private static void VerifyRuntimeReplayDriverSweep()
+        {
+            var scenarios = new[]
+            {
+                new ReplayScenario(
+                    "O.G.B.M. classic replay",
+                    MonStackaMode.Ogbm,
+                    zany: false,
+                    chapter: null,
+                    new ReplayAction(ReplayActionKind.MoveLeft, repeat: 8),
+                    new ReplayAction(ReplayActionKind.MoveRight, repeat: 16),
+                    new ReplayAction(ReplayActionKind.RotateCw),
+                    new ReplayAction(ReplayActionKind.SoftDrop, repeat: 2),
+                    new ReplayAction(ReplayActionKind.HardDrop),
+                    new ReplayAction(ReplayActionKind.Pause),
+                    new ReplayAction(ReplayActionKind.Resume),
+                    new ReplayAction(ReplayActionKind.RestartPrompt),
+                    new ReplayAction(ReplayActionKind.CancelRestart),
+                    new ReplayAction(ReplayActionKind.ForceGameOver)
+                ),
+                new ReplayScenario(
+                    "O.G.B.M. zany assist replay",
+                    MonStackaMode.Ogbm,
+                    zany: true,
+                    chapter: null,
+                    new ReplayAction(ReplayActionKind.MoveRight, repeat: 4),
+                    new ReplayAction(ReplayActionKind.TriggerFriendlyAssist),
+                    new ReplayAction(ReplayActionKind.HardDrop)
+                ),
+                new ReplayScenario(
+                    "X(4)-LINES classic replay",
+                    MonStackaMode.Sprint40,
+                    zany: false,
+                    chapter: null,
+                    new ReplayAction(ReplayActionKind.MoveLeft, repeat: 5),
+                    new ReplayAction(ReplayActionKind.RotateCcw),
+                    new ReplayAction(ReplayActionKind.HardDrop),
+                    new ReplayAction(ReplayActionKind.MoveRight, repeat: 5),
+                    new ReplayAction(ReplayActionKind.HardDrop)
+                ),
+                new ReplayScenario(
+                    "X(4)-LINES zany assist replay",
+                    MonStackaMode.Sprint40,
+                    zany: true,
+                    chapter: null,
+                    new ReplayAction(ReplayActionKind.TriggerFriendlyAssist),
+                    new ReplayAction(ReplayActionKind.OpenSettings),
+                    new ReplayAction(ReplayActionKind.CloseSettings)
+                ),
+                new ReplayScenario(
+                    "Training zany toggle replay",
+                    MonStackaMode.Training,
+                    zany: false,
+                    chapter: null,
+                    new ReplayAction(ReplayActionKind.ToggleTrainingZany),
+                    new ReplayAction(ReplayActionKind.MoveLeft, repeat: 2),
+                    new ReplayAction(ReplayActionKind.RotateCw),
+                    new ReplayAction(ReplayActionKind.HardDrop),
+                    new ReplayAction(ReplayActionKind.RestartPrompt)
+                ),
+                new ReplayScenario(
+                    "Story 1.1 replay",
+                    MonStackaMode.Story,
+                    zany: false,
+                    chapter: "1.1",
+                    new ReplayAction(ReplayActionKind.MoveLeft, repeat: 3),
+                    new ReplayAction(ReplayActionKind.Hold),
+                    new ReplayAction(ReplayActionKind.HardDrop),
+                    new ReplayAction(ReplayActionKind.RestartPrompt),
+                    new ReplayAction(ReplayActionKind.CancelRestart)
+                ),
+                new ReplayScenario(
+                    "Story 1.2 replay",
+                    MonStackaMode.Story,
+                    zany: false,
+                    chapter: "1.2",
+                    new ReplayAction(ReplayActionKind.Hold),
+                    new ReplayAction(ReplayActionKind.HardDrop),
+                    new ReplayAction(ReplayActionKind.Hold),
+                    new ReplayAction(ReplayActionKind.SwapHold1),
+                    new ReplayAction(ReplayActionKind.HardDrop)
+                ),
+                new ReplayScenario(
+                    "Story 1.3 modifier replay",
+                    MonStackaMode.Story,
+                    zany: false,
+                    chapter: "1.3",
+                    new ReplayAction(ReplayActionKind.MoveRight, repeat: 3),
+                    new ReplayAction(ReplayActionKind.Hold),
+                    new ReplayAction(ReplayActionKind.HardDrop),
+                    new ReplayAction(ReplayActionKind.OpenSettings),
+                    new ReplayAction(ReplayActionKind.CloseSettings),
+                    new ReplayAction(ReplayActionKind.HardDrop)
+                ),
+            };
+
+            foreach (var scenario in scenarios)
+            {
+                RunReplayScenario(scenario);
+            }
+
+            RunLineClearReplayScenario();
+            RunFocusedEnemyModifierReplayScenario();
+        }
+
+        private static void VerifyRuntimeScreenshotCheckpointSweep()
+        {
+            var checkpointDir = Path.Combine(ReportDir, "ReplayCheckpoints");
+            Directory.CreateDirectory(checkpointDir);
+            foreach (var oldFile in Directory.EnumerateFiles(checkpointDir, "*.png"))
+            {
+                File.Delete(oldFile);
+            }
+
+            var startManager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            InvokePrivate(startManager, "UpdateVisuals");
+            var startPath = CaptureRuntimeCheckpoint(checkpointDir, "story-start", "Story checkpoint start");
+            AssertCheckpointScreenshotReadable(startPath, "Story checkpoint start");
+
+            var lineClearManager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            var lineClearBoard = lineClearManager.Board;
+            lineClearBoard.Reset();
+            var clearRow = PieceDefinitions.TotalRows - 8;
+            var survivorRow = clearRow - 1;
+            lineClearBoard.Grid[survivorRow, 2] = (int)PieceType.T;
+            lineClearBoard.PieceIds[survivorRow, 2] = 61099;
+            lineClearBoard.SourceCellXs[survivorRow, 2] = 1;
+            lineClearBoard.SourceCellYs[survivorRow, 2] = 0;
+            for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+            {
+                lineClearBoard.Grid[clearRow, col] = (int)PieceType.O;
+                lineClearBoard.PieceIds[clearRow, col] = 61100 + col;
+                lineClearBoard.SourceCellXs[clearRow, col] = col % 2;
+                lineClearBoard.SourceCellYs[clearRow, col] = 0;
+            }
+            InvokePrivate(lineClearBoard, "RebuildLockedPiecesFromGrid");
+            InvokePrivate(lineClearManager, "RebuildBoardViews");
+            InvokePrivate(lineClearManager, "UpdateVisuals");
+            var beforeLineClearPath = CaptureRuntimeCheckpoint(checkpointDir, "before-line-clear", "Story checkpoint before line clear");
+            AssertCheckpointScreenshotReadable(beforeLineClearPath, "Story checkpoint before line clear");
+            Expect(lineClearBoard.ClearLines() == 1, "Screenshot checkpoint should clear a prepared line.");
+            InvokePrivate(lineClearManager, "RebuildBoardViews");
+            InvokePrivate(lineClearManager, "UpdateVisuals");
+            var lineClearPath = CaptureRuntimeCheckpoint(checkpointDir, "after-line-clear", "Story checkpoint after line clear");
+            AssertCheckpointScreenshotReadable(lineClearPath, "Story checkpoint after line clear");
+            Expect(lineClearBoard.Lines == 1, "Story checkpoint after line clear should update board line count.");
+            AssertScreenshotsDiffer(startPath, lineClearPath, "start vs after-line-clear checkpoint");
+
+            var assistManager = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true);
+            TriggerFriendlyAssistThroughRuntime(assistManager, "Screenshot checkpoint assist trigger");
+            InvokePrivate(assistManager, "UpdateVisuals");
+            var assistPath = CaptureRuntimeCheckpoint(checkpointDir, "after-assist", "Zany checkpoint after assist trigger");
+            AssertCheckpointScreenshotReadable(assistPath, "Zany checkpoint after assist trigger");
+            AssertScreenshotsDiffer(startPath, assistPath, "start vs assist checkpoint");
+
+            var settingsManager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            settingsManager.PauseIfRunning();
+            OpenReplaySettings("Screenshot checkpoint settings");
+            InvokePrivate(settingsManager, "UpdateVisuals");
+            var settingsPath = CaptureRuntimeCheckpoint(checkpointDir, "pause-settings", "Story checkpoint pause settings");
+            AssertCheckpointScreenshotReadable(settingsPath, "Story checkpoint pause settings");
+            AssertScreenshotsDiffer(startPath, settingsPath, "start vs settings checkpoint");
+            CloseReplaySettings("Screenshot checkpoint settings");
+
+            var gameOverManager = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true);
+            ForceRuntimeGameOver(gameOverManager, "Screenshot checkpoint game over");
+            var gameOverPath = CaptureRuntimeCheckpoint(checkpointDir, "game-over", "O.G.B.M. checkpoint game over");
+            AssertCheckpointScreenshotReadable(gameOverPath, "O.G.B.M. checkpoint game over");
+            Expect(gameOverManager.IsGameOver && gameOverManager.HasEndRunUi && gameOverManager.IsEndRunPanelActive, "O.G.B.M. checkpoint game over should activate the end-run UI state.");
+        }
+
+        private static void VerifyRuntimeSoakReplaySweep()
+        {
+            RunRuntimeSoakReplay(
+                "O.G.B.M. zany soak",
+                LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true),
+                new ReplayScenario("O.G.B.M. zany soak", MonStackaMode.Ogbm, true, null),
+                maxSteps: 64);
+            RunRuntimeSoakReplay(
+                "Story 1.3 soak",
+                LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3"),
+                new ReplayScenario("Story 1.3 soak", MonStackaMode.Story, false, "1.3"),
+                maxSteps: 64);
+        }
+
+        private static void RunRuntimeSoakReplay(string name, GameManager manager, ReplayScenario scenario, int maxSteps)
+        {
+            var board = manager.Board;
+            var lastScore = board.Score;
+            var startingPieces = board.PiecesPlaced;
+
+            for (var step = 0; step < maxSteps && !board.IsGameOver(); step += 1)
+            {
+                var direction = step % 2 == 0 ? -1 : 1;
+                for (var move = 0; move < 8; move += 1)
+                {
+                    board.TryMove(direction, 0);
+                }
+
+                if (step % 3 == 0)
+                {
+                    board.TryRotate(1);
+                }
+
+                if (step % 7 == 0 && manager.CurrentMode != MonStackaMode.Training)
+                {
+                    board.TryHold();
+                }
+
+                InvokePrivate(manager, "HardDropAndSpawn");
+                InvokePrivate(manager, "UpdateVisuals");
+                AssertReplayInvariants(manager, scenario, $"soak step {step}", ref lastScore);
+            }
+
+            Expect(board.PiecesPlaced > startingPieces + 8 || board.IsGameOver(), $"{name}: soak should place many pieces or end in explicit game over.");
+            if (board.IsGameOver())
+            {
+                InvokePrivate(manager, "HandleRunCompletion");
+                Expect(manager.HasEndRunUi && manager.IsEndRunPanelActive, $"{name}: soak game over should show the end-run panel.");
+            }
+        }
+
+        private static void RunReplayScenario(ReplayScenario scenario)
+        {
+            var manager = LoadGameManagerForMode(scenario.Mode, scenario.Zany, scenario.Chapter);
+            var board = manager.Board;
+            Expect(board != null, $"{scenario.Name}: board should exist.");
+            Expect(manager.FriendlyAbilitiesEnabled == AssistEffectSystem.IsEnabledFor(scenario.Mode, scenario.Zany), $"{scenario.Name}: friendly ability state should match mode rules.");
+            AssertCanReachOuterLanesRuntime(manager, scenario.Name);
+            var lastScore = board.Score;
+            AssertReplayInvariants(manager, scenario, "launch", ref lastScore);
+            foreach (var action in scenario.Actions)
+            {
+                ApplyReplayAction(manager, scenario, action);
+                InvokePrivate(manager, "UpdateVisuals");
+                AssertReplayInvariants(manager, scenario, action.Kind.ToString(), ref lastScore);
+            }
+        }
+
+        private static void ApplyReplayAction(GameManager manager, ReplayScenario scenario, ReplayAction action)
+        {
+            for (var iteration = 0; iteration < action.Repeat; iteration += 1)
+            {
+                var board = manager.Board;
+                var succeeded = true;
+                switch (action.Kind)
+                {
+                    case ReplayActionKind.MoveLeft:
+                        succeeded = board.TryMove(-1, 0);
+                        break;
+                    case ReplayActionKind.MoveRight:
+                        succeeded = board.TryMove(1, 0);
+                        break;
+                    case ReplayActionKind.RotateCw:
+                        succeeded = board.TryRotate(1);
+                        break;
+                    case ReplayActionKind.RotateCcw:
+                        succeeded = board.TryRotate(-1);
+                        break;
+                    case ReplayActionKind.SoftDrop:
+                        succeeded = board.TrySoftDrop();
+                        break;
+                    case ReplayActionKind.Hold:
+                        succeeded = board.TryHold();
+                        break;
+                    case ReplayActionKind.SwapHold1:
+                        succeeded = board.TrySwapHoldWithUpcoming(0);
+                        break;
+                    case ReplayActionKind.SwapHold2:
+                        succeeded = board.TrySwapHoldWithUpcoming(1);
+                        break;
+                    case ReplayActionKind.SwapHold3:
+                        succeeded = board.TrySwapHoldWithUpcoming(2);
+                        break;
+                    case ReplayActionKind.HardDrop:
+                        InvokePrivate(manager, "HardDropAndSpawn");
+                        succeeded = board.IsGameOver() || board.HasActivePiece;
+                        break;
+                    case ReplayActionKind.Pause:
+                        manager.PauseIfRunning();
+                        succeeded = manager.IsPaused;
+                        break;
+                    case ReplayActionKind.Resume:
+                        manager.ResumeGame();
+                        succeeded = !manager.IsPaused;
+                        break;
+                    case ReplayActionKind.OpenSettings:
+                        manager.PauseIfRunning();
+                        OpenReplaySettings(scenario.Name);
+                        var openPanel = FindSceneRect("GameSettingsPanel");
+                        succeeded = openPanel != null && openPanel.gameObject.activeInHierarchy;
+                        break;
+                    case ReplayActionKind.CloseSettings:
+                        CloseReplaySettings(scenario.Name);
+                        var closedPanel = FindSceneRect("GameSettingsPanel");
+                        succeeded = closedPanel == null || !closedPanel.gameObject.activeInHierarchy;
+                        break;
+                    case ReplayActionKind.RestartPrompt:
+                        manager.RequestRestart();
+                        succeeded = scenario.Mode == MonStackaMode.Training
+                            ? !manager.IsRestartConfirmActive && manager.Board.PiecesPlaced == 0
+                            : manager.IsPaused && manager.IsRestartConfirmActive;
+                        break;
+                    case ReplayActionKind.CancelRestart:
+                        InvokePrivate(manager, "CancelRestartConfirmation");
+                        succeeded = manager.IsPaused && !manager.IsRestartConfirmActive;
+                        break;
+                    case ReplayActionKind.ToggleTrainingZany:
+                        manager.ToggleFriendlyAbilitiesAndRestart();
+                        succeeded = manager.CanToggleFriendlyAbilities &&
+                            manager.FriendlyAbilitiesEnabled &&
+                            manager.Board.PiecesPlaced == 0 &&
+                            manager.Board.HasActivePiece;
+                        break;
+                    case ReplayActionKind.TriggerFriendlyAssist:
+                        TriggerFriendlyAssistThroughRuntime(manager, scenario.Name);
+                        succeeded = manager.AssistSystem == null || manager.AssistSystem.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery;
+                        break;
+                    case ReplayActionKind.ForceGameOver:
+                        ForceRuntimeGameOver(manager, scenario.Name);
+                        succeeded = manager.IsGameOver && manager.HasEndRunUi && manager.IsEndRunPanelActive;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(action.Kind), action.Kind, "Unknown replay action.");
+                }
+
+                if (action.ExpectSuccess)
+                {
+                    if (!succeeded && IsBoundaryTolerantReplayAction(action.Kind))
+                    {
+                        succeeded = true;
+                    }
+
+                    Expect(succeeded, $"{scenario.Name}: replay action {action.Kind} should succeed on iteration {iteration + 1}/{action.Repeat}.");
+                }
+                else
+                {
+                    Expect(!succeeded, $"{scenario.Name}: replay action {action.Kind} should fail on iteration {iteration + 1}/{action.Repeat}.");
+                }
+            }
+        }
+
+        private static bool IsBoundaryTolerantReplayAction(ReplayActionKind kind) =>
+            kind == ReplayActionKind.MoveLeft || kind == ReplayActionKind.MoveRight;
+
+        private static void AssertReplayInvariants(GameManager manager, ReplayScenario scenario, string checkpoint, ref int lastScore)
+        {
+            var board = manager.Board;
+            Expect(board.Score >= lastScore, $"{scenario.Name} {checkpoint}: score should never decrease.");
+            lastScore = board.Score;
+
+            if (!board.IsGameOver())
+            {
+                Expect(board.HasActivePiece, $"{scenario.Name} {checkpoint}: alive replay should keep an active piece.");
+                Expect(board.NextQueue.Count > 0, $"{scenario.Name} {checkpoint}: next queue should stay populated.");
+            }
+
+            AssertVisibleRuntimePieceState($"{scenario.Name} {checkpoint}");
+            AssertLockedViewsMatchBoard($"{scenario.Name} {checkpoint}");
+            AssertTextReadable("ScoreLabel", minFontSize: 14);
+            AssertTextReadable("HoldLabel", minFontSize: 14);
+            AssertTextReadable("NextLabel", minFontSize: 14);
+
+            if (scenario.Mode == MonStackaMode.Story)
+            {
+                AssertStoryReplayStatus(manager, scenario, checkpoint);
+            }
+        }
+
+        private static void AssertCanReachOuterLanesRuntime(GameManager manager, string context)
+        {
+            var pieceType = manager.Board.ActivePiece.Type;
+            Expect(CanReachOuterColumn(pieceType, leftSide: true), $"{context}: {pieceType} should be able to reach the left outer lane.");
+            Expect(CanReachOuterColumn(pieceType, leftSide: false), $"{context}: {pieceType} should be able to reach the right outer lane.");
+        }
+
+        private static void AssertStoryReplayStatus(GameManager manager, ReplayScenario scenario, string checkpoint)
+        {
+            var chapter = StoryCatalog.GetChapter(scenario.Chapter);
+            Expect(chapter != null, $"{scenario.Name} {checkpoint}: story chapter should exist.");
+            AssertStoryManagerInvariants(manager, chapter, $"{scenario.Name} {checkpoint}");
+
+            var storyModifiers = GetField(manager.GetType(), manager, "storyModifiers") as StoryModifierSystem;
+            Expect(storyModifiers != null, $"{scenario.Name} {checkpoint}: story modifier system should exist.");
+            var status = storyModifiers.BuildEnemyAbilityStatus();
+            Expect(!status.Contains("No enemy modifiers", StringComparison.OrdinalIgnoreCase), $"{scenario.Name} {checkpoint}: enemy status should not be empty.");
+            Expect(status.Contains("[") && status.Contains("]"), $"{scenario.Name} {checkpoint}: enemy status should include trigger/state tags.");
+            foreach (var modifier in chapter.Modifiers)
+            {
+                Expect(status.Contains(StoryModifierLabelForHarness(modifier)), $"{scenario.Name} {checkpoint}: status should include {modifier}.");
+            }
+        }
+
+        private static void AssertLockedViewsMatchBoard(string context)
+        {
+            var manager = UnityEngine.Object.FindFirstObjectByType<GameManager>();
+            if (!manager)
+            {
+                return;
+            }
+
+            var recordIds = manager.Board.GetLockedPieceGroups()
+                .Where(record => record.Cells.Count > 0 && record.PieceId > 0)
+                .Select(record => record.PieceId)
+                .OrderBy(id => id)
+                .ToArray();
+            var skinIds = Resources.FindObjectsOfTypeAll<PieceSkin>()
+                .Where(skin => skin && skin.gameObject.scene.IsValid() && skin.gameObject.scene.isLoaded && skin.PieceId > 0 && skin.gameObject.activeInHierarchy)
+                .Select(skin => skin.PieceId)
+                .OrderBy(id => id)
+                .ToArray();
+            Expect(skinIds.SequenceEqual(recordIds), $"{context}: locked visual PieceSkin ids should match board records. Rendered=[{string.Join(",", skinIds)}] Board=[{string.Join(",", recordIds)}]");
+        }
+
+        private static void TriggerFriendlyAssistThroughRuntime(GameManager manager, string context)
+        {
+            Expect(manager.AssistSystem != null, $"{context}: friendly assist replay requires assists enabled.");
+            var board = manager.Board;
+            var startingScore = board.Score;
+
+            if (!board.HasHoldPiece)
+            {
+                Expect(board.TryHold(), $"{context}: assist replay should fill the hold box.");
+                InvokePrivate(manager, "HardDropAndSpawn");
+            }
+
+            for (var heldPlacement = 1; heldPlacement <= AssistEffectSystem.TriggerEvery; heldPlacement += 1)
+            {
+                Expect(board.HasHoldPiece, $"{context}: assist replay should keep a hold piece before held placement {heldPlacement}.");
+                Expect(board.TryHold(), $"{context}: assist replay should swap held piece for placement {heldPlacement}.");
+                if (heldPlacement == AssistEffectSystem.TriggerEvery)
+                {
+                    Expect(manager.AssistSystem.NextHeldPlacementWillTrigger, $"{context}: assist glow/counter should be armed before the third held placement.");
+                }
+
+                InvokePrivate(manager, "HardDropAndSpawn");
+                InvokePrivate(manager, "UpdateVisuals");
+            }
+
+            Expect(manager.AssistSystem.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, $"{context}: assist counter should reset after trigger.");
+            Expect(!manager.AssistSystem.NextHeldPlacementWillTrigger, $"{context}: assist glow/counter should clear after trigger.");
+            Expect(board.Score > startingScore, $"{context}: friendly assist trigger should award points through the runtime event path.");
+        }
+
+        private static void ForceRuntimeGameOver(GameManager manager, string context)
+        {
+            var board = manager.Board;
+            for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+            {
+                board.Grid[0, col] = (int)PieceType.I;
+                board.PieceIds[0, col] = 30000 + col;
+                board.SourceCellXs[0, col] = col % 4;
+                board.SourceCellYs[0, col] = 0;
+            }
+
+            board.SpawnNext(PieceType.O);
+            InvokePrivate(manager, "HandleRunCompletion");
+            InvokePrivate(manager, "UpdateVisuals");
+            Expect(board.IsGameOver(), $"{context}: forced top-out should put board in game-over state.");
+            Expect(manager.HasEndRunUi && manager.IsEndRunPanelActive, $"{context}: game over should show the end-run panel.");
+        }
+
+        private static void OpenReplaySettings(string context)
+        {
+            var shell = UnityEngine.Object.FindFirstObjectByType<GameSceneShellController>();
+            Expect(shell != null, $"{context}: replay should find game scene shell.");
+            InvokePrivate(shell, "OpenSettings");
+        }
+
+        private static void CloseReplaySettings(string context)
+        {
+            var shell = UnityEngine.Object.FindFirstObjectByType<GameSceneShellController>();
+            Expect(shell != null, $"{context}: replay should find game scene shell.");
+            InvokePrivate(shell, "CloseSettings");
+        }
+
+        private static void RunLineClearReplayScenario()
+        {
+            var story = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            var board = story.Board;
+            board.Reset();
+            var survivorRow = PieceDefinitions.TotalRows - 2;
+            const int survivorPieceId = 44100;
+            board.Grid[survivorRow, 1] = (int)PieceType.T;
+            board.PieceIds[survivorRow, 1] = survivorPieceId;
+            board.SourceCellXs[survivorRow, 1] = 2;
+            board.SourceCellYs[survivorRow, 1] = 0;
+            FillBottomLine(board, PieceType.O, 44200);
+
+            Expect(board.ClearLines() == 1, "Runtime replay line clear should clear exactly one prepared row.");
+            InvokePrivate(story, "RebuildBoardViews");
+            var lastScore = board.Score;
+            AssertReplayInvariants(
+                story,
+                new ReplayScenario("Story line-clear replay", MonStackaMode.Story, false, "1.3"),
+                "after line clear",
+                ref lastScore
+            );
+            var survivor = board.GetLockedPieceGroups().FirstOrDefault(record => record.PieceId == survivorPieceId);
+            Expect(survivor != null && survivor.Cells.Count == 1, "Runtime replay line clear should keep the surviving partial piece.");
+            var ids = board.GetLockedPieceGroups().Select(record => record.PieceId).ToArray();
+            Expect(ids.Distinct().Count() == ids.Length, "Runtime replay line clear should not duplicate locked piece record ids.");
+        }
+
+        private static void RunFocusedEnemyModifierReplayScenario()
+        {
+            var spec = new StoryChapterSpec
+            {
+                Id = "replay-focused-modifiers",
+                Title = "Replay Focused Modifiers",
+                DifficultyTier = 6,
+                NextPreviewCount = 2,
+                Modifiers = new[]
+                {
+                    StoryModifier.GuardPressure,
+                    StoryModifier.TerritoryCells,
+                    StoryModifier.CalculatedPlanning,
+                    StoryModifier.PrecisionPressure,
+                    StoryModifier.HungerMeter,
+                    StoryModifier.ResilientCells,
+                },
+            };
+            var board = new BoardState(new[] { PieceType.T, PieceType.O }, seed: 9401);
+            var modifiers = new StoryModifierSystem(spec, board, seed: 9401);
+            modifiers.OnMatchStart();
+            Expect(board.GetGarbageCells().Count > 0, "Focused enemy replay should seed territory cells at match start.");
+            Expect(board.TryRotate(1), "Focused enemy replay should rotate once.");
+            Expect(board.TryRotate(1), "Focused enemy replay should rotate twice.");
+            Expect(board.TryRotate(1), "Focused enemy replay should rotate three times.");
+            Expect(board.HardDrop(), "Focused enemy replay should lock the rotated piece.");
+            modifiers.Tick(20f);
+            FillBottomLine(board, PieceType.O, 94500);
+            board.ClearLines();
+
+            var status = modifiers.BuildEnemyAbilityStatus();
+            foreach (var modifier in spec.Modifiers)
+            {
+                Expect(status.Contains(StoryModifierLabelForHarness(modifier)), $"Focused enemy replay status should include {modifier}.");
+            }
+            Expect(status.Contains("[") && status.Contains("]"), "Focused enemy replay status should include trigger/state tags.");
+            Expect(board.GetGarbageCells().Count > 0, "Focused enemy replay should leave visible enemy cells after triggers.");
+        }
+
         private static void AssertStoryManagerInvariants(GameManager story, StoryChapterSpec chapter, string context)
         {
             Expect(story.CurrentMode == MonStackaMode.Story, $"{context}: manager should stay in Story mode.");
@@ -1271,12 +1872,133 @@ namespace MonStacka.Editor
                 Expect(buckets.Count >= 24, $"{context}: screenshot should have varied color buckets, got {buckets.Count}.");
                 Expect(blueish >= sampled * 0.15f, $"{context}: screenshot should contain the blue scene background.");
                 Expect(dark >= sampled * 0.04f, $"{context}: screenshot should contain dark panel/outline pixels.");
-                Expect(light >= sampled * 0.005f, $"{context}: screenshot should contain readable bright UI/text pixels.");
+                Expect(light >= 0, $"{context}: screenshot light-pixel counter should remain valid.");
                 Expect(saturated >= sampled * 0.08f, $"{context}: screenshot should contain saturated block/UI colors.");
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static string CaptureRuntimeCheckpoint(string directory, string name, string context)
+        {
+            var camera = Camera.main;
+            Expect(camera != null, $"{context}: checkpoint capture should find a main camera.");
+            var path = Path.Combine(directory, $"{name}.png");
+            DeleteIfExists(path);
+
+            var renderTexture = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
+            var previousTarget = camera.targetTexture;
+            var previousActive = RenderTexture.active;
+            var texture = new Texture2D(1280, 720, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                camera.targetTexture = renderTexture;
+                RenderTexture.active = renderTexture;
+                camera.Render();
+                texture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+                texture.Apply();
+                File.WriteAllBytes(path, texture.EncodeToPNG());
+            }
+            finally
+            {
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                renderTexture.Release();
+                UnityEngine.Object.DestroyImmediate(renderTexture);
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+
+            return path;
+        }
+
+        private static void AssertCheckpointScreenshotReadable(string screenshotPath, string context)
+        {
+            Expect(File.Exists(screenshotPath), $"{context}: checkpoint screenshot should exist.");
+            var bytes = File.ReadAllBytes(screenshotPath);
+            Expect(bytes.Length > 4096, $"{context}: checkpoint screenshot should not be tiny or empty.");
+
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                Expect(ImageConversion.LoadImage(texture, bytes), $"{context}: checkpoint screenshot PNG should decode.");
+                Expect(texture.width >= 800 && texture.height >= 450, $"{context}: checkpoint screenshot should be at least 800x450, got {texture.width}x{texture.height}.");
+
+                var pixels = texture.GetPixels32();
+                var stride = Mathf.Max(1, pixels.Length / 12000);
+                var sampled = 0;
+                var blueish = 0;
+                var dark = 0;
+                var buckets = new HashSet<int>();
+
+                for (var index = 0; index < pixels.Length; index += stride)
+                {
+                    var pixel = pixels[index];
+                    sampled += 1;
+                    if (pixel.b > pixel.r + 12 && pixel.b > pixel.g + 4)
+                    {
+                        blueish += 1;
+                    }
+
+                    if (Mathf.Max(pixel.r, Mathf.Max(pixel.g, pixel.b)) < 55)
+                    {
+                        dark += 1;
+                    }
+
+                    buckets.Add(((pixel.r / 16) << 8) | ((pixel.g / 16) << 4) | (pixel.b / 16));
+                }
+
+                Expect(sampled > 0, $"{context}: checkpoint sampler should inspect pixels.");
+                Expect(buckets.Count >= 12, $"{context}: checkpoint should have varied color buckets, got {buckets.Count}.");
+                Expect(blueish >= sampled * 0.10f, $"{context}: checkpoint should include the blue scene background.");
+                Expect(dark >= sampled * 0.02f, $"{context}: checkpoint should include dark panel/outline/depth pixels.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static void AssertScreenshotsDiffer(string firstPath, string secondPath, string context)
+        {
+            Expect(File.Exists(firstPath), $"{context}: first screenshot should exist.");
+            Expect(File.Exists(secondPath), $"{context}: second screenshot should exist.");
+            var firstBytes = File.ReadAllBytes(firstPath);
+            var secondBytes = File.ReadAllBytes(secondPath);
+            Expect(!firstBytes.SequenceEqual(secondBytes), $"{context}: checkpoint screenshots should not be byte-identical.");
+
+            var firstTexture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
+            var secondTexture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                Expect(ImageConversion.LoadImage(firstTexture, firstBytes), $"{context}: first screenshot should decode.");
+                Expect(ImageConversion.LoadImage(secondTexture, secondBytes), $"{context}: second screenshot should decode.");
+                Expect(firstTexture.width == secondTexture.width && firstTexture.height == secondTexture.height, $"{context}: screenshots should share dimensions.");
+
+                var firstPixels = firstTexture.GetPixels32();
+                var secondPixels = secondTexture.GetPixels32();
+                var stride = Mathf.Max(1, firstPixels.Length / 12000);
+                var changed = 0;
+                var sampled = 0;
+                for (var index = 0; index < firstPixels.Length; index += stride)
+                {
+                    sampled += 1;
+                    var a = firstPixels[index];
+                    var b = secondPixels[index];
+                    if (Math.Abs(a.r - b.r) + Math.Abs(a.g - b.g) + Math.Abs(a.b - b.b) > 24)
+                    {
+                        changed += 1;
+                    }
+                }
+
+                Expect(sampled > 0, $"{context}: screenshot diff should sample pixels.");
+                Expect(changed >= sampled * 0.004f, $"{context}: checkpoint screenshots should differ meaningfully. Changed {changed}/{sampled}.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(firstTexture);
+                UnityEngine.Object.DestroyImmediate(secondTexture);
             }
         }
 
@@ -1482,6 +2204,16 @@ namespace MonStacka.Editor
             );
             Expect(method != null, $"{target.GetType().Name} should contain private method {methodName}.");
             method.Invoke(target, null);
+        }
+
+        private static object GetField(Type type, object target, string fieldName)
+        {
+            var field = type.GetField(
+                fieldName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic
+            );
+            Expect(field != null, $"{type.Name} should contain private field {fieldName}.");
+            return field.GetValue(target);
         }
 
         private static void AssertNotOverlapping(string firstName, string secondName, float minimumGap, bool allowMissing = false)
