@@ -1834,13 +1834,7 @@ namespace MonStacka.Core
             }
 
             sceneTransitioning = true;
-            HideRestartConfirmation();
-            if (endRunRoot)
-            {
-                endRunRoot.SetActive(false);
-            }
-
-            pauseOverlay?.SetVisible(false);
+            PrepareForSceneTransition();
             if (EventSystem.current)
             {
                 EventSystem.current.SetSelectedGameObject(null);
@@ -1857,6 +1851,7 @@ namespace MonStacka.Core
             }
 
             sceneTransitioning = true;
+            PrepareForSceneTransition();
             Application.Quit();
         }
 
@@ -1880,6 +1875,27 @@ namespace MonStacka.Core
             }
 #endif
             SceneManager.LoadScene(sceneName);
+        }
+
+        private void PrepareForSceneTransition()
+        {
+            restartConfirmActive = false;
+            endRunPanelShown = false;
+            paused = false;
+            pauseOverlaySuppressed = false;
+            dialogueGate = false;
+
+            if (restartConfirmRoot)
+            {
+                restartConfirmRoot.SetActive(false);
+            }
+
+            if (endRunRoot)
+            {
+                endRunRoot.SetActive(false);
+            }
+
+            pauseOverlay?.SetVisible(false);
         }
 
         private bool IsGamepadLeftHeld()

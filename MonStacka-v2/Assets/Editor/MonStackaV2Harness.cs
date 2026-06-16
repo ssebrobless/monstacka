@@ -962,6 +962,9 @@ namespace MonStacka.Editor
             Expect(story.IsPaused, "Story restart confirmation should pause the match.");
             story.ReturnHome();
             Expect(story.IsSceneTransitioning, "Home navigation should enter an idempotent scene-transition guard.");
+            Expect(!story.IsPaused, "Home navigation should immediately leave gameplay pause state before the scene unloads.");
+            Expect(!story.IsRestartConfirmActive, "Home navigation should clear restart confirmation before the scene unloads.");
+            Expect(!story.IsEndRunPanelActive, "Home navigation should clear end-run state before the scene unloads.");
             story.ReturnHome();
             Expect(story.IsSceneTransitioning, "Repeated Home clicks during scene transition should stay guarded.");
 
