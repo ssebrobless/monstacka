@@ -173,7 +173,7 @@ namespace MonStacka.Core
             if (storyChapter != null)
             {
                 storyModifiers = new StoryModifierSystem(storyChapter, boardState);
-                storyModifiers.OnMatchStart();
+                storyModifiers.OnModifierTriggered += HandleStoryModifierTriggered;
                 CreateStoryDimOverlay();
             }
             if (AssistEffectSystem.IsEnabledFor(mode, MonStackaAppState.FriendlyAbilitiesEnabled))
@@ -206,6 +206,7 @@ namespace MonStacka.Core
             startTime = Time.time + CountdownSeconds;
             hudController?.Configure(mode, storyChapter);
             hudController?.RenderLeaderboard(MonStackaRecords.GetDisplayRows(mode, MonStackaAppState.FriendlyAbilitiesEnabled));
+            storyModifiers?.OnMatchStart();
             RebuildBoardViews();
 
             var skipDialogue = System.Array.Exists(
@@ -862,6 +863,11 @@ namespace MonStacka.Core
             neighborMapDirty = true;
             skin.TriggerImpact(lockEvent.Cells, PieceDefinitions.HiddenRows);
             audioController?.PlayMonsterImpact(lockEvent.PieceType);
+        }
+
+        private void HandleStoryModifierTriggered(StoryModifierTriggerEvent trigger)
+        {
+            hudController?.ShowEnemyModifierTrigger(trigger.Name, trigger.State, trigger.Detail);
         }
 
         private void UpdateVisuals()

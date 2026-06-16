@@ -918,13 +918,13 @@ namespace MonStacka.UI
                 PieceType.Z =>
                     $"<color=#{titleColor}><b>AGGRASO PRESSURE</b></color>\n" +
                     "<color=#FFB0B0><b>Modifiers</b></color>\nGuardPressure, TerritoryCells\n\n" +
-                    "<color=#FFD86B><b>Triggers</b></color>\nGuardPressure is active for the whole mission. It applies whenever a falling piece touches down and enters lock-delay behavior.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nLock delay is multiplied by 0.6, so pieces stick faster after contact. TerritoryCells seeds 4 + difficulty tier enemy cells at match start. Signal Relay can temporarily reactivate either effect.",
+                    "<color=#FFD86B><b>Triggers</b></color>\nGuardPressure and TerritoryCells each run on a timer that gets shorter as story difficulty rises.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nGuardPressure adds full timed rows from the bottom; clearing a row removes one early. TerritoryCells starts with one permanent source, then claims touching blocks. Claimed blocks do not count toward row clears until you clear another row to unclaim them one at a time.",
                 PieceType.O =>
                     $"<color=#{titleColor}><b>CALCULATED</b></color>\n" +
                     "<color=#FFB0B0><b>Modifiers</b></color>\nCalculatedPlanning, PrecisionPressure\n\n" +
-                    "<color=#FFD86B><b>Triggers</b></color>\nCalculatedPlanning watches every piece you lock. PrecisionPressure watches each locked piece for unsupported overhang cells.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nCalculatedPlanning gives safer missions a longer Next preview, but each piece has only 2 safe successful rotations. Extra rotations seed 1 enemy cell each, up to 3 per piece. PrecisionPressure seeds enemy cells when a locked block leaves unsupported cells hanging over empty space, up to 3 cells per piece.",
+                    "<color=#FFD86B><b>Triggers</b></color>\nCalculatedPlanning watches rotations and queues a penalty once you lock a piece after rotating it more than 3 times. PrecisionPressure watches each locked piece for unsupported overhang cells.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nCalculatedPlanning gives safer missions a longer Next preview, then punishes over-rotation by debuffing the next block you place. Rows cleared with any cell from that debuffed block pay reduced points, so they also deal reduced mission damage. The reduction grows with mission difficulty. PrecisionPressure seeds enemy cells when a locked block leaves unsupported cells hanging over empty space, up to 3 cells per piece.",
                 PieceType.L =>
                     $"<color=#{titleColor}><b>BLINDED</b></color>\n" +
                     "<color=#FFB0B0><b>Modifiers</b></color>\nGhostFlicker, EcholocationDim\n\n" +
@@ -949,7 +949,7 @@ namespace MonStacka.UI
                     $"<color=#{titleColor}><b>BLYNDOOLIE ADRENALINE</b></color>\n" +
                     "<color=#FFB0B0><b>Modifiers</b></color>\nAdrenalineMonitor, SignalRelay\n\n" +
                     "<color=#FFD86B><b>Triggers</b></color>\nAdrenaline checks stack height for the whole mission. Signal Relay waits 25s, activates for 6s, then repeats.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nIf the stack reaches about 13 visible rows high, gravity multiplier becomes 0.7, making pieces fall faster. Signal Relay randomly activates GuardPressure, TerritoryCells, GhostFlicker, or AdrenalineMonitor. Territory relay immediately seeds 3 enemy cells.",
+                    "<color=#C8FF9A><b>Effect</b></color>\nIf the stack reaches about 13 visible rows high, gravity multiplier becomes 0.7, making pieces fall faster. Signal Relay randomly activates GuardPressure, TerritoryCells, GhostFlicker, or AdrenalineMonitor. Territory relay seeds a source if needed or claims one touching block.",
                 _ =>
                     $"<color=#{titleColor}><b>ENEMY ABILITY</b></color>\n" +
                     "Story chapters can turn this monster's traits into stage pressure.",

@@ -4,6 +4,22 @@ using UnityEngine;
 
 namespace MonStacka.Story
 {
+    public readonly struct StoryModifierTriggerEvent
+    {
+        public readonly StoryModifier Modifier;
+        public readonly string Name;
+        public readonly string State;
+        public readonly string Detail;
+
+        public StoryModifierTriggerEvent(StoryModifier modifier, string name, string state, string detail)
+        {
+            Modifier = modifier;
+            Name = name;
+            State = state;
+            Detail = detail;
+        }
+    }
+
     /// <summary>
     /// Runtime behavior for chapter modifiers declared in StoryChapterSpec.
     /// Plain C# (no MonoBehaviour); GameManager ticks it and reads its outputs.
@@ -12,7 +28,7 @@ namespace MonStacka.Story
     /// the time/board behaviors.
     ///
     /// Notes against the handoff:
-    /// - CalculatedPlanning is enforced as a per-piece rotation budget.
+    /// - CalculatedPlanning queues a score debuff after excess rotations.
     /// - PrecisionPressure is enforced as an unsupported-overhang check on lock.
     /// - ResilientCells is implemented as regrowth: each line clear has a chance
     ///   to reseed one territory cell ("the flesh regrows"), rather than a second
@@ -21,6 +37,9 @@ namespace MonStacka.Story
     public sealed class StoryModifierSystem
     {
         private const float HungerBaseWindowSeconds = 22f;
+        private const float GuardPressureBaseWindowSeconds = 18f;
+        private const float GuardPressureActiveSeconds = 6f;
+        private const float TerritoryBaseWindowSeconds = 18f;
         private const float SedationCycleSeconds = 18f;
         private const float SedationWarningSeconds = 3f;
         private const float SedationActiveSeconds = 4f;
@@ -29,8 +48,7 @@ namespace MonStacka.Story
         private const float FlickerCycleSeconds = 2.6f;
         private const float FlickerOffSeconds = 0.35f;
         private const int AdrenalineHeightRows = 13;
-        private const int CalculatedPlanningRotationBudget = 2;
-        private const int CalculatedPlanningMaxPenaltyCells = 3;
+        private const int CalculatedPlanningRotationBudget = 3;
         private const int PrecisionPressureMaxPenaltyCells = 3;
 
         private readonly StoryChapterSpec spec;
@@ -38,13 +56,19 @@ namespace MonStacka.Story
         private readonly System.Random rng;
 
         private float hungerTimer;
+        private float guardPressureTimer;
+        private float territoryTimer;
+        private readonly List<float> guardPressureRowTimers = new();
         private float sedationTimer;
         private float relayTimer;
         private float flickerTimer;
         private bool relayActive;
         private StoryModifier relayedModifier;
+        private bool calculatedPlanningDebuffQueued;
         private string lastCalculatedPlanningStatus = "safe";
         private string lastPrecisionPressureStatus = "safe";
+
+        public event System.Action<StoryModifierTriggerEvent> OnModifierTriggered;
 
         public StoryModifierSystem(StoryChapterSpec chapterSpec, BoardState boardState, int? seed = null)
         {
@@ -53,6 +77,7 @@ namespace MonStacka.Story
             rng = seed.HasValue ? new System.Random(seed.Value) : new System.Random();
             board.OnLinesCleared += HandleLinesCleared;
             board.OnPieceLocked += HandlePieceLocked;
+            board.OnPieceRotated += HandlePieceRotated;
         }
 
         public bool Has(StoryModifier modifier)
@@ -68,8 +93,8 @@ namespace MonStacka.Story
             return relayActive && relayedModifier == modifier;
         }
 
-        /// <summary>Lock delay multiplier (&lt;1 = faster lock under Aggraso guard pressure).</summary>
-        public float LockDelayMultiplier => Has(StoryModifier.GuardPressure) ? 0.6f : 1f;
+        /// <summary>Lock delay multiplier (&lt;1 = faster lock under special story modifiers).</summary>
+        public float LockDelayMultiplier => 1f;
 
         /// <summary>Gravity multiplier (&lt;1 = faster fall under adrenaline).</summary>
         public float GravityMultiplier =>
@@ -151,7 +176,7 @@ namespace MonStacka.Story
 
             if (Has(StoryModifier.GuardPressure))
             {
-                Append(chips, "GUARD");
+                Append(chips, guardPressureRowTimers.Count > 0 ? $"GUARD ROW x{guardPressureRowTimers.Count}" : "GUARD TIMER");
             }
 
             return chips.ToString();
@@ -164,23 +189,40 @@ namespace MonStacka.Story
 
             if (Has(StoryModifier.GuardPressure))
             {
-                AppendStatus(status, "Guard Pressure", "ON", $"{RelayTag(StoryModifier.GuardPressure)}every piece locks faster: delay x0.6");
+                if (guardPressureRowTimers.Count > 0)
+                {
+                    var oldestRemaining = GuardPressureActiveSeconds - guardPressureRowTimers[0];
+                    AppendStatus(
+                        status,
+                        "Guard Pressure",
+                        "ACTIVE",
+                        $"{RelayTag(StoryModifier.GuardPressure)}{guardPressureRowTimers.Count} pressure row{Plural(guardPressureRowTimers.Count)} active; oldest clears in {Seconds(oldestRemaining)}; clear a line to remove one early");
+                }
+                else
+                {
+                    var remaining = GuardPressureWindowSeconds - guardPressureTimer;
+                    AppendStatus(status, "Guard Pressure", "TIMER", $"{RelayTag(StoryModifier.GuardPressure)}pressure row in {Seconds(remaining)}");
+                }
             }
 
             if (Has(StoryModifier.TerritoryCells))
             {
-                var seedCount = HasDeclared(StoryModifier.TerritoryCells)
-                    ? 4 + spec.DifficultyTier
-                    : 3;
-                AppendStatus(status, "Territory Cells", "SETUP", $"{RelayTag(StoryModifier.TerritoryCells)}{seedCount} enemy cells seeded at match start");
+                var claimCount = board.GetTerritoryClaimedCells().Count;
+                var sourceStatus = board.GetTerritorySourceCells().Count > 0
+                    ? $"source locked; {claimCount} claim{Plural(claimCount)} active"
+                    : "source pending";
+                AppendStatus(status, "Territory Cells", "TIMER", $"{RelayTag(StoryModifier.TerritoryCells)}{sourceStatus}; next claim in {Seconds(TerritoryWindowSeconds - territoryTimer)}");
             }
 
             if (Has(StoryModifier.CalculatedPlanning))
             {
                 var previewDelta = Mathf.Max(0, spec.NextPreviewCount - 3);
-                var rotationPressure = board.CurrentPieceRotations <= CalculatedPlanningRotationBudget
+                var reductionPercent = Mathf.RoundToInt((1f - CalculatedPlanningScoreMultiplier) * 100f);
+                var rotationPressure = calculatedPlanningDebuffQueued
+                    ? $"score -{reductionPercent}% queued for next block"
+                    : board.CurrentPieceRotations <= CalculatedPlanningRotationBudget
                     ? $"rotations {board.CurrentPieceRotations}/{CalculatedPlanningRotationBudget}"
-                    : $"rotations {board.CurrentPieceRotations}/{CalculatedPlanningRotationBudget}: penalty armed";
+                    : $"rotations {board.CurrentPieceRotations}/{CalculatedPlanningRotationBudget}: debuff armed";
                 var previewStatus = previewDelta > 0
                     ? $"+{previewDelta} next; {rotationPressure}; last {lastCalculatedPlanningStatus}"
                     : $"{rotationPressure}; last {lastCalculatedPlanningStatus}";
@@ -278,14 +320,29 @@ namespace MonStacka.Story
         {
             if (Has(StoryModifier.TerritoryCells))
             {
-                board.SeedTerritoryCells(4 + spec.DifficultyTier);
+                board.SeedTerritorySource();
+                EmitModifierTrigger(StoryModifier.TerritoryCells, "SETUP", "permanent claimed source seeded");
+            }
+
+            if (HasDeclared(StoryModifier.ReducedPreview))
+            {
+                EmitModifierTrigger(StoryModifier.ReducedPreview, "ON", $"{spec.NextPreviewCount} next shown");
+            }
+
+            if (HasDeclared(StoryModifier.NoHold))
+            {
+                EmitModifierTrigger(StoryModifier.NoHold, "ON", "hold disabled");
             }
 
             hungerTimer = 0f;
+            guardPressureTimer = 0f;
+            territoryTimer = 0f;
+            guardPressureRowTimers.Clear();
             sedationTimer = 0f;
             relayTimer = 0f;
             flickerTimer = 0f;
             relayActive = false;
+            calculatedPlanningDebuffQueued = false;
             lastCalculatedPlanningStatus = "safe";
             lastPrecisionPressureStatus = "safe";
         }
@@ -293,6 +350,8 @@ namespace MonStacka.Story
         public void Tick(float deltaTime)
         {
             flickerTimer += deltaTime;
+            TickGuardPressure(deltaTime);
+            TickTerritoryCells(deltaTime);
 
             if (Has(StoryModifier.HungerMeter))
             {
@@ -301,6 +360,7 @@ namespace MonStacka.Story
                 {
                     hungerTimer = 0f;
                     board.AddGarbageRow(rng.Next(0, PieceDefinitions.Columns));
+                    EmitModifierTrigger(StoryModifier.HungerMeter, "TRIGGER", "garbage row inserted");
                 }
             }
 
@@ -321,21 +381,40 @@ namespace MonStacka.Story
                     relayActive = true;
                     relayTimer = 0f;
                     relayedModifier = PickRelayModifier();
+                    EmitModifierTrigger(StoryModifier.SignalRelay, "ACTIVE", $"{ModifierLabel(relayedModifier)} relayed");
                     if (relayedModifier == StoryModifier.TerritoryCells)
                     {
-                        board.SeedTerritoryCells(3);
+                        if (board.GetTerritorySourceCells().Count == 0)
+                        {
+                            board.SeedTerritorySource();
+                            EmitModifierTrigger(StoryModifier.TerritoryCells, "SETUP", "relay seeded a claimed source");
+                        }
+                        else if (board.TryClaimAdjacentTerritoryCell(rng))
+                        {
+                            EmitModifierTrigger(StoryModifier.TerritoryCells, "CLAIM", "relay claimed a touching block");
+                        }
                     }
                 }
                 else if (relayActive && relayTimer >= SignalRelayActiveSeconds)
                 {
                     relayActive = false;
                     relayTimer = 0f;
+                    EmitModifierTrigger(StoryModifier.SignalRelay, "END", "relay expired");
                 }
             }
         }
 
         private float HungerWindowSeconds =>
             Mathf.Max(10f, HungerBaseWindowSeconds - spec.DifficultyTier);
+
+        private float GuardPressureWindowSeconds =>
+            Mathf.Max(4f, GuardPressureBaseWindowSeconds - (spec.DifficultyTier * 1.4f));
+
+        private float TerritoryWindowSeconds =>
+            Mathf.Max(4f, TerritoryBaseWindowSeconds - (spec.DifficultyTier * 1.4f));
+
+        private float CalculatedPlanningScoreMultiplier =>
+            Mathf.Clamp(0.7f - (spec.DifficultyTier * 0.05f), 0.25f, 0.7f);
 
         /// <summary>Declared on the spec itself (relay never relays itself).</summary>
         private bool HasDeclared(StoryModifier modifier)
@@ -367,6 +446,24 @@ namespace MonStacka.Story
         {
             hungerTimer = 0f;
 
+            if (lines > 0 && guardPressureRowTimers.Count > 0)
+            {
+                var removed = board.ClearOldestGuardPressureRow();
+                guardPressureRowTimers.RemoveAt(0);
+                if (removed)
+                {
+                    EmitModifierTrigger(StoryModifier.GuardPressure, "CLEARED", "oldest pressure row removed by line clear");
+                }
+            }
+
+            if (lines > 0 && board.GetTerritoryClaimedCells().Count > 0)
+            {
+                if (board.ClearOldestTerritoryClaim())
+                {
+                    EmitModifierTrigger(StoryModifier.TerritoryCells, "CLEARED", "oldest claimed block unclaimed by line clear");
+                }
+            }
+
             if (HasDeclared(StoryModifier.ResilientCells) && lines > 0)
             {
                 // Regrowth: clearing flesh leaves scar tissue behind sometimes.
@@ -374,6 +471,67 @@ namespace MonStacka.Story
                 if (rng.NextDouble() < chance)
                 {
                     board.SeedTerritoryCells(1);
+                    EmitModifierTrigger(StoryModifier.ResilientCells, "TRIGGER", "1 enemy cell regrew after clear");
+                }
+            }
+        }
+
+        private void TickTerritoryCells(float deltaTime)
+        {
+            if (!Has(StoryModifier.TerritoryCells) || board.GameOver)
+            {
+                return;
+            }
+
+            if (board.GetTerritorySourceCells().Count == 0)
+            {
+                board.SeedTerritorySource();
+                EmitModifierTrigger(StoryModifier.TerritoryCells, "SETUP", "permanent claimed source seeded");
+            }
+
+            territoryTimer += deltaTime;
+            var window = TerritoryWindowSeconds;
+            while (territoryTimer >= window && !board.GameOver)
+            {
+                territoryTimer -= window;
+                if (board.TryClaimAdjacentTerritoryCell(rng))
+                {
+                    EmitModifierTrigger(StoryModifier.TerritoryCells, "CLAIM", $"{board.GetTerritoryClaimedCells().Count} claimed block{Plural(board.GetTerritoryClaimedCells().Count)} active");
+                }
+            }
+        }
+
+        private void TickGuardPressure(float deltaTime)
+        {
+            for (var index = 0; index < guardPressureRowTimers.Count; index += 1)
+            {
+                guardPressureRowTimers[index] += deltaTime;
+            }
+
+            while (guardPressureRowTimers.Count > 0 && guardPressureRowTimers[0] >= GuardPressureActiveSeconds)
+            {
+                var removed = board.ClearOldestGuardPressureRow();
+                guardPressureRowTimers.RemoveAt(0);
+                if (removed)
+                {
+                    EmitModifierTrigger(StoryModifier.GuardPressure, "END", "oldest pressure row expired");
+                }
+            }
+
+            if (!Has(StoryModifier.GuardPressure) || board.GameOver)
+            {
+                return;
+            }
+
+            guardPressureTimer += deltaTime;
+            var window = GuardPressureWindowSeconds;
+            while (guardPressureTimer >= window && !board.GameOver)
+            {
+                guardPressureTimer -= window;
+                if (board.AddGuardPressureRow())
+                {
+                    guardPressureRowTimers.Add(0f);
+                    EmitModifierTrigger(StoryModifier.GuardPressure, "ACTIVE", $"pressure row added; {guardPressureRowTimers.Count} active");
                 }
             }
         }
@@ -382,12 +540,13 @@ namespace MonStacka.Story
         {
             if (Has(StoryModifier.CalculatedPlanning))
             {
-                var extraRotations = Mathf.Max(0, lockEvent.RotationInputs - CalculatedPlanningRotationBudget);
-                if (extraRotations > 0)
+                if (calculatedPlanningDebuffQueued)
                 {
-                    var penaltyCells = Mathf.Min(CalculatedPlanningMaxPenaltyCells, extraRotations);
-                    board.SeedTerritoryCells(penaltyCells);
-                    lastCalculatedPlanningStatus = $"+{penaltyCells} cells after {lockEvent.RotationInputs} rotations";
+                    calculatedPlanningDebuffQueued = false;
+                    board.MarkPieceScoreDebuffed(lockEvent.PieceId, CalculatedPlanningScoreMultiplier);
+                    var reductionPercent = Mathf.RoundToInt((1f - CalculatedPlanningScoreMultiplier) * 100f);
+                    lastCalculatedPlanningStatus = $"score -{reductionPercent}% applied to next block";
+                    EmitModifierTrigger(StoryModifier.CalculatedPlanning, "APPLIED", lastCalculatedPlanningStatus);
                 }
                 else
                 {
@@ -403,12 +562,26 @@ namespace MonStacka.Story
                     var penaltyCells = Mathf.Min(PrecisionPressureMaxPenaltyCells, unsupportedCells);
                     board.SeedTerritoryCells(penaltyCells);
                     lastPrecisionPressureStatus = $"+{penaltyCells} cells from {unsupportedCells} overhangs";
+                    EmitModifierTrigger(StoryModifier.PrecisionPressure, "TRIGGER", lastPrecisionPressureStatus);
                 }
                 else
                 {
                     lastPrecisionPressureStatus = "clean lock";
                 }
             }
+        }
+
+        private void HandlePieceRotated(int rotations)
+        {
+            if (!Has(StoryModifier.CalculatedPlanning) || calculatedPlanningDebuffQueued || rotations <= CalculatedPlanningRotationBudget)
+            {
+                return;
+            }
+
+            calculatedPlanningDebuffQueued = true;
+            var reductionPercent = Mathf.RoundToInt((1f - CalculatedPlanningScoreMultiplier) * 100f);
+            lastCalculatedPlanningStatus = $"score -{reductionPercent}% queued after {rotations} rotations";
+            EmitModifierTrigger(StoryModifier.CalculatedPlanning, "QUEUED", lastCalculatedPlanningStatus);
         }
 
         private int CountUnsupportedCells(IReadOnlyList<Vector2Int> cells)
@@ -482,8 +655,21 @@ namespace MonStacka.Story
             builder.Append(detail);
         }
 
+        private void EmitModifierTrigger(StoryModifier modifier, string state, string detail)
+        {
+            OnModifierTriggered?.Invoke(new StoryModifierTriggerEvent(
+                modifier,
+                ModifierLabel(modifier),
+                state,
+                detail
+            ));
+        }
+
         private static string Seconds(float seconds) =>
             $"{Mathf.CeilToInt(Mathf.Max(0f, seconds))}s";
+
+        private static string Plural(int count) =>
+            count == 1 ? string.Empty : "s";
 
         private static string ModifierLabel(StoryModifier modifier) =>
             modifier switch

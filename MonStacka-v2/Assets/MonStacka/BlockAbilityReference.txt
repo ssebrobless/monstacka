@@ -65,7 +65,7 @@ Actual friendly mechanics:
 ENEMY ABILITY: AGGRASO PRESSURE
 
 Home menu preview text:
-Story effect: pieces lock faster after touching the stack. Some Aggraso missions also add enemy cells near the left and right edges.
+Story effect: Guard Pressure raises the stack with timed bottom rows. Territory Cells starts from one permanent source and spreads claims to touching blocks.
 
 Actual enemy modifiers:
 - GuardPressure
@@ -73,10 +73,16 @@ Actual enemy modifiers:
 
 Enemy trigger details:
 - GuardPressure is active for the whole mission when the chapter includes that modifier.
-- It triggers whenever a falling piece touches down and enters lock-delay behavior.
-- Lock delay is multiplied by 0.6, so pieces stick faster after contact.
+- It runs on a timer that gets shorter as difficulty tier rises.
+- When the timer fills, it adds a full pressure row at the bottom of the stack.
+- Each pressure row lasts 6 seconds, or can be removed early by clearing a row.
+- Clearing a row removes only the oldest active Guard Pressure row.
 - TerritoryCells triggers at match start when the chapter includes that modifier.
-- It seeds 4 + difficulty tier enemy territory cells onto the board.
+- It creates one permanent claimed source that stays for the whole match.
+- Its timer also gets shorter as difficulty tier rises.
+- When the Territory timer fills, it claims one random locked block touching the permanent source or another claimed block.
+- Claimed blocks do not count toward row completion.
+- Clearing a row removes one temporary Territory claim, oldest first. The permanent source remains.
 - Signal Relay can temporarily reactivate GuardPressure or TerritoryCells in later story missions.
 
 ============================================================
@@ -113,9 +119,12 @@ Actual enemy modifiers:
 Enemy trigger details:
 - CalculatedPlanning is active for the whole mission when a Muwerde chapter includes it.
 - It can increase the Next preview count through the chapter spec so the player can plan farther ahead.
-- It also tracks successful rotations on every piece.
-- Each piece has 2 safe successful rotations.
-- Each successful rotation after the safe budget seeds 1 enemy territory cell, up to 3 penalty cells per locked piece.
+- It tracks successful rotations on every piece until a score debuff is already queued.
+- Rotating more than 3 times queues a score debuff for the next block the player locks.
+- The over-rotated block is not debuffed; the next placed block is.
+- If a debuff is queued, extra rotations do not queue another debuff until that next block locks.
+- Rows cleared with any cell from the debuffed block award reduced points, which also reduces mission HP damage.
+- The reduction is 30% plus 5% per difficulty tier, capped at 75%.
 - PrecisionPressure is active for the whole mission when a Muwerde chapter includes it.
 - When a piece locks, the game checks the cells in that piece.
 - Any locked cell that hangs over empty space, without another cell in that same piece below it, counts as an unsupported overhang.
@@ -321,7 +330,7 @@ Enemy trigger details:
 - Signal Relay waits 25 seconds, then activates for 6 seconds.
 - When it activates, it randomly chooses one earlier modifier:
   GuardPressure, TerritoryCells, GhostFlicker, or AdrenalineMonitor.
-- If it chooses TerritoryCells, it immediately seeds 3 enemy territory cells.
+- If it chooses TerritoryCells, it seeds a permanent source if none exists, or claims one touching block if a source already exists.
 - After 6 seconds, the relay turns off and the 25-second timer starts again.
 
 ============================================================
@@ -349,5 +358,5 @@ NOTES FOR REVIEW
 
 Potential text/mechanics notes to decide on:
 - CALCULATION, ECHO GUIDE, and SEDATE use the shared trigger/combo rules and their +200 per-line timed-window scoring. They do not give an instant danger-save payout by themselves.
-- MUWERDE enemy preview now matches the runtime: CalculatedPlanning enforces a 2-rotation safe budget, and PrecisionPressure punishes unsupported overhangs.
+- MUWERDE enemy preview now matches the runtime: CalculatedPlanning queues a score debuff after more than 3 rotations, and PrecisionPressure punishes unsupported overhangs.
 - DOUSEMA enemy preview says some cells can be resilient, but the current runtime implements this as a chance to reseed one territory cell after line clears.

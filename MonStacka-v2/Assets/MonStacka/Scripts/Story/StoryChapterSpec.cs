@@ -88,7 +88,7 @@ namespace MonStacka.Story
         GuardPressure,
         /// <summary>Aggraso/Z: pre-seeded territory garbage cells near edges.</summary>
         TerritoryCells,
-        /// <summary>Muwerde/O: extended next-queue preview but stricter rotation budget per piece.</summary>
+        /// <summary>Muwerde/O: extended next-queue preview, with over-rotation queuing a score debuff.</summary>
         CalculatedPlanning,
         /// <summary>Muwerde/O: precision scoring - bonus for flush placements, penalty cells for overhangs.</summary>
         PrecisionPressure,

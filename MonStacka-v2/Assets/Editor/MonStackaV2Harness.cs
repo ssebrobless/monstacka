@@ -435,7 +435,7 @@ namespace MonStacka.Editor
             var firstMissionModifiers = new StoryModifierSystem(firstMission, firstMissionBoard, seed: 111);
             firstMissionModifiers.OnMatchStart();
             Expect(!firstMissionModifiers.BuildEnemyAbilityStatus().Contains("No enemy modifiers"), "Story 1.1 enemy tracker should not be empty.");
-            Expect(firstMissionModifiers.BuildEnemyAbilityStatus().Contains("[ON]"), "Story 1.1 enemy tracker should show that Guard Pressure is active now.");
+            Expect(firstMissionModifiers.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Story 1.1 enemy tracker should show when Guard Pressure will add a pressure row.");
 
             var combinedSpec = new StoryChapterSpec
             {
@@ -472,7 +472,7 @@ namespace MonStacka.Editor
                 Expect(status.Contains(label), $"Enemy status should include {label}.");
             }
 
-            Expect(combinedSystem.LockDelayMultiplier < 1f, "Guard Pressure should tighten lock delay.");
+            Expect(Mathf.Approximately(combinedSystem.LockDelayMultiplier, 1f), "Guard Pressure should not tighten lock delay after becoming a row pressure ability.");
             Expect(combinedBoard.GetGarbageCells().Count > 0, "Territory Cells should seed enemy cells on match start.");
 
             var planningSpec = new StoryChapterSpec
@@ -483,16 +483,22 @@ namespace MonStacka.Editor
                 NextPreviewCount = 5,
                 Modifiers = new[] { StoryModifier.CalculatedPlanning },
             };
-            var planningBoard = new BoardState(new[] { PieceType.T }, seed: 1002);
+            var planningBoard = new BoardState(new[] { PieceType.T, PieceType.O }, seed: 1002);
             var planningSystem = new StoryModifierSystem(planningSpec, planningBoard, seed: 1002);
+            var planningLockedPieces = new List<PieceLockEvent>();
+            planningBoard.OnPieceLocked += lockEvent => planningLockedPieces.Add(lockEvent);
             Expect(planningBoard.TryRotate(1), "Planning harness rotation 1 should succeed.");
             Expect(planningBoard.TryRotate(1), "Planning harness rotation 2 should succeed.");
             Expect(planningBoard.TryRotate(1), "Planning harness rotation 3 should succeed.");
+            Expect(planningBoard.TryRotate(1), "Planning harness rotation 4 should succeed.");
+            var planningQueuedStatus = planningSystem.BuildEnemyAbilityStatus();
+            Expect(planningQueuedStatus.Contains("queued"), "Calculated Planning should queue immediately after the fourth rotation, before the piece locks.");
+            Expect(planningBoard.TryHold(), "Calculated Planning queued debuff should survive swapping before placement.");
             Expect(planningBoard.HardDrop(), "Planning harness piece should lock.");
-            Expect(planningBoard.GetGarbageCells().Count > 0, "Calculated Planning should punish extra rotations.");
+            Expect(planningLockedPieces.Count == 1, "Calculated Planning should observe the first locked piece.");
+            Expect(planningBoard.IsPieceScoreDebuffed(planningLockedPieces[0].PieceId), "Calculated Planning should apply the queued debuff to the next placed piece after a swap.");
             var planningStatus = planningSystem.BuildEnemyAbilityStatus();
-            Expect(planningStatus.Contains("rotations"), "Calculated Planning status should mention rotations.");
-            Expect(planningStatus.Contains("+") && planningStatus.Contains("cells"), "Calculated Planning status should show triggered penalty progress after extra rotations.");
+            Expect(planningStatus.Contains("score"), "Calculated Planning status should report the score debuff after it applies.");
 
             var precisionSpec = new StoryChapterSpec
             {
@@ -560,35 +566,130 @@ namespace MonStacka.Editor
             var guardSpec = ModifierSpec("harness-guard", 2, StoryModifier.GuardPressure);
             var guardBoard = new BoardState(new[] { PieceType.Z }, seed: 4101);
             var guardSystem = new StoryModifierSystem(guardSpec, guardBoard, seed: 4101);
-            Expect(guardSystem.LockDelayMultiplier < 1f, "Guard Pressure should reduce lock delay multiplier.");
-            Expect(guardSystem.BuildEnemyAbilityStatus().Contains("[ON]"), "Guard Pressure should report ON status.");
+            var guardEvents = new List<StoryModifierTriggerEvent>();
+            guardSystem.OnModifierTriggered += trigger => guardEvents.Add(trigger);
+            guardSystem.OnMatchStart();
+            Expect(Mathf.Approximately(guardSystem.LockDelayMultiplier, 1f), "Guard Pressure should leave lock delay unchanged.");
+            Expect(guardSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Guard Pressure should report timer status before pressure rows trigger.");
+            guardSystem.Tick(16f);
+            Expect(guardBoard.GetGuardPressureRowCount() == 1, "Guard Pressure should add a full temporary bottom row when its timer fills.");
+            Expect(guardSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Guard Pressure should report ACTIVE status while pressure rows are on the board.");
+            Expect(guardEvents.Any(trigger => trigger.Modifier == StoryModifier.GuardPressure && trigger.State == "ACTIVE"), "Guard Pressure should emit an ACTIVE trigger when it adds a pressure row.");
+            Expect(guardBoard.ClearLines() == 0, "A Guard Pressure row should not score as a normal completed line.");
+            guardSystem.Tick(5.9f);
+            Expect(guardBoard.GetGuardPressureRowCount() == 1, "Guard Pressure row should remain until the six-second timer expires.");
+            guardSystem.Tick(0.2f);
+            Expect(guardBoard.GetGuardPressureRowCount() == 0, "Guard Pressure row should clear itself after six seconds.");
+            Expect(guardEvents.Any(trigger => trigger.Modifier == StoryModifier.GuardPressure && trigger.State == "END"), "Guard Pressure should emit END when a pressure row expires.");
+
+            var guardEarlyBoard = new BoardState(new[] { PieceType.Z }, seed: 4115);
+            var guardEarlySystem = new StoryModifierSystem(guardSpec, guardEarlyBoard, seed: 4115);
+            var guardEarlyEvents = new List<StoryModifierTriggerEvent>();
+            guardEarlySystem.OnModifierTriggered += trigger => guardEarlyEvents.Add(trigger);
+            guardEarlySystem.Tick(16f);
+            FillLine(guardEarlyBoard, PieceDefinitions.TotalRows - 2, PieceType.O, pieceIdStart: 6100);
+            Expect(guardEarlyBoard.ClearLines() == 1, "Clearing a player-built row should still score normally while Guard Pressure is active.");
+            Expect(guardEarlyBoard.GetGuardPressureRowCount() == 0, "Clearing a player-built row should remove the active Guard Pressure row early.");
+            Expect(guardEarlyEvents.Any(trigger => trigger.Modifier == StoryModifier.GuardPressure && trigger.State == "CLEARED"), "Guard Pressure should emit CLEARED when the player clears it early.");
+
+            var stackedGuardSpec = ModifierSpec("harness-guard-stacked", 10, StoryModifier.GuardPressure);
+            var stackedGuardBoard = new BoardState(new[] { PieceType.Z }, seed: 4116);
+            var stackedGuardSystem = new StoryModifierSystem(stackedGuardSpec, stackedGuardBoard, seed: 4116);
+            var stackedGuardEvents = new List<StoryModifierTriggerEvent>();
+            stackedGuardSystem.OnModifierTriggered += trigger => stackedGuardEvents.Add(trigger);
+            stackedGuardSystem.Tick(4f);
+            stackedGuardSystem.Tick(4f);
+            Expect(stackedGuardBoard.GetGuardPressureRowCount() == 2, "High-tier Guard Pressure should be able to stack two active pressure rows.");
+            FillLine(stackedGuardBoard, PieceDefinitions.TotalRows - 3, PieceType.O, pieceIdStart: 6200);
+            Expect(stackedGuardBoard.ClearLines() == 1, "Clearing a player-built row should still score while multiple Guard Pressure rows are active.");
+            Expect(stackedGuardBoard.GetGuardPressureRowCount() == 1, "Clearing a row should remove only the oldest Guard Pressure row, not every active pressure row.");
+            stackedGuardSystem.Tick(2.1f);
+            Expect(stackedGuardBoard.GetGuardPressureRowCount() == 1, "The remaining newer Guard Pressure row should keep its own timer after an early clear.");
+            stackedGuardSystem.Tick(4f);
+            Expect(stackedGuardEvents.Any(trigger => trigger.Modifier == StoryModifier.GuardPressure && trigger.State == "END"), "The remaining newer Guard Pressure row should expire on its own six-second timer.");
+            Expect(stackedGuardBoard.GetGuardPressureRowCount() == 1, "High-tier Guard Pressure may add a replacement row as the previous row expires.");
 
             var territorySpec = ModifierSpec("harness-territory", 4, StoryModifier.TerritoryCells);
             var territoryBoard = new BoardState(new[] { PieceType.Z }, seed: 4102);
             var territorySystem = new StoryModifierSystem(territorySpec, territoryBoard, seed: 4102);
+            var territoryEvents = new List<StoryModifierTriggerEvent>();
+            territorySystem.OnModifierTriggered += trigger => territoryEvents.Add(trigger);
             territorySystem.OnMatchStart();
-            Expect(territoryBoard.GetGarbageCells().Count >= 4, "Territory Cells should seed enemy cells at match start.");
-            Expect(territorySystem.BuildEnemyAbilityStatus().Contains("[SETUP]"), "Territory Cells should report setup status.");
+            Expect(territoryBoard.GetTerritorySourceCells().Count == 1, "Territory Cells should seed one permanent claimed source at match start.");
+            Expect(territoryBoard.GetTerritoryClaimedCells().Count == 0, "Territory Cells should not start with temporary claims.");
+            var territorySource = territoryBoard.GetTerritorySourceCells()[0];
+            var firstClaimCandidate = new Vector2Int(territorySource.x, territorySource.y - 1);
+            territoryBoard.Grid[firstClaimCandidate.y, firstClaimCandidate.x] = (int)PieceType.Z;
+            territoryBoard.PieceIds[firstClaimCandidate.y, firstClaimCandidate.x] = 7100;
+            territorySystem.Tick(13f);
+            Expect(territoryBoard.IsTerritoryClaimed(firstClaimCandidate), "Territory Cells should claim a locked block touching the permanent source after its timer fills.");
+            FillLine(territoryBoard, firstClaimCandidate.y, PieceType.O, pieceIdStart: 7200);
+            territoryBoard.Grid[firstClaimCandidate.y, firstClaimCandidate.x] = (int)PieceType.Z;
+            territoryBoard.PieceIds[firstClaimCandidate.y, firstClaimCandidate.x] = 7100;
+            Expect(territoryBoard.ClearLines() == 0, "A claimed block should not count toward row completion.");
+            FillBottomLine(territoryBoard, PieceType.O, pieceIdStart: 7300);
+            Expect(territoryBoard.ClearLines() == 1, "Clearing another completed row should still score while territory claims exist.");
+            Expect(territoryBoard.GetTerritoryClaimedCells().Count == 0, "Clearing a row should remove exactly one temporary Territory claim.");
+            Expect(territoryBoard.GetTerritorySourceCells().Count == 1, "The permanent Territory source should remain after line clears.");
+            Expect(territorySystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Territory Cells should report timer status after setup.");
+            Expect(territoryEvents.Any(trigger => trigger.Modifier == StoryModifier.TerritoryCells && trigger.State == "SETUP"), "Territory Cells should emit a setup trigger event.");
+            Expect(territoryEvents.Any(trigger => trigger.Modifier == StoryModifier.TerritoryCells && trigger.State == "CLAIM"), "Territory Cells should emit a claim trigger event.");
+            Expect(territoryEvents.Any(trigger => trigger.Modifier == StoryModifier.TerritoryCells && trigger.State == "CLEARED"), "Territory Cells should emit CLEARED when a line clear removes a claim.");
+
+            var stackedTerritorySpec = ModifierSpec("harness-territory-stacked", 10, StoryModifier.TerritoryCells);
+            var stackedTerritoryBoard = new BoardState(new[] { PieceType.Z }, seed: 4117);
+            var stackedTerritorySystem = new StoryModifierSystem(stackedTerritorySpec, stackedTerritoryBoard, seed: 4117);
+            stackedTerritorySystem.OnMatchStart();
+            var stackedSource = stackedTerritoryBoard.GetTerritorySourceCells()[0];
+            FillTerritoryClaimCandidates(stackedTerritoryBoard, stackedSource, PieceType.Z, pieceIdStart: 7400);
+            stackedTerritorySystem.Tick(4f);
+            stackedTerritorySystem.Tick(4f);
+            Expect(stackedTerritoryBoard.GetTerritoryClaimedCells().Count == 2, "High-tier Territory Cells should be able to stack multiple claimed blocks.");
+            FillLine(stackedTerritoryBoard, PieceDefinitions.TotalRows - 5, PieceType.O, pieceIdStart: 7500);
+            Expect(stackedTerritoryBoard.ClearLines() == 1, "A normal line clear should remove only one stacked Territory claim.");
+            Expect(stackedTerritoryBoard.GetTerritoryClaimedCells().Count == 1, "Territory claims should clear oldest-first, one per player line clear.");
 
             var planningSpec = ModifierSpec("harness-planning-focused", 3, StoryModifier.CalculatedPlanning);
             planningSpec.NextPreviewCount = 5;
-            var planningBoard = new BoardState(new[] { PieceType.T }, seed: 4103);
+            var planningBoard = new BoardState(new[] { PieceType.T, PieceType.O }, seed: 4103);
             var planningSystem = new StoryModifierSystem(planningSpec, planningBoard, seed: 4103);
+            var planningEvents = new List<StoryModifierTriggerEvent>();
+            var planningLocks = new List<PieceLockEvent>();
+            planningSystem.OnModifierTriggered += trigger => planningEvents.Add(trigger);
+            planningBoard.OnPieceLocked += lockEvent => planningLocks.Add(lockEvent);
             planningBoard.TryRotate(1);
             planningBoard.TryRotate(1);
             planningBoard.TryRotate(1);
-            Expect(planningBoard.LockPiece(), "Calculated Planning focused matrix should lock a rotated piece.");
-            Expect(planningBoard.GetGarbageCells().Count > 0, "Calculated Planning should seed penalty cells after extra rotations.");
-            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("penalty") || planningSystem.BuildEnemyAbilityStatus().Contains("+"), "Calculated Planning should report penalty progress.");
+            planningBoard.TryRotate(1);
+            Expect(planningEvents.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED"), "Calculated Planning should queue a score debuff as soon as rotations exceed the budget.");
+            Expect(planningBoard.TryHold(), "Calculated Planning focused matrix should allow swapping after the debuff is queued.");
+            planningBoard.TryRotate(1);
+            planningBoard.TryRotate(1);
+            planningBoard.TryRotate(1);
+            planningBoard.TryRotate(1);
+            Expect(planningBoard.HardDrop(), "Calculated Planning focused matrix should lock the swapped-in debuffed piece.");
+            var debuffedPieceId = planningLocks.Last().PieceId;
+            Expect(planningBoard.IsPieceScoreDebuffed(debuffedPieceId), "Calculated Planning should apply the queued debuff to the next locked piece.");
+            Expect(planningEvents.Count(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED") == 1, "Calculated Planning should not retrigger while a debuff is already queued.");
+            Expect(planningEvents.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "APPLIED"), "Calculated Planning should emit APPLIED when the queued debuff lands on a piece.");
+            var beforePenaltyScore = planningBoard.Score;
+            FillBottomLine(planningBoard, PieceType.O, pieceIdStart: 7600);
+            planningBoard.PieceIds[PieceDefinitions.TotalRows - 1, 0] = debuffedPieceId;
+            Expect(planningBoard.ClearLines() == 1, "Calculated Planning focused matrix should clear a row containing the debuffed piece.");
+            Expect(planningBoard.Score - beforePenaltyScore == 55, "Calculated Planning should reduce row-clear points for rows touching the debuffed block at difficulty tier 3.");
+            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("score"), "Calculated Planning should report score reduction status.");
 
             var precisionSpec = ModifierSpec("harness-precision-focused", 3, StoryModifier.PrecisionPressure);
             var precisionBoard = new BoardState(new[] { PieceType.T }, seed: 4104);
             var precisionSystem = new StoryModifierSystem(precisionSpec, precisionBoard, seed: 4104);
+            var precisionEvents = new List<StoryModifierTriggerEvent>();
+            precisionSystem.OnModifierTriggered += trigger => precisionEvents.Add(trigger);
             precisionBoard.TryMove(0, 1);
             precisionBoard.TryMove(0, 1);
             Expect(precisionBoard.LockPiece(), "Precision Pressure focused matrix should lock an unsupported piece.");
             Expect(precisionBoard.GetGarbageCells().Count > 0, "Precision Pressure should seed cells from unsupported overhangs.");
             Expect(precisionSystem.BuildEnemyAbilityStatus().Contains("overhangs"), "Precision Pressure should report overhang trigger progress.");
+            Expect(precisionEvents.Any(trigger => trigger.Modifier == StoryModifier.PrecisionPressure && trigger.State == "TRIGGER"), "Precision Pressure should emit a trigger event when unsupported cells seed enemies.");
 
             var ghostSpec = ModifierSpec("harness-ghost", 2, StoryModifier.GhostFlicker);
             var ghostSystem = new StoryModifierSystem(ghostSpec, new BoardState(new[] { PieceType.L }, seed: 4105), seed: 4105);
@@ -616,9 +717,12 @@ namespace MonStacka.Editor
             var hungerSpec = ModifierSpec("harness-hunger-focused", 12, StoryModifier.HungerMeter);
             var hungerBoard = new BoardState(new[] { PieceType.S }, seed: 4109);
             var hungerSystem = new StoryModifierSystem(hungerSpec, hungerBoard, seed: 4109);
+            var hungerEvents = new List<StoryModifierTriggerEvent>();
+            hungerSystem.OnModifierTriggered += trigger => hungerEvents.Add(trigger);
             hungerSystem.Tick(20f);
             Expect(hungerBoard.GetGarbageCells().Count > 0, "Hunger Meter should insert garbage when its timer fills.");
             Expect(hungerSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Hunger Meter should report timer status.");
+            Expect(hungerEvents.Any(trigger => trigger.Modifier == StoryModifier.HungerMeter && trigger.State == "TRIGGER"), "Hunger Meter should emit a trigger event when it inserts garbage.");
 
             var sedationSpec = ModifierSpec("harness-sedation", 2, StoryModifier.SedationWindows);
             var sedationSystem = new StoryModifierSystem(sedationSpec, new BoardState(new[] { PieceType.T }, seed: 4110), seed: 4110);
@@ -636,8 +740,11 @@ namespace MonStacka.Editor
             var relaySpec = ModifierSpec("harness-relay-focused", 5, StoryModifier.SignalRelay);
             var relayBoard = new BoardState(new[] { PieceType.I }, seed: 4112);
             var relaySystem = new StoryModifierSystem(relaySpec, relayBoard, seed: 4112);
+            var relayEvents = new List<StoryModifierTriggerEvent>();
+            relaySystem.OnModifierTriggered += trigger => relayEvents.Add(trigger);
             relaySystem.Tick(25f);
             Expect(relaySystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Signal Relay should activate after its timer fills.");
+            Expect(relayEvents.Any(trigger => trigger.Modifier == StoryModifier.SignalRelay && trigger.State == "ACTIVE"), "Signal Relay should emit an active trigger event when the relay begins.");
 
             var reducedPreviewSpec = ModifierSpec("harness-reduced-preview", 2, StoryModifier.ReducedPreview);
             reducedPreviewSpec.NextPreviewCount = 1;
@@ -774,6 +881,10 @@ namespace MonStacka.Editor
             var enemyText = RequireRect("StoryEnemyStatus").GetComponent<Text>();
             hud.RenderStoryEnemyStatus("<color=#ffcf74>Guard Pressure</color> [ON] every piece locks faster\n<color=#ffcf74>Territory Cells</color> [SETUP] cells seeded");
             Expect(enemyText.text.Contains("[ON]") && enemyText.text.Contains("[SETUP]"), "Story enemy HUD should render explicit state tags.");
+            hud.ShowEnemyModifierTrigger("Hunger Meter", "TRIGGER", "garbage row inserted");
+            var triggerText = RequireRect("StoryEnemyTriggerCue").GetComponent<Text>();
+            Expect(triggerText.gameObject.activeInHierarchy, "Story enemy HUD should show a trigger cue when an enemy ability fires.");
+            Expect(triggerText.text.Contains("Hunger Meter") && triggerText.text.Contains("TRIGGER"), "Story enemy trigger cue should name the modifier and trigger state.");
 
             var territoryRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
                 .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal))
@@ -867,7 +978,7 @@ namespace MonStacka.Editor
 
             foreach (var required in new[]
             {
-                "2 safe successful rotations",
+                "Rotating more than 3 times queues a score debuff",
                 "Unsupported overhangs seed enemy territory cells",
                 "instant danger-save payout by itself",
             })
@@ -2194,13 +2305,42 @@ namespace MonStacka.Editor
 
         private static void FillBottomLine(BoardState board, PieceType type, int pieceIdStart)
         {
-            var bottom = PieceDefinitions.TotalRows - 1;
+            FillLine(board, PieceDefinitions.TotalRows - 1, type, pieceIdStart);
+        }
+
+        private static void FillLine(BoardState board, int row, PieceType type, int pieceIdStart)
+        {
             for (var col = 0; col < PieceDefinitions.Columns; col += 1)
             {
-                board.Grid[bottom, col] = (int)type;
-                board.PieceIds[bottom, col] = pieceIdStart + col;
-                board.SourceCellXs[bottom, col] = col % 2;
-                board.SourceCellYs[bottom, col] = col / 2;
+                board.Grid[row, col] = (int)type;
+                board.PieceIds[row, col] = pieceIdStart + col;
+                board.SourceCellXs[row, col] = col % 2;
+                board.SourceCellYs[row, col] = col / 2;
+            }
+        }
+
+        private static void FillTerritoryClaimCandidates(BoardState board, Vector2Int source, PieceType type, int pieceIdStart)
+        {
+            var candidates = new[]
+            {
+                new Vector2Int(source.x, source.y - 1),
+                new Vector2Int(Mathf.Max(0, source.x - 1), source.y),
+                new Vector2Int(Mathf.Min(PieceDefinitions.Columns - 1, source.x + 1), source.y),
+                new Vector2Int(source.x, Mathf.Max(0, source.y - 2)),
+            };
+
+            var pieceId = pieceIdStart;
+            foreach (var candidate in candidates.Distinct())
+            {
+                if (candidate.x < 0 || candidate.x >= PieceDefinitions.Columns || candidate.y < 0 || candidate.y >= PieceDefinitions.TotalRows)
+                {
+                    continue;
+                }
+
+                board.Grid[candidate.y, candidate.x] = (int)type;
+                board.PieceIds[candidate.y, candidate.x] = pieceId++;
+                board.SourceCellXs[candidate.y, candidate.x] = 0;
+                board.SourceCellYs[candidate.y, candidate.x] = 0;
             }
         }
 

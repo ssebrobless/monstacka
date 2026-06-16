@@ -32,6 +32,9 @@ namespace MonStacka.UI
         private Text storyScoreValueText;
         private Text storyBossLabelText;
         private Text storyEnemyStatusText;
+        private Text storyEnemyTriggerText;
+        private float storyEnemyTriggerUntil;
+        private Color storyEnemyTriggerBaseColor = Color.white;
         private Text[] storyRankTexts;
         private string lastStoryEnemyStatus;
         private readonly List<PointPopup> pointPopups = new();
@@ -177,6 +180,7 @@ namespace MonStacka.UI
             }
 
             UpdatePointPopups();
+            UpdateEnemyTriggerCue();
         }
 
         private void EnsureBossHealthBar()
@@ -238,7 +242,12 @@ namespace MonStacka.UI
             storyBossLabelText = CreateStoryHudText(anchorRect.parent, "StoryBossLabel", "MISSION HP", 22, FontStyle.Bold, new Vector2(1340f, -224f), new Vector2(360f, 30f), TextAnchor.MiddleLeft);
             storyScoreLabelText = CreateStoryHudText(anchorRect.parent, "StoryScoreLabel", "SCORE", 20, FontStyle.Normal, new Vector2(1340f, -306f), new Vector2(360f, 28f), TextAnchor.MiddleLeft);
             storyScoreValueText = CreateStoryHudText(anchorRect.parent, "StoryScoreValue", "0", 36, FontStyle.Bold, new Vector2(1340f, -338f), new Vector2(360f, 44f), TextAnchor.MiddleLeft);
+            storyEnemyTriggerText = CreateStoryHudText(anchorRect.parent, "StoryEnemyTriggerCue", string.Empty, 18, FontStyle.Bold, new Vector2(1340f, -386f), new Vector2(430f, 34f), TextAnchor.MiddleLeft);
+            storyEnemyTriggerText.supportRichText = true;
+            storyEnemyTriggerText.color = new Color(1f, 0.78f, 0.38f, 1f);
+            storyEnemyTriggerText.gameObject.SetActive(false);
             storyEnemyStatusText = CreateStoryHudText(anchorRect.parent, "StoryEnemyStatus", string.Empty, 17, FontStyle.Normal, new Vector2(1340f, -430f), new Vector2(420f, 430f), TextAnchor.UpperLeft);
+            storyEnemyStatusText.supportRichText = true;
             storyEnemyStatusText.lineSpacing = 0.92f;
             storyEnemyStatusText.horizontalOverflow = HorizontalWrapMode.Wrap;
         }
@@ -282,6 +291,11 @@ namespace MonStacka.UI
             if (storyScoreValueText)
             {
                 storyScoreValueText.gameObject.SetActive(visible);
+            }
+
+            if (storyEnemyTriggerText)
+            {
+                storyEnemyTriggerText.gameObject.SetActive(visible && Time.time < storyEnemyTriggerUntil);
             }
 
             if (storyEnemyStatusText)
@@ -389,6 +403,23 @@ namespace MonStacka.UI
             lastStoryEnemyStatus = display;
         }
 
+        public void ShowEnemyModifierTrigger(string name, string state, string detail)
+        {
+            if (!storyEnemyTriggerText || currentMode != MonStackaMode.Story)
+            {
+                return;
+            }
+
+            var safeName = string.IsNullOrWhiteSpace(name) ? "Enemy Ability" : name;
+            var safeState = string.IsNullOrWhiteSpace(state) ? "TRIGGER" : state;
+            storyEnemyTriggerText.text = $"<color=#ffcf74>{safeName}</color> [{safeState}] {detail}";
+            storyEnemyTriggerBaseColor = new Color(1f, 0.78f, 0.38f, 1f);
+            storyEnemyTriggerText.color = storyEnemyTriggerBaseColor;
+            storyEnemyTriggerText.fontStyle = FontStyle.Bold;
+            storyEnemyTriggerUntil = Time.time + 1.8f;
+            storyEnemyTriggerText.gameObject.SetActive(true);
+        }
+
         /// <summary>Fills the top-3 leaderboard rows ("---" for empty slots).</summary>
         public void RenderLeaderboard(System.Collections.Generic.IReadOnlyList<string> rows)
         {
@@ -473,6 +504,26 @@ namespace MonStacka.UI
                     pointPopups.RemoveAt(index);
                 }
             }
+        }
+
+        private void UpdateEnemyTriggerCue()
+        {
+            if (!storyEnemyTriggerText || !storyEnemyTriggerText.gameObject.activeSelf)
+            {
+                return;
+            }
+
+            var remaining = storyEnemyTriggerUntil - Time.time;
+            if (remaining <= 0f || currentMode != MonStackaMode.Story)
+            {
+                storyEnemyTriggerText.gameObject.SetActive(false);
+                return;
+            }
+
+            var t = Mathf.Clamp01(remaining / 1.8f);
+            var color = storyEnemyTriggerBaseColor;
+            color.a = Mathf.SmoothStep(0f, 1f, t);
+            storyEnemyTriggerText.color = color;
         }
 
         private string lastAssistDisplay;
