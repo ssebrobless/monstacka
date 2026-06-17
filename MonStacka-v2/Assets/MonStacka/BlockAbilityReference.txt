@@ -99,26 +99,26 @@ Actual friendly mechanics:
 - Awards +200 per line cleared while the window is active.
 - CALCULATION rewards planning and line clears during its window. It does not give an instant danger-save payout by itself.
 
-ENEMY ABILITY: RESILIENT CELLS
+ENEMY ABILITY: CALCULATED PREDICTION
 
 Home menu preview text:
-Muwerde starts each mission by claiming one permanent enemy cell, then periodically spreads that claim to whole blocks touching the claimed area.
+Muwerde tracks over-rotation. If you rotate too much, the next block you place is marked to reduce row-clear points and mission damage.
 
 Actual enemy modifiers:
-- ResilientCells
+- CalculatedPlanning
 
 Enemy trigger details:
-- ResilientCells triggers at match start when the Muwerde chapter begins.
-- It places one permanent claimed source cell for the enemy.
-- The permanent source can never be cleared.
-- Every 10 seconds, the ability tries to claim one random locked block touching the claimed area.
-- The whole target block becomes claimed, not just the touching cell.
-- A claimed block does not count toward row clears where its cells would have completed the row.
-- Clearing a normal row removes one temporary claimed block, oldest first.
-- Removing one temporary claim does not remove every claimed block at once.
-- If removing a claim causes extra rows to clear, those extra clears do not also remove another claimed block.
-- Lower difficulty keeps only one temporary claim active. Higher difficulty can allow up to 4 temporary blocks to stay claimed at the same time.
-- The right-side story HUD reports the permanent source, active claim count, cap, and next claim timer during missions.
+- Calculated Prediction is active for the whole mission when the Muwerde chapter includes that modifier.
+- It tracks successful rotations on the active piece.
+- Swapping the active block with the held block does not reset the rotation limit.
+- Rotating more than 4 times queues a debuff for the next block the player locks.
+- The over-rotated block is not necessarily the debuffed block; the next placed block receives the debuff.
+- If a debuff is already queued, extra rotations do not queue another debuff until that next block locks.
+- Once the debuff is applied to a placed block, it cannot be canceled or removed from that block.
+- Rows cleared with any cell from the debuffed block award reduced points.
+- Since mission HP damage is based on points, those rows also deal reduced mission damage.
+- The point reduction is 30% plus 5% per difficulty tier, capped at 75%.
+- The right-side story HUD reports current rotation pressure and the most recent Calculated Prediction status during missions.
 
 ============================================================
 GALIFFAMBOS / L
@@ -142,21 +142,21 @@ Actual friendly mechanics:
 - Awards +200 per line cleared while the window is active.
 - ECHO GUIDE rewards safer line clears during its window. It does not give an instant danger-save payout by itself.
 
-ENEMY ABILITY: BLINDED
+ENEMY ABILITY: VISION LOSS
 
 Home menu preview text:
 Story effect: placed blocks flicker in and out on a timer, making it harder to read the stack while you keep playing.
 
 Actual enemy modifiers:
-- Blinded
+- Vision Loss
 
 Enemy trigger details:
-- Blinded runs on a 12-second cooldown.
-- When the cooldown fills, Blinded activates for 4 to 7 seconds depending on story difficulty.
+- Vision Loss runs on a 12-second cooldown.
+- When the cooldown fills, Vision Loss activates for 4 to 7 seconds depending on story difficulty.
 - While active, every placed block on the board flickers between visible and invisible every 0.5 seconds.
 - The falling active piece stays visible.
-- Blinded cannot be canceled early.
-- When Blinded ends, all placed blocks are forced visible again even if the last flicker state was invisible.
+- Vision Loss cannot be canceled early.
+- When Vision Loss ends, all placed blocks are forced visible again even if the last flicker state was invisible.
 
 ============================================================
 DOUSEMA / J
@@ -192,13 +192,13 @@ Actual enemy modifiers:
 
 Enemy trigger details:
 - ResilientCells triggers at match start when the chapter includes that modifier.
-- It creates one permanent claimed source that stays for the whole match.
-- Every 10 seconds, it can claim one random locked block touching the permanent source.
-- The whole target block is claimed, not just one cell.
+- It creates one permanent claimed source cell that stays for the whole match.
+- Every 10 seconds, it tries to claim one random locked block touching the claimed area.
+- The whole target block becomes claimed, not just one cell.
 - Claimed blocks do not count toward row completion.
 - Low-tier missions hold at 1 active claimed block until the player clears a row to unclaim it.
 - Higher difficulty can allow up to 4 active claimed blocks at once.
-- Clearing a row removes one temporary Resilient Cells claimed block, oldest first. The permanent source remains.
+- Clearing a row removes one temporary claimed block, oldest first. The permanent source remains.
 - If unclaiming a block allows extra rows to clear, those unlocked row clears do not remove another claimed block.
 - MutedHints is active for the whole mission when the chapter includes it.
 - It hides assist/status hints.
@@ -349,5 +349,5 @@ NOTES FOR REVIEW
 
 Potential text/mechanics notes to decide on:
 - CALCULATION, ECHO GUIDE, and SEDATE use the shared trigger/combo rules and their +200 per-line timed-window scoring. They do not give an instant danger-save payout by themselves.
-- MUWERDE enemy preview now matches the runtime: Resilient Cells starts with one permanent claimed source and spreads to adjacent locked blocks over time.
+- MUWERDE enemy preview now matches the runtime: Calculated Prediction queues a score and mission-damage debuff after more than 4 rotations.
 - DOUSEMA enemy preview now matches runtime: Resilient Cells starts with one permanent claimed source and spreads to adjacent locked blocks over time.

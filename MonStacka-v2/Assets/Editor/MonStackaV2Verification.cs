@@ -257,7 +257,7 @@ namespace MonStacka.Editor
             var planningChapter = new MonStacka.Story.StoryChapterSpec
             {
                 Id = "test-planning",
-                Title = "Calculated Planning Test",
+                Title = "Calculated Prediction Test",
                 DifficultyTier = 2,
                 Modifiers = new[] { MonStacka.Story.StoryModifier.CalculatedPlanning },
                 NextPreviewCount = 5,
@@ -266,14 +266,16 @@ namespace MonStacka.Editor
             var planningSystem = new MonStacka.Story.StoryModifierSystem(planningChapter, planningBoard, seed: 34);
             var planningLocks = new System.Collections.Generic.List<PieceLockEvent>();
             planningBoard.OnPieceLocked += lockEvent => planningLocks.Add(lockEvent);
-            Expect(planningBoard.TryRotate(1), "Calculated Planning test rotation 1 should succeed.");
-            Expect(planningBoard.TryRotate(1), "Calculated Planning test rotation 2 should succeed.");
-            Expect(planningBoard.TryRotate(1), "Calculated Planning test rotation 3 should succeed.");
-            Expect(planningBoard.TryRotate(1), "Calculated Planning test rotation 4 should succeed.");
-            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("queued"), "Calculated Planning should queue as soon as the fourth rotation succeeds.");
-            Expect(planningBoard.HardDrop(), "Calculated Planning test piece should lock.");
-            Expect(planningLocks.Count == 1 && planningBoard.IsPieceScoreDebuffed(planningLocks[0].PieceId), "Calculated Planning should apply the queued score debuff to the next placed piece.");
-            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("score"), "Calculated Planning status should report score pressure.");
+            Expect(planningBoard.TryRotate(1), "Calculated Prediction test rotation 1 should succeed.");
+            Expect(planningBoard.TryRotate(1), "Calculated Prediction test rotation 2 should succeed.");
+            Expect(planningBoard.TryRotate(1), "Calculated Prediction test rotation 3 should succeed.");
+            Expect(planningBoard.TryRotate(1), "Calculated Prediction test rotation 4 should succeed.");
+            Expect(!planningSystem.BuildEnemyAbilityStatus().Contains("queued"), "Calculated Prediction should not queue at exactly four rotations.");
+            Expect(planningBoard.TryRotate(1), "Calculated Prediction test rotation 5 should succeed.");
+            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("queued"), "Calculated Prediction should queue as soon as the fifth rotation succeeds.");
+            Expect(planningBoard.HardDrop(), "Calculated Prediction test piece should lock.");
+            Expect(planningLocks.Count == 1 && planningBoard.IsPieceScoreDebuffed(planningLocks[0].PieceId), "Calculated Prediction should apply the queued score debuff to the next placed piece.");
+            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("score"), "Calculated Prediction status should report score pressure.");
 
             var stitchBoard = new BoardState(new[] { PieceType.J }, seed: 32);
             var stitchBottom = PieceDefinitions.TotalRows - 1;

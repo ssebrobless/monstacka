@@ -443,8 +443,8 @@ namespace MonStacka.Editor
             {
                 var muwerdeChapter = StoryCatalog.GetChapter(muwerdeChapterId);
                 Expect(muwerdeChapter != null, $"{muwerdeChapterId} should exist.");
-                Expect(muwerdeChapter.Modifiers.SequenceEqual(new[] { StoryModifier.ResilientCells }), $"{muwerdeChapterId} should use Muwerde's single Resilient Cells ability only.");
-                Expect(!muwerdeChapter.Modifiers.Contains(StoryModifier.CalculatedPlanning), $"{muwerdeChapterId} should not keep the retired Muwerde rotation debuff.");
+                Expect(muwerdeChapter.Modifiers.SequenceEqual(new[] { StoryModifier.CalculatedPlanning }), $"{muwerdeChapterId} should use Muwerde's single Calculated Prediction ability only.");
+                Expect(!muwerdeChapter.Modifiers.Contains(StoryModifier.ResilientCells), $"{muwerdeChapterId} should leave Resilient Cells assigned to Dousema.");
                 Expect(!muwerdeChapter.Modifiers.Contains(StoryModifier.PrecisionPressure), $"{muwerdeChapterId} should not keep the retired Muwerde overhang penalty.");
             }
 
@@ -478,9 +478,9 @@ namespace MonStacka.Editor
             foreach (var label in new[]
             {
                 "Guard Pressure",
-                "Calculated Planning",
+                "Calculated Prediction",
                 "Precision Pressure",
-                "Blinded",
+                "Vision Loss",
                 "Resilient Cells",
                 "Muted Hints",
                 "Insatiable Hunger",
@@ -501,7 +501,7 @@ namespace MonStacka.Editor
             var planningSpec = new StoryChapterSpec
             {
                 Id = "harness-calculated",
-                Title = "Harness Calculated Planning",
+                Title = "Harness Calculated Prediction",
                 DifficultyTier = 3,
                 NextPreviewCount = 5,
                 Modifiers = new[] { StoryModifier.CalculatedPlanning },
@@ -514,14 +514,18 @@ namespace MonStacka.Editor
             Expect(planningBoard.TryRotate(1), "Planning harness rotation 2 should succeed.");
             Expect(planningBoard.TryRotate(1), "Planning harness rotation 3 should succeed.");
             Expect(planningBoard.TryRotate(1), "Planning harness rotation 4 should succeed.");
+            var planningSafeStatus = planningSystem.BuildEnemyAbilityStatus();
+            Expect(!planningSafeStatus.Contains("queued"), "Calculated Prediction should not queue after exactly four rotations.");
+            Expect(planningBoard.TryRotate(1), "Planning harness rotation 5 should succeed.");
             var planningQueuedStatus = planningSystem.BuildEnemyAbilityStatus();
-            Expect(planningQueuedStatus.Contains("queued"), "Calculated Planning should queue immediately after the fourth rotation, before the piece locks.");
-            Expect(planningBoard.TryHold(), "Calculated Planning queued debuff should survive swapping before placement.");
+            Expect(planningQueuedStatus.Contains("Calculated Prediction"), "Calculated Prediction should use its public ability name in enemy status.");
+            Expect(planningQueuedStatus.Contains("queued"), "Calculated Prediction should queue immediately after the fifth rotation, before the piece locks.");
+            Expect(planningBoard.TryHold(), "Calculated Prediction queued debuff should survive swapping before placement.");
             Expect(planningBoard.HardDrop(), "Planning harness piece should lock.");
-            Expect(planningLockedPieces.Count == 1, "Calculated Planning should observe the first locked piece.");
-            Expect(planningBoard.IsPieceScoreDebuffed(planningLockedPieces[0].PieceId), "Calculated Planning should apply the queued debuff to the next placed piece after a swap.");
+            Expect(planningLockedPieces.Count == 1, "Calculated Prediction should observe the first locked piece.");
+            Expect(planningBoard.IsPieceScoreDebuffed(planningLockedPieces[0].PieceId), "Calculated Prediction should apply the queued debuff to the next placed piece after a swap.");
             var planningStatus = planningSystem.BuildEnemyAbilityStatus();
-            Expect(planningStatus.Contains("score"), "Calculated Planning status should report the score debuff after it applies.");
+            Expect(planningStatus.Contains("score"), "Calculated Prediction status should report the score debuff after it applies.");
 
             var precisionSpec = new StoryChapterSpec
             {
@@ -746,27 +750,28 @@ namespace MonStacka.Editor
             var planningLocks = new List<PieceLockEvent>();
             planningSystem.OnModifierTriggered += trigger => planningEvents.Add(trigger);
             planningBoard.OnPieceLocked += lockEvent => planningLocks.Add(lockEvent);
+            Expect(planningBoard.TryHold(), "Calculated Prediction focused matrix should seed the hold box before testing active/held swaps.");
+            Expect(planningBoard.HardDrop(), "Calculated Prediction focused matrix should lock once after seeding hold so hold can be used again.");
+            Expect(planningBoard.EnsureActivePiece(), "Calculated Prediction focused matrix should spawn a fresh active piece after the setup lock.");
             planningBoard.TryRotate(1);
             planningBoard.TryRotate(1);
             planningBoard.TryRotate(1);
             planningBoard.TryRotate(1);
-            Expect(planningEvents.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED"), "Calculated Planning should queue a score debuff as soon as rotations exceed the budget.");
-            Expect(planningBoard.TryHold(), "Calculated Planning focused matrix should allow swapping after the debuff is queued.");
+            Expect(!planningEvents.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED"), "Calculated Prediction should not queue at exactly four rotations.");
+            Expect(planningBoard.TryHold(), "Calculated Prediction focused matrix should preserve rotation pressure through a hold swap.");
             planningBoard.TryRotate(1);
-            planningBoard.TryRotate(1);
-            planningBoard.TryRotate(1);
-            planningBoard.TryRotate(1);
-            Expect(planningBoard.HardDrop(), "Calculated Planning focused matrix should lock the swapped-in debuffed piece.");
+            Expect(planningEvents.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED"), "Calculated Prediction should queue when the post-swap rotation pushes the shared count over four.");
+            Expect(planningBoard.HardDrop(), "Calculated Prediction focused matrix should lock the swapped-in debuffed piece.");
             var debuffedPieceId = planningLocks.Last().PieceId;
-            Expect(planningBoard.IsPieceScoreDebuffed(debuffedPieceId), "Calculated Planning should apply the queued debuff to the next locked piece.");
-            Expect(planningEvents.Count(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED") == 1, "Calculated Planning should not retrigger while a debuff is already queued.");
-            Expect(planningEvents.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "APPLIED"), "Calculated Planning should emit APPLIED when the queued debuff lands on a piece.");
+            Expect(planningBoard.IsPieceScoreDebuffed(debuffedPieceId), "Calculated Prediction should apply the queued debuff to the next locked piece.");
+            Expect(planningEvents.Count(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED") == 1, "Calculated Prediction should not retrigger while a debuff is already queued.");
+            Expect(planningEvents.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "APPLIED"), "Calculated Prediction should emit APPLIED when the queued debuff lands on a piece.");
             var beforePenaltyScore = planningBoard.Score;
             FillBottomLine(planningBoard, PieceType.O, pieceIdStart: 7600);
             planningBoard.PieceIds[PieceDefinitions.TotalRows - 1, 0] = debuffedPieceId;
-            Expect(planningBoard.ClearLines() == 1, "Calculated Planning focused matrix should clear a row containing the debuffed piece.");
-            Expect(planningBoard.Score - beforePenaltyScore == 55, "Calculated Planning should reduce row-clear points for rows touching the debuffed block at difficulty tier 3.");
-            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("score"), "Calculated Planning should report score reduction status.");
+            Expect(planningBoard.ClearLines() == 1, "Calculated Prediction focused matrix should clear a row containing the debuffed piece.");
+            Expect(planningBoard.Score - beforePenaltyScore == 55, "Calculated Prediction should reduce row-clear points for rows touching the debuffed block at difficulty tier 3.");
+            Expect(planningSystem.BuildEnemyAbilityStatus().Contains("score"), "Calculated Prediction should report score reduction status.");
 
             var precisionSpec = ModifierSpec("harness-precision-focused", 3, StoryModifier.PrecisionPressure);
             var precisionBoard = new BoardState(new[] { PieceType.T }, seed: 4104);
@@ -783,22 +788,23 @@ namespace MonStacka.Editor
             var blindedSpec = ModifierSpec("harness-blinded", 10, StoryModifier.GhostFlicker);
             var blindedSystem = new StoryModifierSystem(blindedSpec, new BoardState(new[] { PieceType.L }, seed: 4105), seed: 4105);
             blindedSystem.OnMatchStart();
-            Expect(!blindedSystem.BlindedActive, "Blinded should start on cooldown.");
-            Expect(blindedSystem.LockedPiecesVisible, "Blinded should leave locked blocks visible while cooling down.");
+            Expect(!blindedSystem.BlindedActive, "Vision Loss should start on cooldown.");
+            Expect(blindedSystem.LockedPiecesVisible, "Vision Loss should leave locked blocks visible while cooling down.");
             var blindedStatus = blindedSystem.BuildEnemyAbilityStatus();
-            Expect(blindedStatus.Contains("Blinded"), "Blinded should use its public ability name in enemy status.");
-            Expect(!blindedStatus.Contains("Ghost Flicker"), "Blinded status should not expose the old Ghost Flicker internal name.");
-            Expect(blindedStatus.Contains("[TIMER]"), "Blinded should expose cooldown timer status before it activates.");
+            Expect(blindedStatus.Contains("Vision Loss"), "Vision Loss should use its public ability name in enemy status.");
+            Expect(!blindedStatus.Contains("Blinded"), "Vision Loss status should not expose the old Blinded public name.");
+            Expect(!blindedStatus.Contains("Ghost Flicker"), "Vision Loss status should not expose the old Ghost Flicker internal name.");
+            Expect(blindedStatus.Contains("[TIMER]"), "Vision Loss should expose cooldown timer status before it activates.");
             blindedSystem.Tick(12f);
-            Expect(blindedSystem.BlindedActive, "Blinded should activate after its 12-second cooldown fills.");
-            Expect(blindedSystem.LockedPiecesVisible, "Blinded should start active while locked blocks are visible.");
+            Expect(blindedSystem.BlindedActive, "Vision Loss should activate after its 12-second cooldown fills.");
+            Expect(blindedSystem.LockedPiecesVisible, "Vision Loss should start active while locked blocks are visible.");
             blindedSystem.Tick(0.5f);
-            Expect(!blindedSystem.LockedPiecesVisible, "Blinded should hide locked blocks after the first half-second flicker.");
+            Expect(!blindedSystem.LockedPiecesVisible, "Vision Loss should hide locked blocks after the first half-second flicker.");
             blindedSystem.Tick(0.5f);
-            Expect(blindedSystem.LockedPiecesVisible, "Blinded should show locked blocks on the next half-second flicker.");
+            Expect(blindedSystem.LockedPiecesVisible, "Vision Loss should show locked blocks on the next half-second flicker.");
             blindedSystem.Tick(6.1f);
-            Expect(!blindedSystem.BlindedActive, "Blinded should end after its scaled active duration.");
-            Expect(blindedSystem.LockedPiecesVisible, "Blinded should force locked blocks visible after it ends.");
+            Expect(!blindedSystem.BlindedActive, "Vision Loss should end after its scaled active duration.");
+            Expect(blindedSystem.LockedPiecesVisible, "Vision Loss should force locked blocks visible after it ends.");
 
             var resilientSpec = ModifierSpec("harness-resilient", 10, StoryModifier.ResilientCells);
             var resilientBoard = new BoardState(new[] { PieceType.J }, seed: 4107);
@@ -932,9 +938,9 @@ namespace MonStacka.Editor
             {
                 StoryModifier.GuardPressure => "Guard Pressure",
                 StoryModifier.TerritoryCells => "Territory Cells",
-                StoryModifier.CalculatedPlanning => "Calculated Planning",
+                StoryModifier.CalculatedPlanning => "Calculated Prediction",
                 StoryModifier.PrecisionPressure => "Precision Pressure",
-                StoryModifier.GhostFlicker => "Blinded",
+                StoryModifier.GhostFlicker => "Vision Loss",
                 StoryModifier.EcholocationDim => "Echolocation Dim",
                 StoryModifier.ResilientCells => "Resilient Cells",
                 StoryModifier.MutedHints => "Muted Hints",
@@ -1152,6 +1158,7 @@ namespace MonStacka.Editor
                 "tries to claim one random locked block touching the claimed area",
                 "The whole target block becomes claimed",
                 "removes one temporary claimed block, oldest first",
+                "Rotating more than 4 times queues a debuff",
                 "instant danger-save payout by itself",
             })
             {

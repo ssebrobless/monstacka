@@ -88,11 +88,11 @@ namespace MonStacka.Story
         GuardPressure,
         /// <summary>Deprecated/internal: claimed-cell spread helper, now surfaced as Dousema/J ResilientCells.</summary>
         TerritoryCells,
-        /// <summary>Muwerde/O: extended next-queue preview, with over-rotation queuing a score debuff.</summary>
+        /// <summary>Muwerde/O: Calculated Prediction queues a score debuff after more than four rotations.</summary>
         CalculatedPlanning,
         /// <summary>Muwerde/O: precision scoring - bonus for flush placements, penalty cells for overhangs.</summary>
         PrecisionPressure,
-        /// <summary>Galiffambos/L: Blinded flickers placed board blocks on a cooldown.</summary>
+        /// <summary>Galiffambos/L: Vision Loss flickers placed board blocks on a cooldown.</summary>
         GhostFlicker,
         /// <summary>Deprecated Galiffambos/L dimming modifier kept for old data compatibility.</summary>
         EcholocationDim,

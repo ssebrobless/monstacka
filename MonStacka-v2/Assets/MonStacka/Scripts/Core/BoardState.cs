@@ -370,7 +370,6 @@ namespace MonStacka.Core
                 activePiece = candidate;
                 HasActivePiece = true;
                 ActivePieceCameFromHold = true;
-                CurrentPieceRotations = 0;
             }
             else
             {

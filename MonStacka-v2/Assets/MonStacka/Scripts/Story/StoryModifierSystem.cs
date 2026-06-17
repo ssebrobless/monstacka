@@ -48,7 +48,7 @@ namespace MonStacka.Story
         private const float BlindedFlickerIntervalSeconds = 0.5f;
         private const float BlindedBaseActiveSeconds = 4f;
         private const float BlindedMaxActiveSeconds = 7f;
-        private const int CalculatedPlanningRotationBudget = 3;
+        private const int CalculatedPlanningRotationBudget = 4;
         private const int PrecisionPressureMaxPenaltyCells = 3;
 
         private readonly StoryChapterSpec spec;
@@ -132,7 +132,7 @@ namespace MonStacka.Story
             }
         }
 
-        /// <summary>Active pieces stay visible; Blinded flickers only locked/placed blocks.</summary>
+        /// <summary>Active pieces stay visible; Vision Loss flickers only locked/placed blocks.</summary>
         public bool ActivePieceVisible => true;
 
         public bool BlindedActive => Has(StoryModifier.GhostFlicker) && blindedActive;
@@ -228,7 +228,7 @@ namespace MonStacka.Story
                 var previewStatus = previewDelta > 0
                     ? $"+{previewDelta} next; {rotationPressure}; last {lastCalculatedPlanningStatus}"
                     : $"{rotationPressure}; last {lastCalculatedPlanningStatus}";
-                AppendStatus(status, "Calculated Planning", "LOCK", previewStatus);
+                AppendStatus(status, "Calculated Prediction", "LOCK", previewStatus);
             }
 
             if (Has(StoryModifier.PrecisionPressure))
@@ -244,13 +244,13 @@ namespace MonStacka.Story
                     var visibleStatus = LockedPiecesVisible ? "visible" : "invisible";
                     AppendStatus(
                         status,
-                        "Blinded",
+                        "Vision Loss",
                         "ACTIVE",
                         $"placed blocks {visibleStatus}; next flicker {Seconds(BlindedFlickerIntervalSeconds - phase)}; ends in {Seconds(blindedCurrentActiveSeconds - blindedActiveTimer)}");
                 }
                 else
                 {
-                    AppendStatus(status, "Blinded", "TIMER", $"flicker starts in {Seconds(BlindedCooldownSeconds - blindedCooldownTimer)}");
+                    AppendStatus(status, "Vision Loss", "TIMER", $"flicker starts in {Seconds(BlindedCooldownSeconds - blindedCooldownTimer)}");
                 }
             }
 
@@ -751,9 +751,9 @@ namespace MonStacka.Story
             {
                 StoryModifier.GuardPressure => "Guard Pressure",
                 StoryModifier.TerritoryCells => "Resilient Cells",
-                StoryModifier.CalculatedPlanning => "Calculated Planning",
+                StoryModifier.CalculatedPlanning => "Calculated Prediction",
                 StoryModifier.PrecisionPressure => "Precision Pressure",
-                StoryModifier.GhostFlicker => "Blinded",
+                StoryModifier.GhostFlicker => "Vision Loss",
                 StoryModifier.EcholocationDim => "Echolocation Dim",
                 StoryModifier.ResilientCells => "Resilient Cells",
                 StoryModifier.MutedHints => "Muted Hints",
