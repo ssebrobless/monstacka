@@ -439,6 +439,15 @@ namespace MonStacka.Editor
                 Expect(!aggrasoChapter.Modifiers.Contains(StoryModifier.TerritoryCells), $"{aggrasoChapterId} should not expose Territory Cells as an Aggraso enemy ability.");
             }
 
+            foreach (var muwerdeChapterId in new[] { "2.1", "2.2", "2.3", "2.4" })
+            {
+                var muwerdeChapter = StoryCatalog.GetChapter(muwerdeChapterId);
+                Expect(muwerdeChapter != null, $"{muwerdeChapterId} should exist.");
+                Expect(muwerdeChapter.Modifiers.SequenceEqual(new[] { StoryModifier.ResilientCells }), $"{muwerdeChapterId} should use Muwerde's single Resilient Cells ability only.");
+                Expect(!muwerdeChapter.Modifiers.Contains(StoryModifier.CalculatedPlanning), $"{muwerdeChapterId} should not keep the retired Muwerde rotation debuff.");
+                Expect(!muwerdeChapter.Modifiers.Contains(StoryModifier.PrecisionPressure), $"{muwerdeChapterId} should not keep the retired Muwerde overhang penalty.");
+            }
+
             foreach (var dousemaChapterId in new[] { "3.3", "3.4" })
             {
                 var dousemaChapter = StoryCatalog.GetChapter(dousemaChapterId);
@@ -477,13 +486,13 @@ namespace MonStacka.Editor
                 "Insatiable Hunger",
                 "Sedating Spit",
                 "Adrenaline Rush",
-                "Signal Relay",
                 "Reduced Preview",
                 "No Hold",
             })
             {
                 Expect(status.Contains(label), $"Enemy status should include {label}.");
             }
+            Expect(!status.Contains("Signal Relay"), "Signal Relay should not appear in enemy status after retirement, even in legacy modifier data.");
 
             Expect(Mathf.Approximately(combinedSystem.LockDelayMultiplier, 1f), "Guard Pressure should not tighten lock delay after becoming a row pressure ability.");
             Expect(combinedBoard.GetGarbageCells().Count > 0, "Resilient Cells should seed claimed enemy cells on match start.");
@@ -892,14 +901,20 @@ namespace MonStacka.Editor
             adrenalineSystem.Tick(11.1f);
             Expect(adrenalineEvents.Any(trigger => trigger.Modifier == StoryModifier.AdrenalineMonitor && trigger.State == "END"), "Adrenaline Rush should emit END after its fixed duration.");
 
-            var relaySpec = ModifierSpec("harness-relay-focused", 5, StoryModifier.SignalRelay);
+            var relaySpec = ModifierSpec("harness-retired-relay-focused", 5, StoryModifier.SignalRelay);
             var relayBoard = new BoardState(new[] { PieceType.I }, seed: 4112);
             var relaySystem = new StoryModifierSystem(relaySpec, relayBoard, seed: 4112);
             var relayEvents = new List<StoryModifierTriggerEvent>();
             relaySystem.OnModifierTriggered += trigger => relayEvents.Add(trigger);
-            relaySystem.Tick(25f);
-            Expect(relaySystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Signal Relay should activate after its timer fills.");
-            Expect(relayEvents.Any(trigger => trigger.Modifier == StoryModifier.SignalRelay && trigger.State == "ACTIVE"), "Signal Relay should emit an active trigger event when the relay begins.");
+            relaySystem.OnMatchStart();
+            relaySystem.Tick(40f);
+            Expect(!relaySystem.BuildEnemyAbilityStatus().Contains("Signal Relay"), "Retired Signal Relay should not show status for legacy data.");
+            Expect(!relayEvents.Any(trigger => trigger.Modifier == StoryModifier.SignalRelay), "Retired Signal Relay should not emit trigger events for legacy data.");
+
+            foreach (var chapter in StoryCatalog.Chapters)
+            {
+                Expect(!chapter.Modifiers.Contains(StoryModifier.SignalRelay), $"Story chapter {chapter.Id} should not declare retired Signal Relay.");
+            }
 
             var reducedPreviewSpec = ModifierSpec("harness-reduced-preview", 2, StoryModifier.ReducedPreview);
             reducedPreviewSpec.NextPreviewCount = 1;
@@ -926,7 +941,7 @@ namespace MonStacka.Editor
                 StoryModifier.HungerMeter => "Insatiable Hunger",
                 StoryModifier.SedationWindows => "Sedating Spit",
                 StoryModifier.AdrenalineMonitor => "Adrenaline Rush",
-                StoryModifier.SignalRelay => "Signal Relay",
+                StoryModifier.SignalRelay => string.Empty,
                 StoryModifier.ReducedPreview => "Reduced Preview",
                 StoryModifier.NoHold => "No Hold",
                 _ => modifier.ToString(),
@@ -1133,8 +1148,10 @@ namespace MonStacka.Editor
 
             foreach (var required in new[]
             {
-                "Rotating more than 3 times queues a score debuff",
-                "Unsupported overhangs seed enemy territory cells",
+                "one permanent claimed source cell",
+                "tries to claim one random locked block touching the claimed area",
+                "The whole target block becomes claimed",
+                "removes one temporary claimed block, oldest first",
                 "instant danger-save payout by itself",
             })
             {

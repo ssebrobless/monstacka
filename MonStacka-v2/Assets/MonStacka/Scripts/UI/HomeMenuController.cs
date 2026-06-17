@@ -921,10 +921,10 @@ namespace MonStacka.UI
                     "<color=#FFD86B><b>Trigger</b></color>\nRuns on a timer that gets shorter as story difficulty rises.\n\n" +
                     "<color=#C8FF9A><b>Effect</b></color>\nAdds a full timed row from the bottom and pushes the stack upward. Each pressure row lasts 6 seconds, or you can clear a normal row to remove the oldest pressure row early.",
                 PieceType.O =>
-                    $"<color=#{titleColor}><b>CALCULATED</b></color>\n" +
-                    "<color=#FFB0B0><b>Modifiers</b></color>\nCalculatedPlanning, PrecisionPressure\n\n" +
-                    "<color=#FFD86B><b>Triggers</b></color>\nCalculatedPlanning watches rotations and queues a penalty once you lock a piece after rotating it more than 3 times. PrecisionPressure watches each locked piece for unsupported overhang cells.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nCalculatedPlanning gives safer missions a longer Next preview, then punishes over-rotation by debuffing the next block you place. Rows cleared with any cell from that debuffed block pay reduced points, so they also deal reduced mission damage. The reduction grows with mission difficulty. PrecisionPressure seeds enemy cells when a locked block leaves unsupported cells hanging over empty space, up to 3 cells per piece.",
+                    $"<color=#{titleColor}><b>RESILIENT CELLS</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifier</b></color>\nResilientCells\n\n" +
+                    "<color=#FFD86B><b>Trigger</b></color>\nStarts each Muwerde mission with one permanent enemy-claimed source cell. After that, it periodically claims one whole locked block touching the claimed area.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nClaimed blocks do not count toward row clears where they would have helped complete the row. Clearing a normal row removes one temporary claimed block, oldest first, while the permanent source stays. Harder missions can keep more temporary blocks claimed at the same time.",
                 PieceType.L =>
                     $"<color=#{titleColor}><b>BLINDED</b></color>\n" +
                     "<color=#FFB0B0><b>Modifier</b></color>\nBlinded\n\n" +
@@ -947,9 +947,9 @@ namespace MonStacka.UI
                     "<color=#C8FF9A><b>Effect</b></color>\nWhen activated, all friendly assist charge and active assist windows are erased. While active, held-piece placements cannot gain assist progress and no friendly ability can trigger.",
                 PieceType.I =>
                     $"<color=#{titleColor}><b>ADRENALINE RUSH</b></color>\n" +
-                    "<color=#FFB0B0><b>Modifiers</b></color>\nAdrenalineMonitor, SignalRelay\n\n" +
-                    "<color=#FFD86B><b>Triggers</b></color>\nAdrenaline Rush waits 20s, activates for 11s, then repeats. It cannot be ended early. Signal Relay waits 25s, activates for 6s, then repeats.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nWhile Rush is active, enemy abilities that trigger use boosted difficulty scaling. Timed effects that start during Rush keep their boosted duration until they finish, even after Rush ends. Signal Relay randomly activates GuardPressure, ResilientCells, Blinded, or Adrenaline Rush. Resilient relay seeds a source if needed or claims one touching block.",
+                    "<color=#FFB0B0><b>Modifier</b></color>\nAdrenalineMonitor\n\n" +
+                    "<color=#FFD86B><b>Trigger</b></color>\nAdrenaline Rush waits 20s, activates for 11s, then repeats. It cannot be ended early.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nWhile Rush is active, enemy abilities that trigger use boosted difficulty scaling. Timed effects that start during Rush keep their boosted duration until they finish, even after Rush ends. Future enemy cycles return to normal until the next Rush.",
                 _ =>
                     $"<color=#{titleColor}><b>ENEMY ABILITY</b></color>\n" +
                     "Story chapters can turn this monster's traits into stage pressure.",

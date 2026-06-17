@@ -106,7 +106,7 @@ namespace MonStacka.Story
         SedationWindows,
         /// <summary>Blyndoolie/I: Adrenaline Rush periodically boosts enemy abilities for a fixed window.</summary>
         AdrenalineMonitor,
-        /// <summary>Blyndoolie/I: signal relay randomly re-activates one earlier chapter modifier briefly.</summary>
+        /// <summary>Deprecated legacy value. Signal Relay is retired and ignored by runtime story modifiers.</summary>
         SignalRelay,
         /// <summary>Chapter 5: reduced next-queue preview.</summary>
         ReducedPreview,
