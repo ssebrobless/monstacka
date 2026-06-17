@@ -916,10 +916,10 @@ namespace MonStacka.UI
             return pieceType switch
             {
                 PieceType.Z =>
-                    $"<color=#{titleColor}><b>AGGRASO PRESSURE</b></color>\n" +
-                    "<color=#FFB0B0><b>Modifiers</b></color>\nGuardPressure, TerritoryCells\n\n" +
-                    "<color=#FFD86B><b>Triggers</b></color>\nGuardPressure and TerritoryCells each run on a timer that gets shorter as story difficulty rises.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nGuardPressure adds full timed rows from the bottom; clearing a row removes one early. TerritoryCells starts with one permanent source, then claims touching blocks. Claimed blocks do not count toward row clears until you clear another row to unclaim them one at a time.",
+                    $"<color=#{titleColor}><b>GUARD PRESSURE</b></color>\n" +
+                    "<color=#FFB0B0><b>Modifier</b></color>\nGuardPressure\n\n" +
+                    "<color=#FFD86B><b>Trigger</b></color>\nRuns on a timer that gets shorter as story difficulty rises.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nAdds a full timed row from the bottom and pushes the stack upward. Each pressure row lasts 6 seconds, or you can clear a normal row to remove the oldest pressure row early.",
                 PieceType.O =>
                     $"<color=#{titleColor}><b>CALCULATED</b></color>\n" +
                     "<color=#FFB0B0><b>Modifiers</b></color>\nCalculatedPlanning, PrecisionPressure\n\n" +
@@ -931,10 +931,10 @@ namespace MonStacka.UI
                     "<color=#FFD86B><b>Triggers</b></color>\nBoth effects are active for the whole mission when included.\n\n" +
                     "<color=#C8FF9A><b>Effect</b></color>\nGhostFlicker runs on a 2.6s cycle: active piece hidden for 0.35s, then visible. EcholocationDim runs on a 3.5s cycle: board clear for 0.5s, then dimmed at 0.42 alpha. Signal Relay can temporarily reactivate GhostFlicker.",
                 PieceType.J =>
-                    $"<color=#{titleColor}><b>MUTE</b></color>\n" +
+                    $"<color=#{titleColor}><b>RESILIENT CELLS</b></color>\n" +
                     "<color=#FFB0B0><b>Modifiers</b></color>\nResilientCells, MutedHints, NoHold\n\n" +
-                    "<color=#FFD86B><b>Triggers</b></color>\nMutedHints and NoHold are whole-mission rules when included. ResilientCells triggers after line clears.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nHints can be hidden, Hold can be disabled, and line clears can regrow one enemy territory cell. Regrow chance is 30% + 3% per difficulty tier.",
+                    "<color=#FFD86B><b>Triggers</b></color>\nResilientCells starts with one permanent claimed source, then spreads on a timer that gets shorter as story difficulty rises. MutedHints and NoHold are whole-mission rules when included.\n\n" +
+                    "<color=#C8FF9A><b>Effect</b></color>\nClaimed blocks do not count toward row clears. Clearing another normal row removes one temporary claim, oldest first, but the permanent source remains.",
                 PieceType.S =>
                     $"<color=#{titleColor}><b>SORRISOL HUNGER</b></color>\n" +
                     "<color=#FFB0B0><b>Modifier</b></color>\nHungerMeter\n\n" +
@@ -949,7 +949,7 @@ namespace MonStacka.UI
                     $"<color=#{titleColor}><b>BLYNDOOLIE ADRENALINE</b></color>\n" +
                     "<color=#FFB0B0><b>Modifiers</b></color>\nAdrenalineMonitor, SignalRelay\n\n" +
                     "<color=#FFD86B><b>Triggers</b></color>\nAdrenaline checks stack height for the whole mission. Signal Relay waits 25s, activates for 6s, then repeats.\n\n" +
-                    "<color=#C8FF9A><b>Effect</b></color>\nIf the stack reaches about 13 visible rows high, gravity multiplier becomes 0.7, making pieces fall faster. Signal Relay randomly activates GuardPressure, TerritoryCells, GhostFlicker, or AdrenalineMonitor. Territory relay seeds a source if needed or claims one touching block.",
+                    "<color=#C8FF9A><b>Effect</b></color>\nIf the stack reaches about 13 visible rows high, gravity multiplier becomes 0.7, making pieces fall faster. Signal Relay randomly activates GuardPressure, ResilientCells, GhostFlicker, or AdrenalineMonitor. Resilient relay seeds a source if needed or claims one touching block.",
                 _ =>
                     $"<color=#{titleColor}><b>ENEMY ABILITY</b></color>\n" +
                     "Story chapters can turn this monster's traits into stage pressure.",

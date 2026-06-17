@@ -62,14 +62,13 @@ Actual friendly mechanics:
 - Awards +20 per garbage cell removed.
 - Awards +300 danger-save bonus if the stack was dangerous and at least one garbage cell was removed.
 
-ENEMY ABILITY: AGGRASO PRESSURE
+ENEMY ABILITY: GUARD PRESSURE
 
 Home menu preview text:
-Story effect: Guard Pressure raises the stack with timed bottom rows. Territory Cells starts from one permanent source and spreads claims to touching blocks.
+Story effect: Guard Pressure raises the stack with timed bottom rows.
 
-Actual enemy modifiers:
+Actual enemy modifier:
 - GuardPressure
-- TerritoryCells
 
 Enemy trigger details:
 - GuardPressure is active for the whole mission when the chapter includes that modifier.
@@ -77,13 +76,7 @@ Enemy trigger details:
 - When the timer fills, it adds a full pressure row at the bottom of the stack.
 - Each pressure row lasts 6 seconds, or can be removed early by clearing a row.
 - Clearing a row removes only the oldest active Guard Pressure row.
-- TerritoryCells triggers at match start when the chapter includes that modifier.
-- It creates one permanent claimed source that stays for the whole match.
-- Its timer also gets shorter as difficulty tier rises.
-- When the Territory timer fills, it claims one random locked block touching the permanent source or another claimed block.
-- Claimed blocks do not count toward row completion.
-- Clearing a row removes one temporary Territory claim, oldest first. The permanent source remains.
-- Signal Relay can temporarily reactivate GuardPressure or TerritoryCells in later story missions.
+- Signal Relay can temporarily reactivate GuardPressure in later story missions.
 
 ============================================================
 MUWERDE / O
@@ -194,10 +187,10 @@ Actual friendly mechanics:
 - Fills that hole with a repair cell.
 - Awards +120 if a hole was successfully repaired.
 
-ENEMY ABILITY: MUTE
+ENEMY ABILITY: RESILIENT CELLS
 
 Home menu preview text:
-Story effect: some Dousema missions hide hints or disable Hold. Some clears can also leave new enemy cells behind.
+Story effect: one permanent claimed source spreads to adjacent locked blocks. Claimed blocks cannot help complete row clears until you clear other rows to remove the claims.
 
 Actual enemy modifiers:
 - ResilientCells
@@ -205,13 +198,15 @@ Actual enemy modifiers:
 - NoHold in some later story chapters
 
 Enemy trigger details:
+- ResilientCells triggers at match start when the chapter includes that modifier.
+- It creates one permanent claimed source that stays for the whole match.
+- Its timer gets shorter as difficulty tier rises.
+- When the timer fills, it claims one random locked block touching the permanent source or another claimed block.
+- Claimed blocks do not count toward row completion.
+- Clearing a row removes one temporary Resilient Cells claim, oldest first. The permanent source remains.
 - MutedHints is active for the whole mission when the chapter includes it.
 - It hides assist/status hints.
 - NoHold is applied by chapter rules when included, disabling Hold for that mission.
-- ResilientCells triggers when lines are cleared.
-- After a line clear, there is a chance to reseed one enemy territory cell.
-- Chance is 30 percent + 3 percent per difficulty tier.
-- The code describes this as regrowth rather than true two-hit cells, so the current implementation is enemy-cell reseeding after clears.
 
 ============================================================
 SORRISOL / S
@@ -329,8 +324,8 @@ Enemy trigger details:
 - SignalRelay is active in later chapters when declared.
 - Signal Relay waits 25 seconds, then activates for 6 seconds.
 - When it activates, it randomly chooses one earlier modifier:
-  GuardPressure, TerritoryCells, GhostFlicker, or AdrenalineMonitor.
-- If it chooses TerritoryCells, it seeds a permanent source if none exists, or claims one touching block if a source already exists.
+  GuardPressure, ResilientCells, GhostFlicker, or AdrenalineMonitor.
+- If it chooses ResilientCells, it seeds a permanent source if none exists, or claims one touching block if a source already exists.
 - After 6 seconds, the relay turns off and the 25-second timer starts again.
 
 ============================================================
@@ -359,4 +354,4 @@ NOTES FOR REVIEW
 Potential text/mechanics notes to decide on:
 - CALCULATION, ECHO GUIDE, and SEDATE use the shared trigger/combo rules and their +200 per-line timed-window scoring. They do not give an instant danger-save payout by themselves.
 - MUWERDE enemy preview now matches the runtime: CalculatedPlanning queues a score debuff after more than 3 rotations, and PrecisionPressure punishes unsupported overhangs.
-- DOUSEMA enemy preview says some cells can be resilient, but the current runtime implements this as a chance to reseed one territory cell after line clears.
+- DOUSEMA enemy preview now matches runtime: Resilient Cells starts with one permanent claimed source and spreads to adjacent locked blocks over time.

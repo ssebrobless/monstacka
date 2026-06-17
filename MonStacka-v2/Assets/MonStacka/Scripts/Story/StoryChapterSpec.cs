@@ -86,7 +86,7 @@ namespace MonStacka.Story
     {
         /// <summary>Aggraso/Z: faster lock delay once the piece touches the ground.</summary>
         GuardPressure,
-        /// <summary>Aggraso/Z: pre-seeded territory garbage cells near edges.</summary>
+        /// <summary>Deprecated/internal: claimed-cell spread helper, now surfaced as Dousema/J ResilientCells.</summary>
         TerritoryCells,
         /// <summary>Muwerde/O: extended next-queue preview, with over-rotation queuing a score debuff.</summary>
         CalculatedPlanning,
@@ -96,7 +96,7 @@ namespace MonStacka.Story
         GhostFlicker,
         /// <summary>Galiffambos/L: board visibility pulses dim (echolocation flashes reveal the stack).</summary>
         EcholocationDim,
-        /// <summary>Dousema/J: some stack cells are resilient and need two clears.</summary>
+        /// <summary>Dousema/J: one permanent enemy claim spreads to adjacent locked cells; claimed cells do not count for row clears.</summary>
         ResilientCells,
         /// <summary>Dousema/J: hold box and hints disabled (mouth sewn shut).</summary>
         MutedHints,

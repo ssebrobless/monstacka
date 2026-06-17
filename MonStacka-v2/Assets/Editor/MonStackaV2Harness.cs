@@ -431,6 +431,21 @@ namespace MonStacka.Editor
             var firstMission = StoryCatalog.GetChapter("1.1");
             Expect(firstMission != null, "Story 1.1 should exist.");
             Expect(firstMission.Modifiers.Contains(StoryModifier.GuardPressure), "Story 1.1 should run an enemy ability tracker.");
+            foreach (var aggrasoChapterId in new[] { "1.1", "1.2", "1.3", "1.4" })
+            {
+                var aggrasoChapter = StoryCatalog.GetChapter(aggrasoChapterId);
+                Expect(aggrasoChapter != null, $"{aggrasoChapterId} should exist.");
+                Expect(aggrasoChapter.Modifiers.Contains(StoryModifier.GuardPressure), $"{aggrasoChapterId} should keep Aggraso's Guard Pressure ability.");
+                Expect(!aggrasoChapter.Modifiers.Contains(StoryModifier.TerritoryCells), $"{aggrasoChapterId} should not expose Territory Cells as an Aggraso enemy ability.");
+            }
+
+            foreach (var dousemaChapterId in new[] { "3.3", "3.4" })
+            {
+                var dousemaChapter = StoryCatalog.GetChapter(dousemaChapterId);
+                Expect(dousemaChapter != null, $"{dousemaChapterId} should exist.");
+                Expect(dousemaChapter.Modifiers.Contains(StoryModifier.ResilientCells), $"{dousemaChapterId} should use Dousema's Resilient Cells ability.");
+            }
+
             var firstMissionBoard = new BoardState(new[] { PieceType.Z }, seed: 111);
             var firstMissionModifiers = new StoryModifierSystem(firstMission, firstMissionBoard, seed: 111);
             firstMissionModifiers.OnMatchStart();
@@ -454,7 +469,6 @@ namespace MonStacka.Editor
             foreach (var label in new[]
             {
                 "Guard Pressure",
-                "Territory Cells",
                 "Calculated Planning",
                 "Precision Pressure",
                 "Ghost Flicker",
@@ -473,7 +487,8 @@ namespace MonStacka.Editor
             }
 
             Expect(Mathf.Approximately(combinedSystem.LockDelayMultiplier, 1f), "Guard Pressure should not tighten lock delay after becoming a row pressure ability.");
-            Expect(combinedBoard.GetGarbageCells().Count > 0, "Territory Cells should seed enemy cells on match start.");
+            Expect(combinedBoard.GetGarbageCells().Count > 0, "Resilient Cells should seed claimed enemy cells on match start.");
+            Expect(status.Contains("Resilient Cells") && status.Contains("next claim"), "Resilient Cells status should track claimed-cell spreading.");
 
             var planningSpec = new StoryChapterSpec
             {
@@ -527,6 +542,22 @@ namespace MonStacka.Editor
             hungerSystem.OnMatchStart();
             hungerSystem.Tick(20f);
             Expect(hungerBoard.GetGarbageCells().Count > 0, "Hunger Meter should add garbage when its timer fills.");
+
+            var resilientSpec = new StoryChapterSpec
+            {
+                Id = "harness-resilient",
+                Title = "Harness Resilient Cells",
+                DifficultyTier = 10,
+                Modifiers = new[] { StoryModifier.ResilientCells },
+            };
+            var resilientBoard = new BoardState(new[] { PieceType.O }, seed: 1005);
+            var resilientSystem = new StoryModifierSystem(resilientSpec, resilientBoard, seed: 1005);
+            resilientSystem.OnMatchStart();
+            Expect(resilientBoard.GetTerritorySourceCells().Count == 1, "Resilient Cells should start with one permanent claimed source.");
+            Expect(resilientSystem.BuildEnemyAbilityStatus().Contains("next claim"), "Resilient Cells status should show claim timer progress.");
+            SeedClaimableNeighbor(resilientBoard);
+            resilientSystem.Tick(20f);
+            Expect(resilientBoard.GetTerritoryClaimedCells().Count > 0, "Resilient Cells should expand to adjacent locked blocks over time.");
 
             var adrenalineSpec = new StoryChapterSpec
             {
@@ -701,13 +732,25 @@ namespace MonStacka.Editor
             Expect(echoSystem.BoardDimAlpha >= 0f, "Echolocation Dim should expose a valid board dim alpha.");
             Expect(echoSystem.BuildEnemyAbilityStatus().Contains("Echolocation Dim"), "Echolocation Dim should appear in enemy status.");
 
-            var resilientSpec = ModifierSpec("harness-resilient", 30, StoryModifier.ResilientCells);
+            var resilientSpec = ModifierSpec("harness-resilient", 10, StoryModifier.ResilientCells);
             var resilientBoard = new BoardState(new[] { PieceType.J }, seed: 4107);
             var resilientSystem = new StoryModifierSystem(resilientSpec, resilientBoard, seed: 4107);
-            FillBottomLine(resilientBoard, PieceType.J, pieceIdStart: 5000);
-            Expect(resilientBoard.ClearLines() == 1, "Resilient Cells focused matrix should clear a prepared line.");
-            Expect(resilientBoard.GetGarbageCells().Count > 0, "Resilient Cells should regrow a territory cell after line clear at high difficulty.");
-            Expect(resilientSystem.BuildEnemyAbilityStatus().Contains("[CLEAR]"), "Resilient Cells should report clear-trigger status.");
+            var resilientEvents = new List<StoryModifierTriggerEvent>();
+            resilientSystem.OnModifierTriggered += trigger => resilientEvents.Add(trigger);
+            resilientSystem.OnMatchStart();
+            Expect(resilientBoard.GetTerritorySourceCells().Count == 1, "Resilient Cells should seed one permanent claimed source at match start.");
+            var resilientSource = resilientBoard.GetTerritorySourceCells()[0];
+            FillTerritoryClaimCandidates(resilientBoard, resilientSource, PieceType.J, pieceIdStart: 5000);
+            resilientSystem.Tick(4f);
+            Expect(resilientBoard.GetTerritoryClaimedCells().Count == 1, "Resilient Cells should claim a touching locked block after its timer fills.");
+            FillLine(resilientBoard, PieceDefinitions.TotalRows - 5, PieceType.O, pieceIdStart: 5100);
+            Expect(resilientBoard.ClearLines() == 1, "A normal line clear should still score while Resilient Cells are active.");
+            Expect(resilientBoard.GetTerritoryClaimedCells().Count == 0, "Clearing a row should remove one temporary Resilient Cells claim.");
+            Expect(resilientBoard.GetTerritorySourceCells().Count == 1, "The permanent Resilient Cells source should remain after line clears.");
+            Expect(resilientSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Resilient Cells should report timer status.");
+            Expect(resilientEvents.Any(trigger => trigger.Modifier == StoryModifier.ResilientCells && trigger.State == "SETUP"), "Resilient Cells should emit a setup trigger event.");
+            Expect(resilientEvents.Any(trigger => trigger.Modifier == StoryModifier.ResilientCells && trigger.State == "CLAIM"), "Resilient Cells should emit a claim trigger event.");
+            Expect(resilientEvents.Any(trigger => trigger.Modifier == StoryModifier.ResilientCells && trigger.State == "CLEARED"), "Resilient Cells should emit CLEARED when a line clear removes a claim.");
 
             var mutedSpec = ModifierSpec("harness-muted", 2, StoryModifier.MutedHints);
             var mutedSystem = new StoryModifierSystem(mutedSpec, new BoardState(new[] { PieceType.J }, seed: 4108), seed: 4108);
@@ -858,9 +901,9 @@ namespace MonStacka.Editor
 
         private static void VerifyStoryRuntimeHudAndVisualSweep()
         {
-            var story = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
-            var chapter = StoryCatalog.GetChapter("1.3");
-            Expect(chapter != null, "Story 1.3 should exist for runtime HUD sweep.");
+            var story = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "3.3");
+            var chapter = StoryCatalog.GetChapter("3.3");
+            Expect(chapter != null, "Story 3.3 should exist for runtime HUD sweep.");
             Expect(story.CurrentMode == MonStackaMode.Story, "Runtime story HUD sweep should be in Story mode.");
 
             var bossRoot = RequireRect("BossHealthBar");
@@ -879,7 +922,7 @@ namespace MonStacka.Editor
             }
 
             var enemyText = RequireRect("StoryEnemyStatus").GetComponent<Text>();
-            hud.RenderStoryEnemyStatus("<color=#ffcf74>Guard Pressure</color> [ON] every piece locks faster\n<color=#ffcf74>Territory Cells</color> [SETUP] cells seeded");
+            hud.RenderStoryEnemyStatus("<color=#ffcf74>Guard Pressure</color> [ON] pressure row in 6s\n<color=#ff7cc8>Resilient Cells</color> [SETUP] source seeded");
             Expect(enemyText.text.Contains("[ON]") && enemyText.text.Contains("[SETUP]"), "Story enemy HUD should render explicit state tags.");
             hud.ShowEnemyModifierTrigger("Hunger Meter", "TRIGGER", "garbage row inserted");
             var triggerText = RequireRect("StoryEnemyTriggerCue").GetComponent<Text>();
@@ -889,7 +932,7 @@ namespace MonStacka.Editor
             var territoryRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
                 .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal))
                 .ToArray();
-            Expect(territoryRenderers.Length > 0, "Story 1.3 should render seeded territory cells.");
+            Expect(territoryRenderers.Length > 0, "Story 3.3 should render seeded Resilient Cells claims.");
             foreach (var renderer in territoryRenderers.Where(renderer => renderer.gameObject.activeSelf))
             {
                 Expect(renderer.sortingOrder >= 18, "Enemy territory cells should render above generic floor art.");
@@ -1832,7 +1875,6 @@ namespace MonStacka.Editor
                 Modifiers = new[]
                 {
                     StoryModifier.GuardPressure,
-                    StoryModifier.TerritoryCells,
                     StoryModifier.CalculatedPlanning,
                     StoryModifier.PrecisionPressure,
                     StoryModifier.HungerMeter,
@@ -2306,6 +2348,16 @@ namespace MonStacka.Editor
         private static void FillBottomLine(BoardState board, PieceType type, int pieceIdStart)
         {
             FillLine(board, PieceDefinitions.TotalRows - 1, type, pieceIdStart);
+        }
+
+        private static void SeedClaimableNeighbor(BoardState board)
+        {
+            var source = board.GetTerritorySourceCells().First();
+            var candidate = new Vector2Int(source.x, Mathf.Max(0, source.y - 1));
+            board.Grid[candidate.y, candidate.x] = (int)PieceType.J;
+            board.PieceIds[candidate.y, candidate.x] = 9700;
+            board.SourceCellXs[candidate.y, candidate.x] = 0;
+            board.SourceCellYs[candidate.y, candidate.x] = 0;
         }
 
         private static void FillLine(BoardState board, int row, PieceType type, int pieceIdStart)

@@ -30,9 +30,8 @@ namespace MonStacka.Story
     /// Notes against the handoff:
     /// - CalculatedPlanning queues a score debuff after excess rotations.
     /// - PrecisionPressure is enforced as an unsupported-overhang check on lock.
-    /// - ResilientCells is implemented as regrowth: each line clear has a chance
-    ///   to reseed one territory cell ("the flesh regrows"), rather than a second
-    ///   grid cell type, to keep clear rules deterministic and readable.
+    /// - ResilientCells owns the claimed-cell spread behavior: one permanent
+    ///   source expands to adjacent locked cells, and claims clear oldest-first.
     /// </summary>
     public sealed class StoryModifierSystem
     {
@@ -205,13 +204,13 @@ namespace MonStacka.Story
                 }
             }
 
-            if (Has(StoryModifier.TerritoryCells))
+            if (HasClaimingCells)
             {
                 var claimCount = board.GetTerritoryClaimedCells().Count;
                 var sourceStatus = board.GetTerritorySourceCells().Count > 0
                     ? $"source locked; {claimCount} claim{Plural(claimCount)} active"
                     : "source pending";
-                AppendStatus(status, "Territory Cells", "TIMER", $"{RelayTag(StoryModifier.TerritoryCells)}{sourceStatus}; next claim in {Seconds(TerritoryWindowSeconds - territoryTimer)}");
+                AppendStatus(status, "Resilient Cells", "TIMER", $"{RelayTag(StoryModifier.ResilientCells)}{sourceStatus}; next claim in {Seconds(TerritoryWindowSeconds - territoryTimer)}");
             }
 
             if (Has(StoryModifier.CalculatedPlanning))
@@ -250,12 +249,6 @@ namespace MonStacka.Story
                     ? $"clear {Seconds(0.5f - phase)}"
                     : $"next flash {Seconds(3.5f - phase)}";
                 AppendStatus(status, "Echolocation Dim", "TIMER", echoStatus);
-            }
-
-            if (Has(StoryModifier.ResilientCells))
-            {
-                var chance = Mathf.RoundToInt((0.3f + (spec.DifficultyTier * 0.03f)) * 100f);
-                AppendStatus(status, "Resilient Cells", "CLEAR", $"line clears have {chance}% regrow chance");
             }
 
             if (Has(StoryModifier.MutedHints))
@@ -318,10 +311,10 @@ namespace MonStacka.Story
 
         public void OnMatchStart()
         {
-            if (Has(StoryModifier.TerritoryCells))
+            if (HasClaimingCells)
             {
                 board.SeedTerritorySource();
-                EmitModifierTrigger(StoryModifier.TerritoryCells, "SETUP", "permanent claimed source seeded");
+                EmitModifierTrigger(ClaimingCellsEventModifier, "SETUP", "permanent claimed source seeded");
             }
 
             if (HasDeclared(StoryModifier.ReducedPreview))
@@ -382,16 +375,16 @@ namespace MonStacka.Story
                     relayTimer = 0f;
                     relayedModifier = PickRelayModifier();
                     EmitModifierTrigger(StoryModifier.SignalRelay, "ACTIVE", $"{ModifierLabel(relayedModifier)} relayed");
-                    if (relayedModifier == StoryModifier.TerritoryCells)
+                    if (relayedModifier == StoryModifier.ResilientCells)
                     {
                         if (board.GetTerritorySourceCells().Count == 0)
                         {
                             board.SeedTerritorySource();
-                            EmitModifierTrigger(StoryModifier.TerritoryCells, "SETUP", "relay seeded a claimed source");
+                            EmitModifierTrigger(StoryModifier.ResilientCells, "SETUP", "relay seeded a claimed source");
                         }
                         else if (board.TryClaimAdjacentTerritoryCell(rng))
                         {
-                            EmitModifierTrigger(StoryModifier.TerritoryCells, "CLAIM", "relay claimed a touching block");
+                            EmitModifierTrigger(StoryModifier.ResilientCells, "CLAIM", "relay claimed a touching block");
                         }
                     }
                 }
@@ -416,6 +409,14 @@ namespace MonStacka.Story
         private float CalculatedPlanningScoreMultiplier =>
             Mathf.Clamp(0.7f - (spec.DifficultyTier * 0.05f), 0.25f, 0.7f);
 
+        private bool HasClaimingCells =>
+            Has(StoryModifier.ResilientCells) || Has(StoryModifier.TerritoryCells);
+
+        private StoryModifier ClaimingCellsEventModifier =>
+            HasDeclared(StoryModifier.ResilientCells) || Has(StoryModifier.ResilientCells)
+                ? StoryModifier.ResilientCells
+                : StoryModifier.TerritoryCells;
+
         /// <summary>Declared on the spec itself (relay never relays itself).</summary>
         private bool HasDeclared(StoryModifier modifier)
         {
@@ -435,7 +436,7 @@ namespace MonStacka.Story
             var options = new[]
             {
                 StoryModifier.GuardPressure,
-                StoryModifier.TerritoryCells,
+                StoryModifier.ResilientCells,
                 StoryModifier.GhostFlicker,
                 StoryModifier.AdrenalineMonitor,
             };
@@ -460,25 +461,14 @@ namespace MonStacka.Story
             {
                 if (board.ClearOldestTerritoryClaim())
                 {
-                    EmitModifierTrigger(StoryModifier.TerritoryCells, "CLEARED", "oldest claimed block unclaimed by line clear");
-                }
-            }
-
-            if (HasDeclared(StoryModifier.ResilientCells) && lines > 0)
-            {
-                // Regrowth: clearing flesh leaves scar tissue behind sometimes.
-                var chance = 0.3f + (spec.DifficultyTier * 0.03f);
-                if (rng.NextDouble() < chance)
-                {
-                    board.SeedTerritoryCells(1);
-                    EmitModifierTrigger(StoryModifier.ResilientCells, "TRIGGER", "1 enemy cell regrew after clear");
+                    EmitModifierTrigger(ClaimingCellsEventModifier, "CLEARED", "oldest claimed block unclaimed by line clear");
                 }
             }
         }
 
         private void TickTerritoryCells(float deltaTime)
         {
-            if (!Has(StoryModifier.TerritoryCells) || board.GameOver)
+            if (!HasClaimingCells || board.GameOver)
             {
                 return;
             }
@@ -486,7 +476,7 @@ namespace MonStacka.Story
             if (board.GetTerritorySourceCells().Count == 0)
             {
                 board.SeedTerritorySource();
-                EmitModifierTrigger(StoryModifier.TerritoryCells, "SETUP", "permanent claimed source seeded");
+                EmitModifierTrigger(ClaimingCellsEventModifier, "SETUP", "permanent claimed source seeded");
             }
 
             territoryTimer += deltaTime;
@@ -496,7 +486,7 @@ namespace MonStacka.Story
                 territoryTimer -= window;
                 if (board.TryClaimAdjacentTerritoryCell(rng))
                 {
-                    EmitModifierTrigger(StoryModifier.TerritoryCells, "CLAIM", $"{board.GetTerritoryClaimedCells().Count} claimed block{Plural(board.GetTerritoryClaimedCells().Count)} active");
+                    EmitModifierTrigger(ClaimingCellsEventModifier, "CLAIM", $"{board.GetTerritoryClaimedCells().Count} claimed block{Plural(board.GetTerritoryClaimedCells().Count)} active");
                 }
             }
         }
@@ -675,7 +665,7 @@ namespace MonStacka.Story
             modifier switch
             {
                 StoryModifier.GuardPressure => "Guard Pressure",
-                StoryModifier.TerritoryCells => "Territory Cells",
+                StoryModifier.TerritoryCells => "Resilient Cells",
                 StoryModifier.CalculatedPlanning => "Calculated Planning",
                 StoryModifier.PrecisionPressure => "Precision Pressure",
                 StoryModifier.GhostFlicker => "Ghost Flicker",
