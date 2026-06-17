@@ -149,21 +149,19 @@ Actual friendly mechanics:
 ENEMY ABILITY: BLINDED
 
 Home menu preview text:
-Story effect: the ghost/guide can flicker off and the board can dim between flashes, making visual timing harder.
+Story effect: placed blocks flicker in and out on a timer, making it harder to read the stack while you keep playing.
 
 Actual enemy modifiers:
-- GhostFlicker
-- EcholocationDim
+- Blinded
 
 Enemy trigger details:
-- GhostFlicker is active for the whole mission when the chapter includes it.
-- It runs on a 2.6-second cycle.
-- The active piece is hidden for the first 0.35 seconds of each cycle, then visible for the rest.
-- EcholocationDim is active for the whole mission when the chapter includes it.
-- It runs on a 3.5-second visual cycle.
-- The board is clear for the first 0.5 seconds, then dimmed with 0.42 alpha for the rest of the cycle.
-- This creates periodic visibility pulses instead of one continuous penalty.
-- Signal Relay can temporarily reactivate GhostFlicker in later story missions.
+- Blinded runs on a 12-second cooldown.
+- When the cooldown fills, Blinded activates for 4 to 7 seconds depending on story difficulty.
+- While active, every placed block on the board flickers between visible and invisible every 0.5 seconds.
+- The falling active piece stays visible.
+- Blinded cannot be canceled early.
+- When Blinded ends, all placed blocks are forced visible again even if the last flicker state was invisible.
+- Signal Relay can temporarily reactivate Blinded in later story missions.
 
 ============================================================
 DOUSEMA / J
@@ -229,21 +227,23 @@ Actual friendly mechanics:
 - Awards +40 per garbage cell removed.
 - Awards +300 danger-save bonus if the stack was dangerous and at least one garbage cell was removed.
 
-ENEMY ABILITY: HUNGER
+ENEMY ABILITY: INSATIABLE HUNGER
 
 Home menu preview text:
-Story effect: a hunger timer counts up while you do not clear lines. If it fills, one garbage row rises from the bottom.
+Counts player-cleared lines. When the requirement is met, it eats one whole block from the highest occupied layer of the board.
 
 Actual enemy modifier:
-- HungerMeter
+- HungerMeter (legacy internal modifier id)
 
 Enemy trigger details:
-- HungerMeter is active for the whole mission when the chapter includes it.
-- The hunger timer starts at 0 on match start.
-- Hunger window is 22 seconds minus difficulty tier, with a minimum of 10 seconds.
-- If the timer fills, one garbage row rises from the bottom.
-- The garbage row has one random open column.
-- Clearing any number of lines resets the hunger timer to 0.
+- Insatiable Hunger is active for the whole mission when the chapter includes HungerMeter.
+- Early missions trigger after 3 player-cleared lines.
+- Difficulty scaling reduces that requirement: higher tiers can trigger after 2 cleared lines, then every cleared line.
+- The line counter carries leftover progress. Example: if the requirement is 2 and you clear 3 lines, one trigger fires and 1 line of progress remains.
+- The effect resolves after the player's row clear finishes and the stack collapses.
+- It targets the highest occupied player block layer on the board.
+- It chooses one block from that top layer and removes every remaining cell that belongs to that same block.
+- If the target block had already been broken by a previous row clear, every surviving cell from that block is still removed.
 
 ============================================================
 LYSERGICADA / T
@@ -268,22 +268,24 @@ Actual friendly mechanics:
 - Awards +200 per line cleared while the window is active.
 - SEDATE rewards line clears during its slowdown window. It does not give an instant danger-save payout by itself.
 
-ENEMY ABILITY: SEDATION
+ENEMY ABILITY: SEDATING SPIT
 
 Home menu preview text:
-Story effect: after a warning, movement becomes sluggish for a short window. Left/right repeat timing is slower during sedation.
+Story effect: a timed spit attack wipes friendly assist charge and blocks new assist progress until it ends.
 
 Actual enemy modifier:
 - SedationWindows
 
 Enemy trigger details:
 - SedationWindows is active for the whole mission when the chapter includes it.
-- It runs on an 18-second cycle.
-- The warning appears before the active sedation window.
-- Warning timing: starts 7 seconds into the cycle and lasts 3 seconds.
-- Active sedation timing: starts 14 seconds into the cycle and lasts 4 seconds.
-- During active sedation, DAS/ARR input timing is multiplied by 2.4, making movement feel sluggish.
-- At 18 seconds, the cycle resets.
+- Sedating Spit runs on a 15-second cooldown.
+- When it activates, it lasts 4 to 8 seconds depending on story difficulty.
+- On activation, any active friendly assist window is cleared.
+- On activation, any held-piece assist progress or ready held-assist charge is reset to 0/3.
+- While active, friendly assists cannot trigger.
+- While active, held-piece placements do not gain progress toward the next friendly assist.
+- Clearing a row ends Sedating Spit early.
+- If no row is cleared, Sedating Spit ends when its active duration runs out and then starts its cooldown again.
 
 ============================================================
 BLYNDOOLIE / I
@@ -307,24 +309,26 @@ Actual friendly mechanics:
 - During the window, clears made while the stack is dangerous can receive an Alert score multiplier of 1.5.
 - Awards +200 per line cleared while the window is active.
 
-ENEMY ABILITY: BLYNDOOLIE ADRENALINE
+ENEMY ABILITY: ADRENALINE RUSH
 
 Home menu preview text:
-Story effect: if your stack reaches the danger height, gravity pressure increases. Later missions can briefly turn older enemy effects back on.
+Adrenaline Rush periodically boosts enemy abilities. Effects that start during Rush keep their boosted version until they finish.
 
 Actual enemy modifiers:
-- AdrenalineMonitor
+- AdrenalineMonitor (legacy internal modifier id)
 - SignalRelay
 
 Enemy trigger details:
-- AdrenalineMonitor is active for the whole mission when the chapter includes it.
-- It checks whether the stack is high, currently about 13 visible rows high.
-- If the stack is high, gravity multiplier becomes 0.7, making pieces fall faster.
-- If the stack drops below the threshold, gravity returns to normal.
+- Adrenaline Rush is active for the whole mission when the chapter includes AdrenalineMonitor.
+- Rush waits 20 seconds, activates for 11 seconds, then repeats.
+- Rush cannot be ended early by line clears or player actions.
+- While Rush is active, enemy abilities that trigger use boosted difficulty scaling.
+- Timed effects that start during Rush keep their boosted duration until they finish, even if Rush ends first.
+- Once Rush ends, future enemy ability cycles return to their normal unboosted scaling until the next Rush window.
 - SignalRelay is active in later chapters when declared.
 - Signal Relay waits 25 seconds, then activates for 6 seconds.
 - When it activates, it randomly chooses one earlier modifier:
-  GuardPressure, ResilientCells, GhostFlicker, or AdrenalineMonitor.
+  GuardPressure, ResilientCells, Blinded, or Adrenaline Rush.
 - If it chooses ResilientCells, it seeds a permanent source if none exists, or claims one touching block if a source already exists.
 - After 6 seconds, the relay turns off and the 25-second timer starts again.
 

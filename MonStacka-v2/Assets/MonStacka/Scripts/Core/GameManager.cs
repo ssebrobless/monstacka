@@ -182,7 +182,12 @@ namespace MonStacka.Core
             }
             boardState.OnPieceLocked += lockEvent =>
             {
-                var trigger = assistSystem?.OnPieceLocked(lockEvent, boardState, points => boardState.AddScore(points, lockEvent.PieceType));
+                var trigger = assistSystem?.OnPieceLocked(
+                    lockEvent,
+                    boardState,
+                    points => boardState.AddScore(points, lockEvent.PieceType),
+                    storyModifiers?.AssistsSuppressed ?? false
+                );
                 if (trigger.HasValue)
                 {
                     ShowAssistBoardCue(lockEvent.Cells, trigger.Value.Piece, tracksActivePiece: false);
@@ -456,6 +461,15 @@ namespace MonStacka.Core
                 }
             }
 
+            if (stackRoot && gameplayPieceVisualsVisible)
+            {
+                var visible = storyModifiers.LockedPiecesVisible;
+                if (stackRoot.gameObject.activeSelf != visible)
+                {
+                    stackRoot.gameObject.SetActive(visible);
+                }
+            }
+
             var storyStatus = storyMissionFailed
                 ? "MISSION FAILED - press R to retry"
                 : BuildStoryBossStatus();
@@ -592,7 +606,6 @@ namespace MonStacka.Core
                 }
                 else if (!pressedThisFrame)
                 {
-                    // Lysergicada sedation: DAS/ARR are sluggish during the window.
                     var sluggish = storyModifiers?.InputSluggishMultiplier ?? 1f;
                     var effectiveDas = dasSeconds * sluggish;
                     var effectiveArr = arrSeconds * sluggish;
@@ -867,6 +880,12 @@ namespace MonStacka.Core
 
         private void HandleStoryModifierTriggered(StoryModifierTriggerEvent trigger)
         {
+            if (trigger.Modifier == StoryModifier.SedationWindows && trigger.State == "ACTIVE")
+            {
+                assistSystem?.SuppressAndReset();
+                UpdatePreviewViews();
+            }
+
             hudController?.ShowEnemyModifierTrigger(trigger.Name, trigger.State, trigger.Detail);
         }
 

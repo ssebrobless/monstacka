@@ -35,18 +35,21 @@ namespace MonStacka.Story
     /// </summary>
     public sealed class StoryModifierSystem
     {
-        private const float HungerBaseWindowSeconds = 22f;
         private const float GuardPressureBaseWindowSeconds = 18f;
         private const float GuardPressureActiveSeconds = 6f;
-        private const float TerritoryBaseWindowSeconds = 18f;
-        private const float SedationCycleSeconds = 18f;
-        private const float SedationWarningSeconds = 3f;
-        private const float SedationActiveSeconds = 4f;
+        private const float TerritoryClaimWindowSeconds = 10f;
+        private const float SedatingSpitCooldownSeconds = 15f;
+        private const float SedatingSpitBaseActiveSeconds = 4f;
+        private const float SedatingSpitMaxActiveSeconds = 8f;
         private const float SignalRelayCycleSeconds = 25f;
         private const float SignalRelayActiveSeconds = 6f;
-        private const float FlickerCycleSeconds = 2.6f;
-        private const float FlickerOffSeconds = 0.35f;
-        private const int AdrenalineHeightRows = 13;
+        private const float AdrenalineRushCooldownSeconds = 20f;
+        private const float AdrenalineRushActiveSeconds = 11f;
+        private const int AdrenalineRushDifficultyBoost = 6;
+        private const float BlindedCooldownSeconds = 12f;
+        private const float BlindedFlickerIntervalSeconds = 0.5f;
+        private const float BlindedBaseActiveSeconds = 4f;
+        private const float BlindedMaxActiveSeconds = 7f;
         private const int CalculatedPlanningRotationBudget = 3;
         private const int PrecisionPressureMaxPenaltyCells = 3;
 
@@ -54,13 +57,22 @@ namespace MonStacka.Story
         private readonly BoardState board;
         private readonly System.Random rng;
 
-        private float hungerTimer;
+        private int hungerClearedLineProgress;
         private float guardPressureTimer;
         private float territoryTimer;
         private readonly List<float> guardPressureRowTimers = new();
-        private float sedationTimer;
+        private float sedatingSpitCooldownTimer;
+        private float sedatingSpitActiveTimer;
+        private bool sedatingSpitActive;
         private float relayTimer;
-        private float flickerTimer;
+        private float adrenalineRushCooldownTimer;
+        private float adrenalineRushActiveTimer;
+        private float blindedCooldownTimer;
+        private float blindedActiveTimer;
+        private float blindedCurrentActiveSeconds;
+        private float sedatingSpitCurrentActiveSeconds;
+        private bool blindedActive;
+        private bool adrenalineRushActive;
         private bool relayActive;
         private StoryModifier relayedModifier;
         private bool calculatedPlanningDebuffQueued;
@@ -95,21 +107,15 @@ namespace MonStacka.Story
         /// <summary>Lock delay multiplier (&lt;1 = faster lock under special story modifiers).</summary>
         public float LockDelayMultiplier => 1f;
 
-        /// <summary>Gravity multiplier (&lt;1 = faster fall under adrenaline).</summary>
-        public float GravityMultiplier =>
-            Has(StoryModifier.AdrenalineMonitor) && IsStackHigh() ? 0.7f : 1f;
+        /// <summary>Gravity multiplier (&lt;1 = faster fall); Adrenaline Rush boosts enemy abilities instead.</summary>
+        public float GravityMultiplier => 1f;
 
-        /// <summary>DAS/ARR multiplier while sedated (&gt;1 = sluggish controls).</summary>
-        public float InputSluggishMultiplier => SedationActive ? 2.4f : 1f;
+        /// <summary>DAS/ARR multiplier. Sedating Spit no longer slows movement.</summary>
+        public float InputSluggishMultiplier => 1f;
 
-        public bool SedationWarning =>
-            Has(StoryModifier.SedationWindows) &&
-            sedationTimer >= SedationCycleSeconds - SedationWarningSeconds - SedationActiveSeconds &&
-            sedationTimer < SedationCycleSeconds - SedationActiveSeconds;
+        public bool SedatingSpitActive => Has(StoryModifier.SedationWindows) && sedatingSpitActive;
 
-        public bool SedationActive =>
-            Has(StoryModifier.SedationWindows) &&
-            sedationTimer >= SedationCycleSeconds - SedationActiveSeconds;
+        public bool AssistsSuppressed => SedatingSpitActive;
 
         /// <summary>Board dim alpha for Galiffambos echolocation chapters (0 = fully visible).</summary>
         public float BoardDimAlpha
@@ -127,45 +133,45 @@ namespace MonStacka.Story
             }
         }
 
-        /// <summary>Active piece visibility for Galiffambos ghost-flicker chapters.</summary>
-        public bool ActivePieceVisible
+        /// <summary>Active pieces stay visible; Blinded flickers only locked/placed blocks.</summary>
+        public bool ActivePieceVisible => true;
+
+        public bool BlindedActive => Has(StoryModifier.GhostFlicker) && blindedActive;
+
+        public bool LockedPiecesVisible
         {
             get
             {
-                if (!Has(StoryModifier.GhostFlicker))
+                if (!BlindedActive)
                 {
                     return true;
                 }
 
-                return flickerTimer % FlickerCycleSeconds >= FlickerOffSeconds;
+                var flickerStep = Mathf.FloorToInt(blindedActiveTimer / BlindedFlickerIntervalSeconds);
+                return flickerStep % 2 == 0;
             }
         }
 
         /// <summary>Hide assist/status hints for Dousema muted chapters.</summary>
         public bool HintsMuted => Has(StoryModifier.MutedHints);
 
-        /// <summary>Compact status chips shown in the HUD ("HUNGER 12s | SEDATION...").</summary>
+        /// <summary>Compact status chips shown in the HUD ("HUNGER 1/3 | SEDATION...").</summary>
         public string BuildStatusChips()
         {
             var chips = new System.Text.StringBuilder();
             if (Has(StoryModifier.HungerMeter))
             {
-                var remaining = Mathf.Max(0f, HungerWindowSeconds - hungerTimer);
-                Append(chips, $"HUNGER {Mathf.CeilToInt(remaining)}s");
+                Append(chips, $"HUNGER {hungerClearedLineProgress}/{InsatiableHungerLineRequirement}");
             }
 
-            if (SedationActive)
+            if (SedatingSpitActive)
             {
-                Append(chips, "SEDATED");
-            }
-            else if (SedationWarning)
-            {
-                Append(chips, "SEDATION INCOMING");
+                Append(chips, "SEDATING SPIT");
             }
 
-            if (Has(StoryModifier.AdrenalineMonitor) && IsStackHigh())
+            if (adrenalineRushActive)
             {
-                Append(chips, "ADRENALINE SPIKE");
+                Append(chips, "ADRENALINE RUSH");
             }
 
             if (relayActive)
@@ -206,11 +212,14 @@ namespace MonStacka.Story
 
             if (HasClaimingCells)
             {
-                var claimCount = board.GetTerritoryClaimedCells().Count;
+                var claimCount = board.GetTerritoryClaimedBlockCount();
                 var sourceStatus = board.GetTerritorySourceCells().Count > 0
                     ? $"source locked; {claimCount} claim{Plural(claimCount)} active"
                     : "source pending";
-                AppendStatus(status, "Resilient Cells", "TIMER", $"{RelayTag(StoryModifier.ResilientCells)}{sourceStatus}; next claim in {Seconds(TerritoryWindowSeconds - territoryTimer)}");
+                var capped = claimCount >= TerritoryClaimLimit
+                    ? $"claim cap {claimCount}/{TerritoryClaimLimit}; clear rows to unclaim oldest"
+                    : $"next claim in {Seconds(TerritoryClaimWindowSeconds - territoryTimer)}; cap {claimCount}/{TerritoryClaimLimit}";
+                AppendStatus(status, "Resilient Cells", "TIMER", $"{RelayTag(StoryModifier.ResilientCells)}{sourceStatus}; {capped}");
             }
 
             if (Has(StoryModifier.CalculatedPlanning))
@@ -235,20 +244,20 @@ namespace MonStacka.Story
 
             if (Has(StoryModifier.GhostFlicker))
             {
-                var phase = flickerTimer % FlickerCycleSeconds;
-                var flickerStatus = phase < FlickerOffSeconds
-                    ? $"hidden {Seconds(FlickerOffSeconds - phase)}"
-                    : $"next blink {Seconds(FlickerCycleSeconds - phase)}";
-                AppendStatus(status, "Ghost Flicker", "TIMER", $"{RelayTag(StoryModifier.GhostFlicker)}{flickerStatus}");
-            }
-
-            if (Has(StoryModifier.EcholocationDim))
-            {
-                var phase = Time.time % 3.5f;
-                var echoStatus = phase < 0.5f
-                    ? $"clear {Seconds(0.5f - phase)}"
-                    : $"next flash {Seconds(3.5f - phase)}";
-                AppendStatus(status, "Echolocation Dim", "TIMER", echoStatus);
+                if (BlindedActive)
+                {
+                    var phase = blindedActiveTimer % BlindedFlickerIntervalSeconds;
+                    var visibleStatus = LockedPiecesVisible ? "visible" : "invisible";
+                    AppendStatus(
+                        status,
+                        "Blinded",
+                        "ACTIVE",
+                        $"{RelayTag(StoryModifier.GhostFlicker)}placed blocks {visibleStatus}; next flicker {Seconds(BlindedFlickerIntervalSeconds - phase)}; ends in {Seconds(blindedCurrentActiveSeconds - blindedActiveTimer)}");
+                }
+                else
+                {
+                    AppendStatus(status, "Blinded", "TIMER", $"{RelayTag(StoryModifier.GhostFlicker)}flicker starts in {Seconds(BlindedCooldownSeconds - blindedCooldownTimer)}");
+                }
             }
 
             if (Has(StoryModifier.MutedHints))
@@ -258,34 +267,43 @@ namespace MonStacka.Story
 
             if (Has(StoryModifier.HungerMeter))
             {
-                var remaining = HungerWindowSeconds - hungerTimer;
-                AppendStatus(status, "Hunger Meter", "TIMER", $"garbage row in {Seconds(remaining)} unless you clear a line");
+                AppendStatus(
+                    status,
+                    "Insatiable Hunger",
+                    "LINES",
+                    $"{RelayTag(StoryModifier.HungerMeter)}{hungerClearedLineProgress}/{InsatiableHungerLineRequirement} cleared lines; next trigger eats one whole top-layer block");
             }
 
             if (Has(StoryModifier.SedationWindows))
             {
-                var activeStart = SedationCycleSeconds - SedationActiveSeconds;
-                var warningStart = activeStart - SedationWarningSeconds;
-                if (SedationActive)
+                if (SedatingSpitActive)
                 {
-                    AppendStatus(status, "Sedation", "ACTIVE", $"sluggish controls for {Seconds(SedationCycleSeconds - sedationTimer)}");
-                }
-                else if (SedationWarning)
-                {
-                    AppendStatus(status, "Sedation", "WARNING", $"sluggish controls start in {Seconds(activeStart - sedationTimer)}");
+                    AppendStatus(status, "Sedating Spit", "ACTIVE", $"friendly assists blocked for {Seconds(sedatingSpitCurrentActiveSeconds - sedatingSpitActiveTimer)}; clear a row to end early");
                 }
                 else
                 {
-                    AppendStatus(status, "Sedation", "TIMER", $"warning in {Seconds(warningStart - sedationTimer)}");
+                    AppendStatus(status, "Sedating Spit", "TIMER", $"assist lockout in {Seconds(SedatingSpitCooldownSeconds - sedatingSpitCooldownTimer)}");
                 }
             }
 
             if (Has(StoryModifier.AdrenalineMonitor))
             {
-                var adrenalineStatus = IsStackHigh()
-                    ? $"{RelayTag(StoryModifier.AdrenalineMonitor)}active: gravity x0.7"
-                    : $"{RelayTag(StoryModifier.AdrenalineMonitor)}armed at high stack";
-                AppendStatus(status, "Adrenaline Monitor", IsStackHigh() ? "ACTIVE" : "ARMED", adrenalineStatus);
+                if (adrenalineRushActive)
+                {
+                    AppendStatus(
+                        status,
+                        "Adrenaline Rush",
+                        "ACTIVE",
+                        $"{RelayTag(StoryModifier.AdrenalineMonitor)}enemy abilities boosted for {Seconds(AdrenalineRushActiveSeconds - adrenalineRushActiveTimer)}");
+                }
+                else
+                {
+                    AppendStatus(
+                        status,
+                        "Adrenaline Rush",
+                        "TIMER",
+                        $"{RelayTag(StoryModifier.AdrenalineMonitor)}next boost in {Seconds(AdrenalineRushCooldownSeconds - adrenalineRushCooldownTimer)}");
+                }
             }
 
             if (HasDeclared(StoryModifier.SignalRelay))
@@ -327,13 +345,22 @@ namespace MonStacka.Story
                 EmitModifierTrigger(StoryModifier.NoHold, "ON", "hold disabled");
             }
 
-            hungerTimer = 0f;
+            hungerClearedLineProgress = 0;
             guardPressureTimer = 0f;
             territoryTimer = 0f;
             guardPressureRowTimers.Clear();
-            sedationTimer = 0f;
+            sedatingSpitCooldownTimer = 0f;
+            sedatingSpitActiveTimer = 0f;
+            sedatingSpitActive = false;
             relayTimer = 0f;
-            flickerTimer = 0f;
+            adrenalineRushCooldownTimer = 0f;
+            adrenalineRushActiveTimer = 0f;
+            adrenalineRushActive = false;
+            blindedCooldownTimer = 0f;
+            blindedActiveTimer = 0f;
+            blindedCurrentActiveSeconds = BlindedActiveSeconds;
+            sedatingSpitCurrentActiveSeconds = SedatingSpitActiveSeconds;
+            blindedActive = false;
             relayActive = false;
             calculatedPlanningDebuffQueued = false;
             lastCalculatedPlanningStatus = "safe";
@@ -342,29 +369,12 @@ namespace MonStacka.Story
 
         public void Tick(float deltaTime)
         {
-            flickerTimer += deltaTime;
+            TickAdrenalineRush(deltaTime);
+            TickBlinded(deltaTime);
             TickGuardPressure(deltaTime);
             TickTerritoryCells(deltaTime);
 
-            if (Has(StoryModifier.HungerMeter))
-            {
-                hungerTimer += deltaTime;
-                if (hungerTimer >= HungerWindowSeconds)
-                {
-                    hungerTimer = 0f;
-                    board.AddGarbageRow(rng.Next(0, PieceDefinitions.Columns));
-                    EmitModifierTrigger(StoryModifier.HungerMeter, "TRIGGER", "garbage row inserted");
-                }
-            }
-
-            if (Has(StoryModifier.SedationWindows))
-            {
-                sedationTimer += deltaTime;
-                if (sedationTimer >= SedationCycleSeconds)
-                {
-                    sedationTimer = 0f;
-                }
-            }
+            TickSedatingSpit(deltaTime);
 
             if (HasDeclared(StoryModifier.SignalRelay))
             {
@@ -397,17 +407,26 @@ namespace MonStacka.Story
             }
         }
 
-        private float HungerWindowSeconds =>
-            Mathf.Max(10f, HungerBaseWindowSeconds - spec.DifficultyTier);
+        private int InsatiableHungerLineRequirement =>
+            Mathf.Clamp(3 - (EffectiveDifficultyTier / 5), 1, 3);
 
         private float GuardPressureWindowSeconds =>
-            Mathf.Max(4f, GuardPressureBaseWindowSeconds - (spec.DifficultyTier * 1.4f));
+            Mathf.Max(4f, GuardPressureBaseWindowSeconds - (EffectiveDifficultyTier * 1.4f));
 
-        private float TerritoryWindowSeconds =>
-            Mathf.Max(4f, TerritoryBaseWindowSeconds - (spec.DifficultyTier * 1.4f));
+        private float BlindedActiveSeconds =>
+            Mathf.Clamp(BlindedBaseActiveSeconds + (EffectiveDifficultyTier * 0.3f), BlindedBaseActiveSeconds, BlindedMaxActiveSeconds);
+
+        private float SedatingSpitActiveSeconds =>
+            Mathf.Clamp(SedatingSpitBaseActiveSeconds + (EffectiveDifficultyTier * 0.4f), SedatingSpitBaseActiveSeconds, SedatingSpitMaxActiveSeconds);
 
         private float CalculatedPlanningScoreMultiplier =>
-            Mathf.Clamp(0.7f - (spec.DifficultyTier * 0.05f), 0.25f, 0.7f);
+            Mathf.Clamp(0.7f - (EffectiveDifficultyTier * 0.05f), 0.25f, 0.7f);
+
+        private int EffectiveDifficultyTier =>
+            adrenalineRushActive ? spec.DifficultyTier + AdrenalineRushDifficultyBoost : spec.DifficultyTier;
+
+        private int TerritoryClaimLimit =>
+            Mathf.Clamp(1 + (EffectiveDifficultyTier / 3), 1, 4);
 
         private bool HasClaimingCells =>
             Has(StoryModifier.ResilientCells) || Has(StoryModifier.TerritoryCells);
@@ -443,10 +462,119 @@ namespace MonStacka.Story
             return options[rng.Next(options.Length)];
         }
 
+        private void TickBlinded(float deltaTime)
+        {
+            if (!Has(StoryModifier.GhostFlicker) || board.GameOver)
+            {
+                blindedActive = false;
+                blindedActiveTimer = 0f;
+                return;
+            }
+
+            if (blindedActive)
+            {
+                blindedActiveTimer += deltaTime;
+                if (blindedActiveTimer >= blindedCurrentActiveSeconds)
+                {
+                    blindedActive = false;
+                    blindedActiveTimer = 0f;
+                    blindedCooldownTimer = 0f;
+                    EmitModifierTrigger(StoryModifier.GhostFlicker, "END", "placed blocks restored visible");
+                }
+
+                return;
+            }
+
+            blindedCooldownTimer += deltaTime;
+            if (blindedCooldownTimer >= BlindedCooldownSeconds)
+            {
+                blindedActive = true;
+                blindedActiveTimer = 0f;
+                blindedCooldownTimer = 0f;
+                blindedCurrentActiveSeconds = BlindedActiveSeconds;
+                EmitModifierTrigger(StoryModifier.GhostFlicker, "ACTIVE", $"placed blocks flicker for {Seconds(blindedCurrentActiveSeconds)}");
+            }
+        }
+
+        private void TickAdrenalineRush(float deltaTime)
+        {
+            if (!HasDeclared(StoryModifier.AdrenalineMonitor) || board.GameOver)
+            {
+                adrenalineRushActive = false;
+                adrenalineRushActiveTimer = 0f;
+                return;
+            }
+
+            if (adrenalineRushActive)
+            {
+                adrenalineRushActiveTimer += deltaTime;
+                if (adrenalineRushActiveTimer >= AdrenalineRushActiveSeconds)
+                {
+                    adrenalineRushActive = false;
+                    adrenalineRushActiveTimer = 0f;
+                    adrenalineRushCooldownTimer = 0f;
+                    EmitModifierTrigger(StoryModifier.AdrenalineMonitor, "END", "enemy ability boost expired");
+                }
+
+                return;
+            }
+
+            adrenalineRushCooldownTimer += deltaTime;
+            if (adrenalineRushCooldownTimer >= AdrenalineRushCooldownSeconds)
+            {
+                adrenalineRushCooldownTimer = 0f;
+                adrenalineRushActiveTimer = 0f;
+                adrenalineRushActive = true;
+                EmitModifierTrigger(StoryModifier.AdrenalineMonitor, "ACTIVE", $"enemy abilities boosted for {Seconds(AdrenalineRushActiveSeconds)}");
+            }
+        }
+
+        private void TickSedatingSpit(float deltaTime)
+        {
+            if (!Has(StoryModifier.SedationWindows) || board.GameOver)
+            {
+                sedatingSpitActive = false;
+                sedatingSpitActiveTimer = 0f;
+                return;
+            }
+
+            if (sedatingSpitActive)
+            {
+                sedatingSpitActiveTimer += deltaTime;
+                if (sedatingSpitActiveTimer >= sedatingSpitCurrentActiveSeconds)
+                {
+                    EndSedatingSpit("END", "assist lockout expired");
+                }
+
+                return;
+            }
+
+            sedatingSpitCooldownTimer += deltaTime;
+            if (sedatingSpitCooldownTimer >= SedatingSpitCooldownSeconds)
+            {
+                sedatingSpitCooldownTimer = 0f;
+                sedatingSpitActiveTimer = 0f;
+                sedatingSpitActive = true;
+                sedatingSpitCurrentActiveSeconds = SedatingSpitActiveSeconds;
+                EmitModifierTrigger(StoryModifier.SedationWindows, "ACTIVE", $"friendly assists reset and blocked for {Seconds(sedatingSpitCurrentActiveSeconds)}");
+            }
+        }
+
+        private void EndSedatingSpit(string state, string detail)
+        {
+            if (!sedatingSpitActive)
+            {
+                return;
+            }
+
+            sedatingSpitActive = false;
+            sedatingSpitActiveTimer = 0f;
+            sedatingSpitCooldownTimer = 0f;
+            EmitModifierTrigger(StoryModifier.SedationWindows, state, detail);
+        }
+
         private void HandleLinesCleared(int lines)
         {
-            hungerTimer = 0f;
-
             if (lines > 0 && guardPressureRowTimers.Count > 0)
             {
                 var removed = board.ClearOldestGuardPressureRow();
@@ -462,7 +590,31 @@ namespace MonStacka.Story
                 if (board.ClearOldestTerritoryClaim())
                 {
                     EmitModifierTrigger(ClaimingCellsEventModifier, "CLEARED", "oldest claimed block unclaimed by line clear");
+                    var unlockedRows = board.ClearRowsUnlockedByTerritoryUnclaim();
+                    if (unlockedRows > 0)
+                    {
+                        EmitModifierTrigger(ClaimingCellsEventModifier, "UNLOCKED", $"{unlockedRows} row{Plural(unlockedRows)} cleared after unclaim");
+                    }
                 }
+            }
+
+            if (lines > 0 && Has(StoryModifier.HungerMeter))
+            {
+                hungerClearedLineProgress += lines;
+                var requirement = InsatiableHungerLineRequirement;
+                while (hungerClearedLineProgress >= requirement)
+                {
+                    hungerClearedLineProgress -= requirement;
+                    if (board.TryConsumeTopLayerPiece(out var pieceId, out var pieceType, out var removedCells))
+                    {
+                        EmitModifierTrigger(StoryModifier.HungerMeter, "TRIGGER", $"ate {pieceType} block #{pieceId} ({removedCells} cells)");
+                    }
+                }
+            }
+
+            if (lines > 0 && sedatingSpitActive)
+            {
+                EndSedatingSpit("CLEARED", "line clear ended assist lockout early");
             }
         }
 
@@ -479,14 +631,25 @@ namespace MonStacka.Story
                 EmitModifierTrigger(ClaimingCellsEventModifier, "SETUP", "permanent claimed source seeded");
             }
 
-            territoryTimer += deltaTime;
-            var window = TerritoryWindowSeconds;
-            while (territoryTimer >= window && !board.GameOver)
+            if (board.GetTerritoryClaimedBlockCount() >= TerritoryClaimLimit)
             {
-                territoryTimer -= window;
+                territoryTimer = 0f;
+                return;
+            }
+
+            territoryTimer += deltaTime;
+            while (territoryTimer >= TerritoryClaimWindowSeconds && !board.GameOver && board.GetTerritoryClaimedBlockCount() < TerritoryClaimLimit)
+            {
+                territoryTimer -= TerritoryClaimWindowSeconds;
                 if (board.TryClaimAdjacentTerritoryCell(rng))
                 {
-                    EmitModifierTrigger(ClaimingCellsEventModifier, "CLAIM", $"{board.GetTerritoryClaimedCells().Count} claimed block{Plural(board.GetTerritoryClaimedCells().Count)} active");
+                    var claimCount = board.GetTerritoryClaimedBlockCount();
+                    EmitModifierTrigger(ClaimingCellsEventModifier, "CLAIM", $"{claimCount} claimed block{Plural(claimCount)} active");
+                }
+                else
+                {
+                    territoryTimer = 0f;
+                    break;
                 }
             }
         }
@@ -600,23 +763,6 @@ namespace MonStacka.Story
             return unsupported;
         }
 
-        private bool IsStackHigh()
-        {
-            var dangerRow = PieceDefinitions.TotalRows - AdrenalineHeightRows;
-            for (var row = 0; row <= dangerRow; row += 1)
-            {
-                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
-                {
-                    if (board.Grid[row, col] != 0)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
         private static void Append(System.Text.StringBuilder builder, string chip)
         {
             if (builder.Length > 0)
@@ -668,13 +814,13 @@ namespace MonStacka.Story
                 StoryModifier.TerritoryCells => "Resilient Cells",
                 StoryModifier.CalculatedPlanning => "Calculated Planning",
                 StoryModifier.PrecisionPressure => "Precision Pressure",
-                StoryModifier.GhostFlicker => "Ghost Flicker",
+                StoryModifier.GhostFlicker => "Blinded",
                 StoryModifier.EcholocationDim => "Echolocation Dim",
                 StoryModifier.ResilientCells => "Resilient Cells",
                 StoryModifier.MutedHints => "Muted Hints",
-                StoryModifier.HungerMeter => "Hunger Meter",
-                StoryModifier.SedationWindows => "Sedation",
-                StoryModifier.AdrenalineMonitor => "Adrenaline Monitor",
+                StoryModifier.HungerMeter => "Insatiable Hunger",
+                StoryModifier.SedationWindows => "Sedating Spit",
+                StoryModifier.AdrenalineMonitor => "Adrenaline Rush",
                 StoryModifier.SignalRelay => "Signal Relay",
                 StoryModifier.ReducedPreview => "Reduced Preview",
                 StoryModifier.NoHold => "No Hold",

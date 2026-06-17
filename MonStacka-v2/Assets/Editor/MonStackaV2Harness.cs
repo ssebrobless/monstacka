@@ -471,13 +471,12 @@ namespace MonStacka.Editor
                 "Guard Pressure",
                 "Calculated Planning",
                 "Precision Pressure",
-                "Ghost Flicker",
-                "Echolocation Dim",
+                "Blinded",
                 "Resilient Cells",
                 "Muted Hints",
-                "Hunger Meter",
-                "Sedation",
-                "Adrenaline Monitor",
+                "Insatiable Hunger",
+                "Sedating Spit",
+                "Adrenaline Rush",
                 "Signal Relay",
                 "Reduced Preview",
                 "No Hold",
@@ -533,15 +532,19 @@ namespace MonStacka.Editor
             var hungerSpec = new StoryChapterSpec
             {
                 Id = "harness-hunger",
-                Title = "Harness Hunger",
+                Title = "Harness Insatiable Hunger",
                 DifficultyTier = 10,
                 Modifiers = new[] { StoryModifier.HungerMeter },
             };
             var hungerBoard = new BoardState(new[] { PieceType.O }, seed: 1004);
             var hungerSystem = new StoryModifierSystem(hungerSpec, hungerBoard, seed: 1004);
+            const int hungerScenarioPieceId = 5100;
+            hungerBoard.Grid[PieceDefinitions.TotalRows - 2, 3] = (int)PieceType.O;
+            hungerBoard.PieceIds[PieceDefinitions.TotalRows - 2, 3] = hungerScenarioPieceId;
+            FillBottomLine(hungerBoard, PieceType.I, pieceIdStart: 5110);
             hungerSystem.OnMatchStart();
-            hungerSystem.Tick(20f);
-            Expect(hungerBoard.GetGarbageCells().Count > 0, "Hunger Meter should add garbage when its timer fills.");
+            Expect(hungerBoard.ClearLines() == 1, "Insatiable Hunger harness should clear one row.");
+            Expect(!hungerBoard.GetLockedPieceGroups().Any(record => record.PieceId == hungerScenarioPieceId), "Insatiable Hunger should consume the top-layer block instead of adding garbage.");
 
             var resilientSpec = new StoryChapterSpec
             {
@@ -564,12 +567,23 @@ namespace MonStacka.Editor
                 Id = "harness-adrenaline",
                 Title = "Harness Adrenaline",
                 DifficultyTier = 5,
-                Modifiers = new[] { StoryModifier.AdrenalineMonitor },
+                Modifiers = new[] { StoryModifier.AdrenalineMonitor, StoryModifier.HungerMeter },
             };
             var adrenalineBoard = new BoardState(new[] { PieceType.I }, seed: 1005);
-            adrenalineBoard.Grid[PieceDefinitions.TotalRows - 14, 0] = (int)PieceType.I;
             var adrenalineSystem = new StoryModifierSystem(adrenalineSpec, adrenalineBoard, seed: 1005);
-            Expect(adrenalineSystem.GravityMultiplier < 1f, "Adrenaline Monitor should speed gravity when the stack is high.");
+            Expect(Mathf.Approximately(adrenalineSystem.GravityMultiplier, 1f), "Adrenaline Rush should not speed gravity directly.");
+            adrenalineSystem.Tick(19f);
+            Expect(adrenalineSystem.BuildEnemyAbilityStatus().Contains("Adrenaline Rush") && adrenalineSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Adrenaline Rush should show cooldown progress before it activates.");
+            adrenalineSystem.Tick(1f);
+            Expect(adrenalineSystem.BuildEnemyAbilityStatus().Contains("Adrenaline Rush") && adrenalineSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Adrenaline Rush should activate every 20 seconds.");
+            const int adrenalineHungerPieceId = 5120;
+            adrenalineBoard.Grid[PieceDefinitions.TotalRows - 4, 4] = (int)PieceType.S;
+            adrenalineBoard.PieceIds[PieceDefinitions.TotalRows - 4, 4] = adrenalineHungerPieceId;
+            FillBottomLine(adrenalineBoard, PieceType.O, pieceIdStart: 5130);
+            Expect(adrenalineBoard.ClearLines() == 1, "Adrenaline Rush harness should clear one row.");
+            Expect(!adrenalineBoard.GetLockedPieceGroups().Any(record => record.PieceId == adrenalineHungerPieceId), "Adrenaline Rush should enhance Insatiable Hunger so one cleared line can trigger it.");
+            adrenalineSystem.Tick(11.1f);
+            Expect(!adrenalineSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Adrenaline Rush should end after 11 seconds.");
 
             foreach (var chapter in StoryCatalog.Chapters)
             {
@@ -640,7 +654,7 @@ namespace MonStacka.Editor
             Expect(stackedGuardEvents.Any(trigger => trigger.Modifier == StoryModifier.GuardPressure && trigger.State == "END"), "The remaining newer Guard Pressure row should expire on its own six-second timer.");
             Expect(stackedGuardBoard.GetGuardPressureRowCount() == 1, "High-tier Guard Pressure may add a replacement row as the previous row expires.");
 
-            var territorySpec = ModifierSpec("harness-territory", 4, StoryModifier.TerritoryCells);
+            var territorySpec = ModifierSpec("harness-territory", 1, StoryModifier.TerritoryCells);
             var territoryBoard = new BoardState(new[] { PieceType.Z }, seed: 4102);
             var territorySystem = new StoryModifierSystem(territorySpec, territoryBoard, seed: 4102);
             var territoryEvents = new List<StoryModifierTriggerEvent>();
@@ -652,11 +666,21 @@ namespace MonStacka.Editor
             var firstClaimCandidate = new Vector2Int(territorySource.x, territorySource.y - 1);
             territoryBoard.Grid[firstClaimCandidate.y, firstClaimCandidate.x] = (int)PieceType.Z;
             territoryBoard.PieceIds[firstClaimCandidate.y, firstClaimCandidate.x] = 7100;
-            territorySystem.Tick(13f);
+            var pairedClaimCell = new Vector2Int(Mathf.Max(0, firstClaimCandidate.x - 1), firstClaimCandidate.y);
+            territoryBoard.Grid[pairedClaimCell.y, pairedClaimCell.x] = (int)PieceType.Z;
+            territoryBoard.PieceIds[pairedClaimCell.y, pairedClaimCell.x] = 7100;
+            territorySystem.Tick(9.9f);
+            Expect(territoryBoard.GetTerritoryClaimedCells().Count == 0, "Territory Cells should wait the full 10 seconds before claiming.");
+            territorySystem.Tick(0.2f);
             Expect(territoryBoard.IsTerritoryClaimed(firstClaimCandidate), "Territory Cells should claim a locked block touching the permanent source after its timer fills.");
+            Expect(territoryBoard.IsTerritoryClaimed(pairedClaimCell), "Territory Cells should claim every remaining cell belonging to the target block.");
+            territorySystem.Tick(30f);
+            Expect(territoryBoard.GetTerritoryClaimedCells().Count == 2, "Low-tier Territory Cells should pause claiming while one block is already claimed.");
             FillLine(territoryBoard, firstClaimCandidate.y, PieceType.O, pieceIdStart: 7200);
             territoryBoard.Grid[firstClaimCandidate.y, firstClaimCandidate.x] = (int)PieceType.Z;
             territoryBoard.PieceIds[firstClaimCandidate.y, firstClaimCandidate.x] = 7100;
+            territoryBoard.Grid[pairedClaimCell.y, pairedClaimCell.x] = (int)PieceType.Z;
+            territoryBoard.PieceIds[pairedClaimCell.y, pairedClaimCell.x] = 7100;
             Expect(territoryBoard.ClearLines() == 0, "A claimed block should not count toward row completion.");
             FillBottomLine(territoryBoard, PieceType.O, pieceIdStart: 7300);
             Expect(territoryBoard.ClearLines() == 1, "Clearing another completed row should still score while territory claims exist.");
@@ -673,12 +697,37 @@ namespace MonStacka.Editor
             stackedTerritorySystem.OnMatchStart();
             var stackedSource = stackedTerritoryBoard.GetTerritorySourceCells()[0];
             FillTerritoryClaimCandidates(stackedTerritoryBoard, stackedSource, PieceType.Z, pieceIdStart: 7400);
-            stackedTerritorySystem.Tick(4f);
-            stackedTerritorySystem.Tick(4f);
-            Expect(stackedTerritoryBoard.GetTerritoryClaimedCells().Count == 2, "High-tier Territory Cells should be able to stack multiple claimed blocks.");
+            stackedTerritorySystem.Tick(10f);
+            stackedTerritorySystem.Tick(10f);
+            stackedTerritorySystem.Tick(10f);
+            stackedTerritorySystem.Tick(10f);
+            Expect(stackedTerritoryBoard.GetTerritoryClaimedCells().Count == 4, "High-tier Territory Cells should be able to stack four claimed blocks.");
+            stackedTerritorySystem.Tick(20f);
+            Expect(stackedTerritoryBoard.GetTerritoryClaimedCells().Count == 4, "High-tier Territory Cells should stop claiming once the active claim cap is reached.");
             FillLine(stackedTerritoryBoard, PieceDefinitions.TotalRows - 5, PieceType.O, pieceIdStart: 7500);
             Expect(stackedTerritoryBoard.ClearLines() == 1, "A normal line clear should remove only one stacked Territory claim.");
-            Expect(stackedTerritoryBoard.GetTerritoryClaimedCells().Count == 1, "Territory claims should clear oldest-first, one per player line clear.");
+            Expect(stackedTerritoryBoard.GetTerritoryClaimedCells().Count == 3, "Territory claims should clear oldest-first, one claimed block per player line clear.");
+
+            var cascadeTerritorySpec = ModifierSpec("harness-territory-cascade", 10, StoryModifier.TerritoryCells);
+            var cascadeTerritoryBoard = new BoardState(new[] { PieceType.Z }, seed: 4118);
+            var cascadeTerritorySystem = new StoryModifierSystem(cascadeTerritorySpec, cascadeTerritoryBoard, seed: 4118);
+            cascadeTerritorySystem.OnMatchStart();
+            var cascadeSource = cascadeTerritoryBoard.GetTerritorySourceCells()[0];
+            var cascadeClaimA = new Vector2Int(cascadeSource.x, cascadeSource.y - 1);
+            var cascadeClaimB = new Vector2Int(Mathf.Max(0, cascadeSource.x - 1), cascadeSource.y);
+            cascadeTerritoryBoard.Grid[cascadeClaimA.y, cascadeClaimA.x] = (int)PieceType.Z;
+            cascadeTerritoryBoard.PieceIds[cascadeClaimA.y, cascadeClaimA.x] = 7600;
+            cascadeTerritoryBoard.Grid[cascadeClaimB.y, cascadeClaimB.x] = (int)PieceType.Z;
+            cascadeTerritoryBoard.PieceIds[cascadeClaimB.y, cascadeClaimB.x] = 7601;
+            cascadeTerritorySystem.Tick(10f);
+            cascadeTerritorySystem.Tick(10f);
+            Expect(cascadeTerritoryBoard.GetTerritoryClaimedCells().Count == 2, "Cascade setup should have two claimed blocks.");
+            FillLine(cascadeTerritoryBoard, cascadeClaimA.y, PieceType.O, pieceIdStart: 7620);
+            cascadeTerritoryBoard.Grid[cascadeClaimA.y, cascadeClaimA.x] = (int)PieceType.Z;
+            cascadeTerritoryBoard.PieceIds[cascadeClaimA.y, cascadeClaimA.x] = 7600;
+            FillLine(cascadeTerritoryBoard, PieceDefinitions.TotalRows - 4, PieceType.O, pieceIdStart: 7630);
+            Expect(cascadeTerritoryBoard.ClearLines() == 1, "Cascade setup should clear a player-built row to unclaim the oldest block.");
+            Expect(cascadeTerritoryBoard.GetTerritoryClaimedCells().Count == 1, "Rows unlocked by unclaiming should not also clear another claimed block.");
 
             var planningSpec = ModifierSpec("harness-planning-focused", 3, StoryModifier.CalculatedPlanning);
             planningSpec.NextPreviewCount = 5;
@@ -722,15 +771,25 @@ namespace MonStacka.Editor
             Expect(precisionSystem.BuildEnemyAbilityStatus().Contains("overhangs"), "Precision Pressure should report overhang trigger progress.");
             Expect(precisionEvents.Any(trigger => trigger.Modifier == StoryModifier.PrecisionPressure && trigger.State == "TRIGGER"), "Precision Pressure should emit a trigger event when unsupported cells seed enemies.");
 
-            var ghostSpec = ModifierSpec("harness-ghost", 2, StoryModifier.GhostFlicker);
-            var ghostSystem = new StoryModifierSystem(ghostSpec, new BoardState(new[] { PieceType.L }, seed: 4105), seed: 4105);
-            ghostSystem.Tick(0.1f);
-            Expect(ghostSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Ghost Flicker should expose timer status.");
-
-            var echoSpec = ModifierSpec("harness-echo", 2, StoryModifier.EcholocationDim);
-            var echoSystem = new StoryModifierSystem(echoSpec, new BoardState(new[] { PieceType.L }, seed: 4106), seed: 4106);
-            Expect(echoSystem.BoardDimAlpha >= 0f, "Echolocation Dim should expose a valid board dim alpha.");
-            Expect(echoSystem.BuildEnemyAbilityStatus().Contains("Echolocation Dim"), "Echolocation Dim should appear in enemy status.");
+            var blindedSpec = ModifierSpec("harness-blinded", 10, StoryModifier.GhostFlicker);
+            var blindedSystem = new StoryModifierSystem(blindedSpec, new BoardState(new[] { PieceType.L }, seed: 4105), seed: 4105);
+            blindedSystem.OnMatchStart();
+            Expect(!blindedSystem.BlindedActive, "Blinded should start on cooldown.");
+            Expect(blindedSystem.LockedPiecesVisible, "Blinded should leave locked blocks visible while cooling down.");
+            var blindedStatus = blindedSystem.BuildEnemyAbilityStatus();
+            Expect(blindedStatus.Contains("Blinded"), "Blinded should use its public ability name in enemy status.");
+            Expect(!blindedStatus.Contains("Ghost Flicker"), "Blinded status should not expose the old Ghost Flicker internal name.");
+            Expect(blindedStatus.Contains("[TIMER]"), "Blinded should expose cooldown timer status before it activates.");
+            blindedSystem.Tick(12f);
+            Expect(blindedSystem.BlindedActive, "Blinded should activate after its 12-second cooldown fills.");
+            Expect(blindedSystem.LockedPiecesVisible, "Blinded should start active while locked blocks are visible.");
+            blindedSystem.Tick(0.5f);
+            Expect(!blindedSystem.LockedPiecesVisible, "Blinded should hide locked blocks after the first half-second flicker.");
+            blindedSystem.Tick(0.5f);
+            Expect(blindedSystem.LockedPiecesVisible, "Blinded should show locked blocks on the next half-second flicker.");
+            blindedSystem.Tick(6.1f);
+            Expect(!blindedSystem.BlindedActive, "Blinded should end after its scaled active duration.");
+            Expect(blindedSystem.LockedPiecesVisible, "Blinded should force locked blocks visible after it ends.");
 
             var resilientSpec = ModifierSpec("harness-resilient", 10, StoryModifier.ResilientCells);
             var resilientBoard = new BoardState(new[] { PieceType.J }, seed: 4107);
@@ -741,7 +800,7 @@ namespace MonStacka.Editor
             Expect(resilientBoard.GetTerritorySourceCells().Count == 1, "Resilient Cells should seed one permanent claimed source at match start.");
             var resilientSource = resilientBoard.GetTerritorySourceCells()[0];
             FillTerritoryClaimCandidates(resilientBoard, resilientSource, PieceType.J, pieceIdStart: 5000);
-            resilientSystem.Tick(4f);
+            resilientSystem.Tick(10f);
             Expect(resilientBoard.GetTerritoryClaimedCells().Count == 1, "Resilient Cells should claim a touching locked block after its timer fills.");
             FillLine(resilientBoard, PieceDefinitions.TotalRows - 5, PieceType.O, pieceIdStart: 5100);
             Expect(resilientBoard.ClearLines() == 1, "A normal line clear should still score while Resilient Cells are active.");
@@ -757,28 +816,81 @@ namespace MonStacka.Editor
             Expect(mutedSystem.HintsMuted, "Muted Hints should hide assist/status hints.");
             Expect(mutedSystem.BuildEnemyAbilityStatus().Contains("[ON]"), "Muted Hints should report ON status.");
 
-            var hungerSpec = ModifierSpec("harness-hunger-focused", 12, StoryModifier.HungerMeter);
+            var hungerSpec = ModifierSpec("harness-hunger-focused", 1, StoryModifier.HungerMeter);
             var hungerBoard = new BoardState(new[] { PieceType.S }, seed: 4109);
             var hungerSystem = new StoryModifierSystem(hungerSpec, hungerBoard, seed: 4109);
             var hungerEvents = new List<StoryModifierTriggerEvent>();
             hungerSystem.OnModifierTriggered += trigger => hungerEvents.Add(trigger);
-            hungerSystem.Tick(20f);
-            Expect(hungerBoard.GetGarbageCells().Count > 0, "Hunger Meter should insert garbage when its timer fills.");
-            Expect(hungerSystem.BuildEnemyAbilityStatus().Contains("[TIMER]"), "Hunger Meter should report timer status.");
-            Expect(hungerEvents.Any(trigger => trigger.Modifier == StoryModifier.HungerMeter && trigger.State == "TRIGGER"), "Hunger Meter should emit a trigger event when it inserts garbage.");
+            const int hungerTopPieceId = 8100;
+            hungerBoard.Grid[PieceDefinitions.TotalRows - 8, 2] = (int)PieceType.S;
+            hungerBoard.PieceIds[PieceDefinitions.TotalRows - 8, 2] = hungerTopPieceId;
+            hungerBoard.Grid[PieceDefinitions.TotalRows - 7, 2] = (int)PieceType.S;
+            hungerBoard.PieceIds[PieceDefinitions.TotalRows - 7, 2] = hungerTopPieceId;
+            FillBottomLine(hungerBoard, PieceType.O, pieceIdStart: 8110);
+            Expect(hungerBoard.ClearLines() == 1, "Insatiable Hunger setup should clear one row.");
+            Expect(hungerBoard.GetLockedPieceGroups().Any(record => record.PieceId == hungerTopPieceId), "Low-tier Insatiable Hunger should wait for three cleared lines before consuming a block.");
+            FillBottomLine(hungerBoard, PieceType.O, pieceIdStart: 8120);
+            Expect(hungerBoard.ClearLines() == 1, "Insatiable Hunger setup should clear a second row.");
+            Expect(hungerBoard.GetLockedPieceGroups().Any(record => record.PieceId == hungerTopPieceId), "Low-tier Insatiable Hunger should still wait after two cleared lines.");
+            FillBottomLine(hungerBoard, PieceType.O, pieceIdStart: 8130);
+            Expect(hungerBoard.ClearLines() == 1, "Insatiable Hunger setup should clear a third row.");
+            Expect(!hungerBoard.GetLockedPieceGroups().Any(record => record.PieceId == hungerTopPieceId), "Insatiable Hunger should consume the whole top-layer block when its line requirement is met.");
+            Expect(hungerEvents.Any(trigger => trigger.Modifier == StoryModifier.HungerMeter && trigger.State == "TRIGGER"), "Insatiable Hunger should emit a trigger event when it consumes a block.");
+            Expect(hungerSystem.BuildEnemyAbilityStatus().Contains("Insatiable Hunger"), "Insatiable Hunger should use its public ability name in enemy status.");
 
-            var sedationSpec = ModifierSpec("harness-sedation", 2, StoryModifier.SedationWindows);
-            var sedationSystem = new StoryModifierSystem(sedationSpec, new BoardState(new[] { PieceType.T }, seed: 4110), seed: 4110);
+            var scaledHungerSpec = ModifierSpec("harness-hunger-scaled", 10, StoryModifier.HungerMeter);
+            var scaledHungerBoard = new BoardState(new[] { PieceType.S }, seed: 4119);
+            var scaledHungerSystem = new StoryModifierSystem(scaledHungerSpec, scaledHungerBoard, seed: 4119);
+            const int scaledHungerPieceId = 8150;
+            scaledHungerBoard.Grid[PieceDefinitions.TotalRows - 2, 4] = (int)PieceType.S;
+            scaledHungerBoard.PieceIds[PieceDefinitions.TotalRows - 2, 4] = scaledHungerPieceId;
+            FillBottomLine(scaledHungerBoard, PieceType.O, pieceIdStart: 8160);
+            Expect(scaledHungerBoard.ClearLines() == 1, "Scaled Insatiable Hunger setup should clear one row.");
+            Expect(!scaledHungerBoard.GetLockedPieceGroups().Any(record => record.PieceId == scaledHungerPieceId), "High-tier Insatiable Hunger should trigger on every cleared line.");
+
+            var sedationSpec = ModifierSpec("harness-sedation", 10, StoryModifier.SedationWindows);
+            var sedationBoard = new BoardState(new[] { PieceType.T }, seed: 4110);
+            var sedationSystem = new StoryModifierSystem(sedationSpec, sedationBoard, seed: 4110);
             sedationSystem.Tick(15f);
-            Expect(sedationSystem.SedationActive && sedationSystem.InputSluggishMultiplier > 1f, "Sedation should become active late in its cycle and slow inputs.");
-            Expect(sedationSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Sedation should report ACTIVE status.");
+            Expect(sedationSystem.SedatingSpitActive, "Sedating Spit should activate after its 15-second cooldown fills.");
+            Expect(sedationSystem.AssistsSuppressed, "Sedating Spit should suppress friendly assists while active.");
+            Expect(sedationSystem.BuildEnemyAbilityStatus().Contains("Sedating Spit"), "Sedating Spit should use its public ability name in enemy status.");
+            Expect(sedationSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Sedating Spit should report ACTIVE status.");
+            FillBottomLine(sedationBoard, PieceType.T, pieceIdStart: 8200);
+            Expect(sedationBoard.ClearLines() == 1, "Sedating Spit focused matrix should clear a row while active.");
+            Expect(!sedationSystem.SedatingSpitActive, "Clearing a row should end Sedating Spit early.");
+            sedationSystem.Tick(15f);
+            Expect(sedationSystem.SedatingSpitActive, "Sedating Spit should reactivate after cooldown following an early clear.");
+            sedationSystem.Tick(8.1f);
+            Expect(!sedationSystem.SedatingSpitActive, "High-tier Sedating Spit should end after its scaled 8-second duration.");
 
-            var adrenalineSpec = ModifierSpec("harness-adrenaline-focused", 4, StoryModifier.AdrenalineMonitor);
+            var assistSuppression = new AssistEffectSystem();
+            var assistBoard = new BoardState(new[] { PieceType.T, PieceType.Z }, seed: 41101);
+            assistSuppression.OnPieceLocked(new PieceLockEvent(1, PieceType.Z, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { });
+            assistSuppression.OnPieceLocked(new PieceLockEvent(2, PieceType.Z, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { });
+            Expect(assistSuppression.NextHeldPlacementWillTrigger, "Assist suppression setup should arm the next held placement.");
+            assistSuppression.SuppressAndReset();
+            Expect(!assistSuppression.NextHeldPlacementWillTrigger && assistSuppression.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Sedating Spit should clear charged and partial assist progress.");
+            Expect(assistSuppression.OnPieceLocked(new PieceLockEvent(3, PieceType.Z, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { }, assistsSuppressed: true) == null, "Sedating Spit should prevent assist activation while active.");
+            Expect(assistSuppression.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Sedating Spit should prevent assist charge progress while active.");
+
+            var adrenalineSpec = ModifierSpec("harness-adrenaline-focused", 4, StoryModifier.AdrenalineMonitor, StoryModifier.HungerMeter);
             var adrenalineBoard = new BoardState(new[] { PieceType.I }, seed: 4111);
-            adrenalineBoard.Grid[PieceDefinitions.TotalRows - 14, 0] = (int)PieceType.I;
             var adrenalineSystem = new StoryModifierSystem(adrenalineSpec, adrenalineBoard, seed: 4111);
-            Expect(adrenalineSystem.GravityMultiplier < 1f, "Adrenaline Monitor should accelerate gravity when stack is high.");
-            Expect(adrenalineSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Adrenaline Monitor should report ACTIVE status at high stack.");
+            var adrenalineEvents = new List<StoryModifierTriggerEvent>();
+            adrenalineSystem.OnModifierTriggered += trigger => adrenalineEvents.Add(trigger);
+            Expect(Mathf.Approximately(adrenalineSystem.GravityMultiplier, 1f), "Adrenaline Rush should not directly accelerate gravity.");
+            adrenalineSystem.Tick(20f);
+            Expect(adrenalineEvents.Any(trigger => trigger.Modifier == StoryModifier.AdrenalineMonitor && trigger.State == "ACTIVE"), "Adrenaline Rush should emit ACTIVE after its cooldown fills.");
+            Expect(adrenalineSystem.BuildEnemyAbilityStatus().Contains("Adrenaline Rush") && adrenalineSystem.BuildEnemyAbilityStatus().Contains("[ACTIVE]"), "Adrenaline Rush should report ACTIVE status while boosting enemy abilities.");
+            const int adrenalineFocusedPieceId = 8250;
+            adrenalineBoard.Grid[PieceDefinitions.TotalRows - 5, 5] = (int)PieceType.S;
+            adrenalineBoard.PieceIds[PieceDefinitions.TotalRows - 5, 5] = adrenalineFocusedPieceId;
+            FillBottomLine(adrenalineBoard, PieceType.O, pieceIdStart: 8260);
+            Expect(adrenalineBoard.ClearLines() == 1, "Focused Adrenaline Rush setup should clear one row.");
+            Expect(!adrenalineBoard.GetLockedPieceGroups().Any(record => record.PieceId == adrenalineFocusedPieceId), "Adrenaline Rush should temporarily enhance Insatiable Hunger line requirements.");
+            adrenalineSystem.Tick(11.1f);
+            Expect(adrenalineEvents.Any(trigger => trigger.Modifier == StoryModifier.AdrenalineMonitor && trigger.State == "END"), "Adrenaline Rush should emit END after its fixed duration.");
 
             var relaySpec = ModifierSpec("harness-relay-focused", 5, StoryModifier.SignalRelay);
             var relayBoard = new BoardState(new[] { PieceType.I }, seed: 4112);
@@ -807,13 +919,13 @@ namespace MonStacka.Editor
                 StoryModifier.TerritoryCells => "Territory Cells",
                 StoryModifier.CalculatedPlanning => "Calculated Planning",
                 StoryModifier.PrecisionPressure => "Precision Pressure",
-                StoryModifier.GhostFlicker => "Ghost Flicker",
+                StoryModifier.GhostFlicker => "Blinded",
                 StoryModifier.EcholocationDim => "Echolocation Dim",
                 StoryModifier.ResilientCells => "Resilient Cells",
                 StoryModifier.MutedHints => "Muted Hints",
-                StoryModifier.HungerMeter => "Hunger Meter",
-                StoryModifier.SedationWindows => "Sedation",
-                StoryModifier.AdrenalineMonitor => "Adrenaline Monitor",
+                StoryModifier.HungerMeter => "Insatiable Hunger",
+                StoryModifier.SedationWindows => "Sedating Spit",
+                StoryModifier.AdrenalineMonitor => "Adrenaline Rush",
                 StoryModifier.SignalRelay => "Signal Relay",
                 StoryModifier.ReducedPreview => "Reduced Preview",
                 StoryModifier.NoHold => "No Hold",
@@ -924,10 +1036,10 @@ namespace MonStacka.Editor
             var enemyText = RequireRect("StoryEnemyStatus").GetComponent<Text>();
             hud.RenderStoryEnemyStatus("<color=#ffcf74>Guard Pressure</color> [ON] pressure row in 6s\n<color=#ff7cc8>Resilient Cells</color> [SETUP] source seeded");
             Expect(enemyText.text.Contains("[ON]") && enemyText.text.Contains("[SETUP]"), "Story enemy HUD should render explicit state tags.");
-            hud.ShowEnemyModifierTrigger("Hunger Meter", "TRIGGER", "garbage row inserted");
+            hud.ShowEnemyModifierTrigger("Insatiable Hunger", "TRIGGER", "ate S block #7 (3 cells)");
             var triggerText = RequireRect("StoryEnemyTriggerCue").GetComponent<Text>();
             Expect(triggerText.gameObject.activeInHierarchy, "Story enemy HUD should show a trigger cue when an enemy ability fires.");
-            Expect(triggerText.text.Contains("Hunger Meter") && triggerText.text.Contains("TRIGGER"), "Story enemy trigger cue should name the modifier and trigger state.");
+            Expect(triggerText.text.Contains("Insatiable Hunger") && triggerText.text.Contains("TRIGGER"), "Story enemy trigger cue should name the modifier and trigger state.");
 
             var territoryRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
                 .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal))
@@ -2376,6 +2488,7 @@ namespace MonStacka.Editor
             var candidates = new[]
             {
                 new Vector2Int(source.x, source.y - 1),
+                new Vector2Int(source.x, Mathf.Min(PieceDefinitions.TotalRows - 1, source.y + 1)),
                 new Vector2Int(Mathf.Max(0, source.x - 1), source.y),
                 new Vector2Int(Mathf.Min(PieceDefinitions.Columns - 1, source.x + 1), source.y),
                 new Vector2Int(source.x, Mathf.Max(0, source.y - 2)),

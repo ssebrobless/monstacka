@@ -506,7 +506,7 @@ namespace MonStacka.Core
             return true;
         }
 
-        public int ClearLines()
+        public int ClearLines(bool notify = true)
         {
             var keptTypes = new List<int[]>();
             var keptIds = new List<int[]>();
@@ -522,7 +522,8 @@ namespace MonStacka.Core
                 var full = true;
                 for (var col = 0; col < PieceDefinitions.Columns; col += 1)
                 {
-                    if (Grid[row, col] == 0 || territoryClaimSet.Contains(new Vector2Int(col, row)))
+                    var cell = new Vector2Int(col, row);
+                    if (Grid[row, col] == 0 || territoryClaimSet.Contains(cell) || territorySourceCells.Contains(cell))
                     {
                         full = false;
                         break;
@@ -604,7 +605,10 @@ namespace MonStacka.Core
                 AwardScore(finalLineScore);
                 TransformTerritoryClaimsAfterLineClear(clearedRows);
                 RebuildLockedPiecesFromGrid();
-                OnLinesCleared?.Invoke(cleared);
+                if (notify)
+                {
+                    OnLinesCleared?.Invoke(cleared);
+                }
             }
 
             return cleared;
@@ -873,6 +877,31 @@ namespace MonStacka.Core
         public IReadOnlyList<Vector2Int> GetTerritoryClaimedCells() =>
             territoryClaimOrder.ToList();
 
+        public int GetTerritoryClaimedBlockCount()
+        {
+            var blockIds = new HashSet<int>();
+            var fallbackCells = 0;
+            foreach (var cell in territoryClaimOrder)
+            {
+                if (cell.x < 0 || cell.x >= PieceDefinitions.Columns || cell.y < 0 || cell.y >= PieceDefinitions.TotalRows)
+                {
+                    continue;
+                }
+
+                var pieceId = PieceIds[cell.y, cell.x];
+                if (pieceId > 0)
+                {
+                    blockIds.Add(pieceId);
+                }
+                else
+                {
+                    fallbackCells += 1;
+                }
+            }
+
+            return blockIds.Count + fallbackCells;
+        }
+
         public bool IsTerritoryClaimed(Vector2Int cell) =>
             territoryClaimSet.Contains(cell);
 
@@ -884,7 +913,7 @@ namespace MonStacka.Core
 
             var source = new Vector2Int(
                 Mathf.Clamp(column ?? (PieceDefinitions.Columns / 2), 0, PieceDefinitions.Columns - 1),
-                Mathf.Clamp(row ?? (PieceDefinitions.TotalRows - 1), 0, PieceDefinitions.TotalRows - 1)
+                Mathf.Clamp(row ?? (PieceDefinitions.TotalRows - 2), 0, PieceDefinitions.TotalRows - 1)
             );
             territorySourceCells.Add(source);
             OnGarbageChanged?.Invoke();
@@ -897,7 +926,7 @@ namespace MonStacka.Core
                 return false;
             }
 
-            var frontier = territorySourceCells.Concat(territoryClaimOrder).ToArray();
+            var frontier = territorySourceCells.ToArray();
             var candidates = new List<Vector2Int>();
             for (var row = 0; row < PieceDefinitions.TotalRows; row += 1)
             {
@@ -926,8 +955,7 @@ namespace MonStacka.Core
             }
 
             var claimedCell = candidates[rng.Next(candidates.Count)];
-            territoryClaimOrder.Add(claimedCell);
-            territoryClaimSet.Add(claimedCell);
+            ClaimTerritoryBlock(claimedCell);
             OnGarbageChanged?.Invoke();
             return true;
         }
@@ -940,8 +968,95 @@ namespace MonStacka.Core
             }
 
             var removed = territoryClaimOrder[0];
-            territoryClaimOrder.RemoveAt(0);
-            territoryClaimSet.Remove(removed);
+            var removedPieceId = PieceIds[removed.y, removed.x];
+            if (removedPieceId > 0)
+            {
+                for (var index = territoryClaimOrder.Count - 1; index >= 0; index -= 1)
+                {
+                    var cell = territoryClaimOrder[index];
+                    if (PieceIds[cell.y, cell.x] != removedPieceId)
+                    {
+                        continue;
+                    }
+
+                    territoryClaimOrder.RemoveAt(index);
+                    territoryClaimSet.Remove(cell);
+                }
+            }
+            else
+            {
+                territoryClaimOrder.RemoveAt(0);
+                territoryClaimSet.Remove(removed);
+            }
+
+            OnGarbageChanged?.Invoke();
+            return true;
+        }
+
+        public int ClearRowsUnlockedByTerritoryUnclaim()
+        {
+            return ClearLines(notify: false);
+        }
+
+        public bool TryConsumeTopLayerPiece(out int pieceId, out PieceType pieceType, out int removedCells)
+        {
+            pieceId = 0;
+            pieceType = default;
+            removedCells = 0;
+
+            for (var row = 0; row < PieceDefinitions.TotalRows && pieceId == 0; row += 1)
+            {
+                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+                {
+                    if (!IsClaimablePlayerBlock(row, col) || PieceIds[row, col] <= 0)
+                    {
+                        continue;
+                    }
+
+                    pieceId = PieceIds[row, col];
+                    pieceType = pieceTypeById.TryGetValue(pieceId, out var mappedType)
+                        ? mappedType
+                        : (PieceType)Grid[row, col];
+                    break;
+                }
+            }
+
+            if (pieceId == 0)
+            {
+                return false;
+            }
+
+            var consumedCells = new HashSet<Vector2Int>();
+            for (var row = 0; row < PieceDefinitions.TotalRows; row += 1)
+            {
+                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+                {
+                    if (PieceIds[row, col] != pieceId)
+                    {
+                        continue;
+                    }
+
+                    Grid[row, col] = 0;
+                    PieceIds[row, col] = 0;
+                    SourceCellXs[row, col] = 0;
+                    SourceCellYs[row, col] = 0;
+                    consumedCells.Add(new Vector2Int(col, row));
+                    removedCells += 1;
+                }
+            }
+
+            if (removedCells <= 0)
+            {
+                return false;
+            }
+
+            lockedPieces.Remove(pieceId);
+            pieceTypeById.Remove(pieceId);
+            pieceRotationById.Remove(pieceId);
+            pieceOriginById.Remove(pieceId);
+            pieceScoreMultipliers.Remove(pieceId);
+            RemoveTerritoryOverlays(consumedCells);
+            RebuildLockedPiecesFromGrid();
             OnGarbageChanged?.Invoke();
             return true;
         }
@@ -962,8 +1077,7 @@ namespace MonStacka.Core
 
         /// <summary>
         /// Pushes the whole stack up one row and inserts a garbage row at the bottom
-        /// with a single hole. Used by the Sorrisol hunger meter. Tops out if the
-        /// stack is pushed past the hidden rows.
+        /// with a single hole. Tops out if the stack is pushed past the hidden rows.
         /// </summary>
         public void AddGarbageRow(int holeColumn)
         {
@@ -1164,11 +1278,51 @@ namespace MonStacka.Core
             return value > 0 && value < GarbageCellValue;
         }
 
+        private void ClaimTerritoryBlock(Vector2Int claimedCell)
+        {
+            var pieceId = PieceIds[claimedCell.y, claimedCell.x];
+            if (pieceId <= 0)
+            {
+                territoryClaimOrder.Add(claimedCell);
+                territoryClaimSet.Add(claimedCell);
+                return;
+            }
+
+            for (var row = 0; row < PieceDefinitions.TotalRows; row += 1)
+            {
+                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+                {
+                    if (PieceIds[row, col] != pieceId)
+                    {
+                        continue;
+                    }
+
+                    var cell = new Vector2Int(col, row);
+                    if (territoryClaimSet.Add(cell))
+                    {
+                        territoryClaimOrder.Add(cell);
+                    }
+                }
+            }
+        }
+
         private void ClearTerritoryOverlays()
         {
             territorySourceCells.Clear();
             territoryClaimOrder.Clear();
             territoryClaimSet.Clear();
+        }
+
+        private void RemoveTerritoryOverlays(HashSet<Vector2Int> cells)
+        {
+            if (cells.Count == 0)
+            {
+                return;
+            }
+
+            territorySourceCells.RemoveAll(cells.Contains);
+            territoryClaimOrder.RemoveAll(cells.Contains);
+            territoryClaimSet.RemoveWhere(cells.Contains);
         }
 
         private void ShiftTerritoryClaims(int deltaY)

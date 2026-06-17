@@ -137,6 +137,11 @@ namespace MonStacka.Core
             piecesSinceTrigger = 0;
         }
 
+        public void SuppressAndReset()
+        {
+            Reset();
+        }
+
         public void Tick(float deltaTime)
         {
             if (windowRemaining > 0f)
@@ -155,8 +160,14 @@ namespace MonStacka.Core
         /// when this placement fired an assist; the returned score is already applied
         /// to scoreSink via the callback.
         /// </summary>
-        public AssistTrigger? OnPieceLocked(PieceLockEvent lockEvent, BoardState board, Action<int> awardScore)
+        public AssistTrigger? OnPieceLocked(PieceLockEvent lockEvent, BoardState board, Action<int> awardScore, bool assistsSuppressed = false)
         {
+            if (assistsSuppressed)
+            {
+                SuppressAndReset();
+                return null;
+            }
+
             piecesSinceTrigger += 1;
 
             if (!lockEvent.CameFromHold)

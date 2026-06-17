@@ -155,7 +155,7 @@ namespace MonStacka.Story
                     FocusedPieces = new[] { PieceType.L }, SpawnBias = Bias(PieceType.L),
                     DifficultyTier = 5, GravitySeconds = 0.46f, LockDelaySeconds = 0.3f,
                     Objective = StoryObjective.Lines(18),
-                    Modifiers = new[] { StoryModifier.GhostFlicker, StoryModifier.EcholocationDim },
+                    Modifiers = new[] { StoryModifier.GhostFlicker },
                     IntroDialogue = StoryDialogueAct3.Intro_3_2,
                     PreMatchDialogue = StoryDialogueAct3.PreMatch_3_2,
                     PostMatchDialogue = StoryDialogueAct3.PostMatch_3_2,

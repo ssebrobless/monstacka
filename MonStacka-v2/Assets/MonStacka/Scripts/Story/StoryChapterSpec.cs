@@ -92,19 +92,19 @@ namespace MonStacka.Story
         CalculatedPlanning,
         /// <summary>Muwerde/O: precision scoring - bonus for flush placements, penalty cells for overhangs.</summary>
         PrecisionPressure,
-        /// <summary>Galiffambos/L: ghost piece flickers in and out.</summary>
+        /// <summary>Galiffambos/L: Blinded flickers placed board blocks on a cooldown.</summary>
         GhostFlicker,
-        /// <summary>Galiffambos/L: board visibility pulses dim (echolocation flashes reveal the stack).</summary>
+        /// <summary>Deprecated Galiffambos/L dimming modifier kept for old data compatibility.</summary>
         EcholocationDim,
         /// <summary>Dousema/J: one permanent enemy claim spreads to adjacent locked cells; claimed cells do not count for row clears.</summary>
         ResilientCells,
         /// <summary>Dousema/J: hold box and hints disabled (mouth sewn shut).</summary>
         MutedHints,
-        /// <summary>Sorrisol/S: hunger meter - garbage rows rise if no clear happens within the window.</summary>
+        /// <summary>Sorrisol/S: Insatiable Hunger consumes a whole top-layer block after enough player-cleared lines.</summary>
         HungerMeter,
-        /// <summary>Lysergicada/T: periodic sedation windows that slow or scramble controls with warning.</summary>
+        /// <summary>Lysergicada/T: Sedating Spit wipes and blocks friendly assist charge.</summary>
         SedationWindows,
-        /// <summary>Blyndoolie/I: adrenaline monitor - stack height over threshold triggers speed escalation.</summary>
+        /// <summary>Blyndoolie/I: Adrenaline Rush periodically boosts enemy abilities for a fixed window.</summary>
         AdrenalineMonitor,
         /// <summary>Blyndoolie/I: signal relay randomly re-activates one earlier chapter modifier briefly.</summary>
         SignalRelay,
