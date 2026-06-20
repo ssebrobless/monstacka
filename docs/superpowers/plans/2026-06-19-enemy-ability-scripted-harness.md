@@ -51,3 +51,6 @@ The logic matrix proves state transitions. The runtime visual checkpoint layer s
 - [x] Expand Guard Pressure runtime coverage to verify active renderer sync, line-clear cleanup, natural expiry cleanup, HUD reset, and no stale enemy-cell renderers.
 - [x] Expand Resilient Cells runtime coverage to verify claimed-row blocking, cleanup through a separate player row clear, unlocked-row event reporting, permanent source preservation, and renderer sync after cleanup.
 - [x] Keep boss HP/score sync verified through HUD text/fill assertions while using the gameplay screenshot only as a lightweight smoke artifact.
+- [x] Expand Vision Loss runtime coverage to verify active falling pieces remain visible while locked blocks flicker and the HUD/cue resets after END.
+- [x] Expand Sedating Spit runtime coverage to verify charged assists reset on activation, assist progress is blocked while active, and progress resumes after line-clear cleanup.
+- [x] Expand Adrenaline Rush runtime coverage to verify the active boost chip/status clears and the END trigger cue is surfaced after expiry.

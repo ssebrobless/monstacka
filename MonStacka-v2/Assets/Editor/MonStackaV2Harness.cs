@@ -1585,14 +1585,14 @@ namespace MonStacka.Editor
             UpdateStoryRuntimeViews(manager);
             var stackRoot = GetStackRoot(manager);
             var activeRoot = GetActiveRoot(manager);
-            activeRoot.gameObject.SetActive(false);
-            HideNonStackPieceSkins(stackRoot);
             Expect(Resources.FindObjectsOfTypeAll<PieceSkin>().Any(skin => skin && skin.gameObject.scene.IsValid() && skin.gameObject.activeInHierarchy && skin.transform.IsChildOf(stackRoot)), "Runtime Vision Loss checkpoint should have a visible locked stack PieceSkin.");
             Expect(stackRoot.gameObject.activeSelf, "Runtime Vision Loss checkpoint should start with placed blocks visible.");
+            Expect(activeRoot.gameObject.activeInHierarchy, "Runtime Vision Loss checkpoint should start with active piece visuals visible.");
 
             modifiers.Tick(12f);
             UpdateStoryRuntimeViews(manager);
             Expect(stackRoot.gameObject.activeSelf, "Runtime Vision Loss should start active on a visible flicker frame.");
+            Expect(activeRoot.gameObject.activeInHierarchy, "Runtime Vision Loss should keep active piece visuals visible on active flicker start.");
             AssertStackSpriteRenderersVisible(stackRoot, "Runtime Vision Loss visible checkpoint");
             AssertEnemyAbilityHudContains("Runtime Vision Loss active checkpoint", "Vision Loss", "[ACTIVE]", "placed blocks visible");
             var visiblePath = CaptureRuntimeCheckpoint(checkpointDir, "vision-loss-visible", "Vision Loss visible checkpoint");
@@ -1601,6 +1601,7 @@ namespace MonStacka.Editor
             modifiers.Tick(0.5f);
             UpdateStoryRuntimeViews(manager);
             Expect(!stackRoot.gameObject.activeSelf, "Runtime Vision Loss should hide placed blocks on the invisible flicker frame.");
+            Expect(activeRoot.gameObject.activeInHierarchy, "Runtime Vision Loss should not hide the active falling piece on invisible locked-block frames.");
             AssertStackSpriteRenderersHidden(stackRoot, "Runtime Vision Loss invisible checkpoint");
             AssertEnemyAbilityHudContains("Runtime Vision Loss invisible checkpoint", "Vision Loss", "placed blocks invisible");
             var invisiblePath = CaptureRuntimeCheckpoint(checkpointDir, "vision-loss-invisible", "Vision Loss invisible checkpoint");
@@ -1609,7 +1610,10 @@ namespace MonStacka.Editor
             modifiers.Tick(5.1f);
             UpdateStoryRuntimeViews(manager);
             Expect(stackRoot.gameObject.activeSelf, "Runtime Vision Loss should restore placed blocks visible after ending.");
+            Expect(activeRoot.gameObject.activeInHierarchy, "Runtime Vision Loss should keep active piece visuals visible after ending.");
             AssertStackSpriteRenderersVisible(stackRoot, "Runtime Vision Loss restored checkpoint");
+            AssertEnemyAbilityHudContains("Runtime Vision Loss restored checkpoint", "Vision Loss", "[TIMER]", "flicker starts in");
+            AssertEnemyTriggerCueContains("Runtime Vision Loss restored checkpoint", "Vision Loss", "END");
             var restoredPath = CaptureRuntimeCheckpoint(checkpointDir, "vision-loss-restored", "Vision Loss restored checkpoint");
             Expect(File.Exists(restoredPath), "Vision Loss restored checkpoint should write a diagnostic screenshot.");
         }
@@ -1618,11 +1622,19 @@ namespace MonStacka.Editor
         {
             var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "4.3");
             var modifiers = GetStoryModifiers(manager);
+            var assist = manager.AssistSystem;
+            Expect(assist != null, "Runtime Sedating Spit checkpoint should have story friendly assists available.");
+            ChargeAssistUntilNextHeldPlacementWillTrigger(assist, manager.Board);
+            Expect(assist.NextHeldPlacementWillTrigger, "Runtime Sedating Spit setup should have a charged friendly assist before lockout.");
             modifiers.Tick(15f);
             UpdateStoryRuntimeViews(manager);
 
             Expect(modifiers.SedatingSpitActive, "Runtime Sedating Spit checkpoint should activate after cooldown.");
             Expect(modifiers.AssistsSuppressed, "Runtime Sedating Spit checkpoint should suppress friendly assists while active.");
+            Expect(!assist.NextHeldPlacementWillTrigger && assist.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Runtime Sedating Spit should clear charged assist progress when it activates.");
+            var suppressedTrigger = assist.OnPieceLocked(CreateHeldLockEvent(58200, PieceType.T), manager.Board, _ => { }, assistsSuppressed: modifiers.AssistsSuppressed);
+            Expect(!suppressedTrigger.HasValue, "Runtime Sedating Spit should block a held-placement assist trigger while active.");
+            Expect(assist.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Runtime Sedating Spit should prevent assist progress while active.");
             AssertEnemyAbilityHudContains("Runtime Sedating Spit checkpoint", "Sedating Spit", "[ACTIVE]", "friendly assists blocked");
             AssertEnemyTriggerCueContains("Runtime Sedating Spit checkpoint", "Sedating Spit", "ACTIVE");
             var activePath = CaptureRuntimeCheckpoint(checkpointDir, "sedating-spit-active", "Sedating Spit active checkpoint");
@@ -1634,6 +1646,8 @@ namespace MonStacka.Editor
             Expect(!modifiers.SedatingSpitActive, "Runtime Sedating Spit should clear after a player line clear.");
             AssertEnemyAbilityHudContains("Runtime Sedating Spit cleared checkpoint", "Sedating Spit", "[TIMER]", "assist lockout in");
             AssertEnemyTriggerCueContains("Runtime Sedating Spit cleared checkpoint", "Sedating Spit", "CLEARED");
+            assist.OnPieceLocked(CreateHeldLockEvent(58201, PieceType.T), manager.Board, _ => { }, assistsSuppressed: modifiers.AssistsSuppressed);
+            Expect(assist.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery - 1, "Runtime Sedating Spit should allow assist progress again after line-clear cleanup.");
         }
 
         private static void VerifyAdrenalineRushRuntimeVisualCheckpoint(string checkpointDir)
@@ -1653,6 +1667,7 @@ namespace MonStacka.Editor
             UpdateStoryRuntimeViews(manager);
             AssertEnemyAbilityHudContains("Runtime Adrenaline Rush ended checkpoint", "Adrenaline Rush", "[TIMER]", "next boost in");
             Expect(!modifiers.BuildStatusChips().Contains("ADRENALINE RUSH"), "Runtime Adrenaline Rush ended checkpoint should clear the active boost chip.");
+            AssertEnemyTriggerCueContains("Runtime Adrenaline Rush ended checkpoint", "Adrenaline Rush", "END");
         }
 
         private static void VerifyStoryBossRuntimeSyncCheckpoint(string checkpointDir)
@@ -3307,6 +3322,23 @@ namespace MonStacka.Editor
             board.SourceCellXs[candidate.y, candidate.x] = 0;
             board.SourceCellYs[candidate.y, candidate.x] = 0;
         }
+
+        private static void ChargeAssistUntilNextHeldPlacementWillTrigger(AssistEffectSystem assist, BoardState board)
+        {
+            var safety = 0;
+            while (!assist.NextHeldPlacementWillTrigger && safety < AssistEffectSystem.TriggerEvery)
+            {
+                var pieceId = 58800 + safety;
+                var trigger = assist.OnPieceLocked(CreateHeldLockEvent(pieceId, PieceType.T), board, _ => { });
+                Expect(!trigger.HasValue, "Assist charge setup should stop before actually triggering an assist.");
+                safety += 1;
+            }
+
+            Expect(assist.NextHeldPlacementWillTrigger, "Assist charge setup should arm the next held placement.");
+        }
+
+        private static PieceLockEvent CreateHeldLockEvent(int pieceId, PieceType pieceType) =>
+            new(pieceId, pieceType, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true);
 
         private static int FindClearableRuntimeRowExcluding(BoardState board, IEnumerable<Vector2Int> excludedCells)
         {
