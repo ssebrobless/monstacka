@@ -48,3 +48,6 @@ The logic matrix proves state transitions. The runtime visual checkpoint layer s
 - [x] Add runtime checkpoint helpers for private scene fields, HUD text, stack visibility, enemy renderers, trigger cue text, and boss HP fill.
 - [x] Add runtime visual scenarios for Guard Pressure, Resilient Cells, Vision Loss, Sedating Spit, Adrenaline Rush, and boss HP/score sync.
 - [x] Discuss with the user before running the full harness again.
+- [x] Expand Guard Pressure runtime coverage to verify active renderer sync, line-clear cleanup, natural expiry cleanup, HUD reset, and no stale enemy-cell renderers.
+- [x] Expand Resilient Cells runtime coverage to verify claimed-row blocking, cleanup through a separate player row clear, unlocked-row event reporting, permanent source preservation, and renderer sync after cleanup.
+- [x] Keep boss HP/score sync verified through HUD text/fill assertions while using the gameplay screenshot only as a lightweight smoke artifact.

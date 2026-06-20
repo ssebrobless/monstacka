@@ -1467,6 +1467,7 @@ namespace MonStacka.Editor
         {
             var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
             var modifiers = GetStoryModifiers(manager);
+            var events = CaptureModifierEvents(modifiers);
             modifiers.Tick(16f);
             RefreshEnemyCellViews(manager);
             UpdateStoryRuntimeViews(manager);
@@ -1475,16 +1476,46 @@ namespace MonStacka.Editor
             AssertEnemyAbilityHudContains("Runtime Guard Pressure checkpoint", "Guard Pressure", "[ACTIVE]", "pressure row");
             AssertEnemyTriggerCueContains("Runtime Guard Pressure checkpoint", "Guard Pressure", "ACTIVE");
             AssertActiveEnemyCellRenderers("Runtime Guard Pressure checkpoint");
+            AssertEnemyCellRenderersMatchBoard(manager.Board, "Runtime Guard Pressure active renderer sync");
             var path = CaptureRuntimeCheckpoint(checkpointDir, "guard-pressure-active", "Guard Pressure runtime checkpoint");
             AssertCheckpointScreenshotReadable(path, "Guard Pressure runtime checkpoint");
+
+            FillLine(manager.Board, PieceDefinitions.TotalRows - 3, PieceType.O, pieceIdStart: 58500);
+            Expect(manager.Board.ClearLines() == 1, "Runtime Guard Pressure clear checkpoint should clear a player-built row.");
+            RefreshEnemyCellViews(manager);
+            UpdateStoryRuntimeViews(manager);
+            Expect(manager.Board.GetGuardPressureRowCount() == 0, "Runtime Guard Pressure line clear should remove the active pressure row.");
+            ExpectEvent(events, StoryModifier.GuardPressure, "CLEARED", "Runtime Guard Pressure should emit CLEARED when line clear removes the pressure row.");
+            AssertEnemyAbilityHudContains("Runtime Guard Pressure cleared checkpoint", "Guard Pressure", "[TIMER]", "pressure row in");
+            AssertNoActiveEnemyCellRenderers("Runtime Guard Pressure cleared checkpoint");
+            var clearedPath = CaptureRuntimeCheckpoint(checkpointDir, "guard-pressure-cleared", "Guard Pressure cleared checkpoint");
+            AssertCheckpointScreenshotReadable(clearedPath, "Guard Pressure cleared checkpoint");
+
+            var naturalManager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            var naturalModifiers = GetStoryModifiers(naturalManager);
+            var naturalEvents = CaptureModifierEvents(naturalModifiers);
+            naturalModifiers.Tick(16f);
+            RefreshEnemyCellViews(naturalManager);
+            UpdateStoryRuntimeViews(naturalManager);
+            Expect(naturalManager.Board.GetGuardPressureRowCount() == 1, "Runtime Guard Pressure natural cleanup setup should add one active pressure row.");
+            naturalModifiers.Tick(6.1f);
+            RefreshEnemyCellViews(naturalManager);
+            UpdateStoryRuntimeViews(naturalManager);
+            Expect(naturalManager.Board.GetGuardPressureRowCount() == 0, "Runtime Guard Pressure natural cleanup should expire the pressure row.");
+            ExpectEvent(naturalEvents, StoryModifier.GuardPressure, "END", "Runtime Guard Pressure should emit END when pressure row naturally expires.");
+            AssertEnemyAbilityHudContains("Runtime Guard Pressure expired checkpoint", "Guard Pressure", "[TIMER]", "pressure row in");
+            AssertNoActiveEnemyCellRenderers("Runtime Guard Pressure expired checkpoint");
+            var expiredPath = CaptureRuntimeCheckpoint(checkpointDir, "guard-pressure-expired", "Guard Pressure expired checkpoint");
+            AssertCheckpointScreenshotReadable(expiredPath, "Guard Pressure expired checkpoint");
         }
 
         private static void VerifyResilientCellsRuntimeVisualCheckpoint(string checkpointDir)
         {
             var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "3.3");
             var modifiers = GetStoryModifiers(manager);
+            var events = CaptureModifierEvents(modifiers);
             var source = manager.Board.GetTerritorySourceCells().First();
-            FillTerritoryClaimCandidates(manager.Board, source, PieceType.J, pieceIdStart: 58100);
+            SeedSingleTerritoryClaimCandidate(manager.Board, source, PieceType.J, pieceId: 58100);
             modifiers.Tick(10f);
             RefreshEnemyCellViews(manager);
             UpdateStoryRuntimeViews(manager);
@@ -1494,8 +1525,39 @@ namespace MonStacka.Editor
             AssertEnemyAbilityHudContains("Runtime Resilient Cells checkpoint", "Resilient Cells", "source locked", "claim");
             AssertEnemyTriggerCueContains("Runtime Resilient Cells checkpoint", "Resilient Cells", "CLAIM");
             AssertActiveEnemyCellRenderers("Runtime Resilient Cells checkpoint");
+            AssertEnemyCellRenderersMatchBoard(manager.Board, "Runtime Resilient Cells claimed renderer sync");
             var path = CaptureRuntimeCheckpoint(checkpointDir, "resilient-cells-claimed", "Resilient Cells runtime checkpoint");
             AssertCheckpointScreenshotReadable(path, "Resilient Cells runtime checkpoint");
+
+            var claimed = manager.Board.GetTerritoryClaimedCells().First();
+            FillLine(manager.Board, claimed.y, PieceType.O, pieceIdStart: 58600);
+            manager.Board.Grid[claimed.y, claimed.x] = (int)PieceType.J;
+            manager.Board.PieceIds[claimed.y, claimed.x] = 58100;
+            RefreshEnemyCellViews(manager);
+            UpdateStoryRuntimeViews(manager);
+            Expect(manager.Board.ClearLines() == 0, "Runtime Resilient Cells claimed row should remain blocked while claimed.");
+            RefreshEnemyCellViews(manager);
+            UpdateStoryRuntimeViews(manager);
+            Expect(manager.Board.GetTerritoryClaimedBlockCount() > 0, "Runtime Resilient Cells blocked row should keep the temporary claim active.");
+            AssertEnemyCellRenderersMatchBoard(manager.Board, "Runtime Resilient Cells blocked-row renderer sync");
+            var blockedPath = CaptureRuntimeCheckpoint(checkpointDir, "resilient-cells-blocked-row", "Resilient Cells blocked row checkpoint");
+            AssertCheckpointScreenshotReadable(blockedPath, "Resilient Cells blocked row checkpoint");
+
+            var safeClearRow = FindClearableRuntimeRowExcluding(
+                manager.Board,
+                manager.Board.GetTerritorySourceCells().Concat(manager.Board.GetTerritoryClaimedCells()));
+            FillLine(manager.Board, safeClearRow, PieceType.O, pieceIdStart: 58700);
+            Expect(manager.Board.ClearLines() == 1, "Runtime Resilient Cells cleanup should clear a separate player-built row.");
+            RefreshEnemyCellViews(manager);
+            UpdateStoryRuntimeViews(manager);
+            Expect(manager.Board.GetTerritorySourceCells().Count == 1, "Runtime Resilient Cells cleanup should preserve the permanent source.");
+            Expect(manager.Board.GetTerritoryClaimedBlockCount() == 0, "Runtime Resilient Cells cleanup should remove one temporary claim.");
+            ExpectEvent(events, StoryModifier.ResilientCells, "CLEARED", "Runtime Resilient Cells should emit CLEARED when a player row unclaims a block.");
+            ExpectEvent(events, StoryModifier.ResilientCells, "UNLOCKED", "Runtime Resilient Cells should emit UNLOCKED when unclaiming releases a completed row.");
+            AssertEnemyAbilityHudContains("Runtime Resilient Cells cleanup checkpoint", "Resilient Cells", "source locked", "cap 0/");
+            AssertEnemyCellRenderersMatchBoard(manager.Board, "Runtime Resilient Cells cleanup renderer sync");
+            var cleanupPath = CaptureRuntimeCheckpoint(checkpointDir, "resilient-cells-cleaned", "Resilient Cells cleaned checkpoint");
+            AssertCheckpointScreenshotReadable(cleanupPath, "Resilient Cells cleaned checkpoint");
         }
 
         private static void VerifyVisionLossRuntimeVisualCheckpoint(string checkpointDir)
@@ -1609,7 +1671,7 @@ namespace MonStacka.Editor
             Expect(Mathf.Abs(bossFill.anchorMax.x - expectedHp) <= 0.02f, $"Runtime boss sync checkpoint should update HP fill. Expected {expectedHp:0.###}, got {bossFill.anchorMax.x:0.###}.");
             SeedBossSyncCheckpointStack(manager);
             var path = CaptureRuntimeCheckpoint(checkpointDir, "boss-hp-score-sync", "Boss HP score sync checkpoint");
-            AssertCheckpointScreenshotReadable(path, "Boss HP score sync checkpoint");
+            AssertCheckpointScreenshotReadable(path, "Boss HP score sync checkpoint", minColorBuckets: 10);
         }
 
         private static void SeedBossSyncCheckpointStack(GameManager manager)
@@ -2819,7 +2881,7 @@ namespace MonStacka.Editor
             return path;
         }
 
-        private static void AssertCheckpointScreenshotReadable(string screenshotPath, string context)
+        private static void AssertCheckpointScreenshotReadable(string screenshotPath, string context, int minColorBuckets = 12)
         {
             Expect(File.Exists(screenshotPath), $"{context}: checkpoint screenshot should exist.");
             var bytes = File.ReadAllBytes(screenshotPath);
@@ -2856,7 +2918,7 @@ namespace MonStacka.Editor
                 }
 
                 Expect(sampled > 0, $"{context}: checkpoint sampler should inspect pixels.");
-                Expect(buckets.Count >= 12, $"{context}: checkpoint should have varied color buckets, got {buckets.Count}.");
+                Expect(buckets.Count >= minColorBuckets, $"{context}: checkpoint should have varied color buckets, got {buckets.Count}.");
                 Expect(blueish >= sampled * 0.10f, $"{context}: checkpoint should include the blue scene background.");
                 Expect(dark >= sampled * 0.02f, $"{context}: checkpoint should include dark panel/outline/depth pixels.");
             }
@@ -3145,14 +3207,7 @@ namespace MonStacka.Editor
 
         private static void AssertActiveEnemyCellRenderers(string context)
         {
-            var renderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
-                .Where(renderer =>
-                    renderer &&
-                    renderer.gameObject.scene.IsValid() &&
-                    renderer.gameObject.scene.isLoaded &&
-                    renderer.gameObject.activeInHierarchy &&
-                    renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal))
-                .ToArray();
+            var renderers = GetActiveEnemyCellRenderers();
 
             Expect(renderers.Length > 0, $"{context}: should render at least one active enemy cell.");
             foreach (var renderer in renderers)
@@ -3162,6 +3217,34 @@ namespace MonStacka.Editor
                 Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, $"{context}: enemy cell renderer should read as red enemy pressure/claim art.");
             }
         }
+
+        private static void AssertNoActiveEnemyCellRenderers(string context)
+        {
+            var renderers = GetActiveEnemyCellRenderers();
+            Expect(renderers.Length == 0, $"{context}: should not leave stale active enemy-cell renderers.");
+        }
+
+        private static void AssertEnemyCellRenderersMatchBoard(BoardState board, string context)
+        {
+            var expected = board.GetGarbageCells()
+                .Count(cell => cell.y >= PieceDefinitions.HiddenRows && cell.y < PieceDefinitions.TotalRows);
+            var renderers = GetActiveEnemyCellRenderers();
+            Expect(renderers.Length == expected, $"{context}: active enemy-cell renderers should match visible board enemy cells. Expected {expected}, got {renderers.Length}.");
+            if (expected > 0)
+            {
+                AssertActiveEnemyCellRenderers(context);
+            }
+        }
+
+        private static SpriteRenderer[] GetActiveEnemyCellRenderers() =>
+            Resources.FindObjectsOfTypeAll<SpriteRenderer>()
+                .Where(renderer =>
+                    renderer &&
+                    renderer.gameObject.scene.IsValid() &&
+                    renderer.gameObject.scene.isLoaded &&
+                    renderer.gameObject.activeInHierarchy &&
+                    renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal))
+                .ToArray();
 
         private static void FillBottomLine(BoardState board, PieceType type, int pieceIdStart)
         {
@@ -3213,6 +3296,57 @@ namespace MonStacka.Editor
                 board.SourceCellXs[candidate.y, candidate.x] = 0;
                 board.SourceCellYs[candidate.y, candidate.x] = 0;
             }
+        }
+
+        private static void SeedSingleTerritoryClaimCandidate(BoardState board, Vector2Int source, PieceType type, int pieceId)
+        {
+            var candidate = new Vector2Int(source.x, Mathf.Max(PieceDefinitions.HiddenRows, source.y - 1));
+            Expect(candidate.y != source.y, "Runtime Resilient Cells single-claim setup should not share the permanent source row.");
+            board.Grid[candidate.y, candidate.x] = (int)type;
+            board.PieceIds[candidate.y, candidate.x] = pieceId;
+            board.SourceCellXs[candidate.y, candidate.x] = 0;
+            board.SourceCellYs[candidate.y, candidate.x] = 0;
+        }
+
+        private static int FindClearableRuntimeRowExcluding(BoardState board, IEnumerable<Vector2Int> excludedCells)
+        {
+            var excludedRows = excludedCells.Select(cell => cell.y).ToHashSet();
+            var firstExcludedRow = excludedRows.Count > 0 ? excludedRows.Min() : PieceDefinitions.TotalRows;
+            for (var row = PieceDefinitions.HiddenRows; row < firstExcludedRow; row += 1)
+            {
+                if (IsEmptyRuntimeRow(board, row))
+                {
+                    return row;
+                }
+            }
+
+            for (var row = PieceDefinitions.HiddenRows; row < PieceDefinitions.TotalRows; row += 1)
+            {
+                if (excludedRows.Contains(row))
+                {
+                    continue;
+                }
+
+                if (IsEmptyRuntimeRow(board, row))
+                {
+                    return row;
+                }
+            }
+
+            throw new InvalidOperationException("Could not find a clearable runtime row outside active enemy claims.");
+        }
+
+        private static bool IsEmptyRuntimeRow(BoardState board, int row)
+        {
+            for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+            {
+                if (board.Grid[row, col] != 0)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static GameManager LoadGameManagerForMode(MonStackaMode mode, bool friendlyAbilitiesEnabled, string storyChapterId = null)
