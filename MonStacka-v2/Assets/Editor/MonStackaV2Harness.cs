@@ -1995,6 +1995,8 @@ namespace MonStacka.Editor
             Expect(survivorSkin.GetComponentsInChildren<SpriteRenderer>(true).Any(renderer => renderer && renderer.sprite), "Runtime survivor should have sprite renderers.");
             Expect(survivorSkin.GetComponentsInChildren<FacialPartAnimator>(true).Any(animator => animator && animator.Animates), "Runtime partial survivor should keep animated monster feature layers after line clear.");
 
+            VerifyIncrementalLineClearPartialSkinMatrix();
+
             var garbageRenderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
                 .Where(renderer => renderer && renderer.gameObject.scene.IsValid() && renderer.gameObject.scene.isLoaded && renderer.name.StartsWith("GarbageCell"))
                 .ToList();
@@ -2003,6 +2005,85 @@ namespace MonStacka.Editor
                 Expect(renderer.sortingOrder >= 18, "Visible garbage/territory cells should render above floor art.");
                 Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, "Visible garbage/territory cells should read as red enemy cells, not gray placeholders.");
                 Expect(renderer.sprite != null && renderer.sprite.texture != Texture2D.whiteTexture, "Visible garbage/territory cells should use cell art, not a stretched white placeholder.");
+            }
+        }
+
+        private static void VerifyIncrementalLineClearPartialSkinMatrix()
+        {
+            foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
+            {
+                var manager = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: false);
+                var board = manager.Board;
+                board.Reset();
+                ClearBoardArrays(board);
+
+                var pieceId = 9300 + (int)pieceType;
+                var clearRow = PieceDefinitions.TotalRows - 1;
+                var rotation = Enumerable.Range(0, 4)
+                    .First(candidateRotation =>
+                    {
+                        var candidateCells = PieceDefinitions.GetCells(pieceType, candidateRotation).ToArray();
+                        var bottomY = candidateCells.Max(cell => cell.y);
+                        return candidateCells.Any(cell => cell.y != bottomY);
+                    });
+                var cells = PieceDefinitions.GetCells(pieceType, rotation).ToArray();
+                var bottomLocalY = cells.Max(cell => cell.y);
+                var width = cells.Max(cell => cell.x) - cells.Min(cell => cell.x) + 1;
+                var originX = Mathf.Clamp(3 - cells.Min(cell => cell.x), 0, PieceDefinitions.Columns - width);
+                var originY = clearRow - bottomLocalY;
+                SetLockedPieceMetadata(board, pieceId, pieceType, rotation, new Vector2Int(originX, originY));
+
+                foreach (var cell in cells)
+                {
+                    var row = originY + cell.y;
+                    var col = originX + cell.x;
+                    board.Grid[row, col] = (int)pieceType;
+                    board.PieceIds[row, col] = pieceId;
+                    board.SourceCellXs[row, col] = cell.x;
+                    board.SourceCellYs[row, col] = cell.y;
+                }
+
+                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+                {
+                    if (board.Grid[clearRow, col] != 0)
+                    {
+                        continue;
+                    }
+
+                    board.Grid[clearRow, col] = (int)PieceType.O;
+                    board.PieceIds[clearRow, col] = 9400 + ((int)pieceType * 20) + col;
+                    board.SourceCellXs[clearRow, col] = col % 2;
+                    board.SourceCellYs[clearRow, col] = col / 2;
+                }
+
+                InvokePrivate(board, "RebuildLockedPiecesFromGrid");
+                InvokePrivate(manager, "RebuildBoardViews");
+                var skinBefore = FindVisiblePieceSkin(pieceId);
+                Expect(skinBefore != null, $"{pieceType} incremental line-clear setup should render the whole piece before clearing.");
+
+                Expect(board.ClearLines() == 1, $"{pieceType} incremental line clear should clear exactly one row.");
+                InvokePrivate(manager, "UpdateVisuals");
+
+                var record = board.GetLockedPieceGroups().FirstOrDefault(group => group.PieceId == pieceId);
+                Expect(record != null, $"{pieceType} should leave a partial locked-piece record after line clear.");
+                Expect(record.Cells.Count > 0 && record.Cells.Count < cells.Length, $"{pieceType} should be partial after clearing its bottom cells.");
+                Expect(record.SourceCells.Count == record.Cells.Count, $"{pieceType} partial record should keep source cells aligned with surviving cells.");
+
+                var skinAfter = FindVisiblePieceSkin(pieceId);
+                Expect(skinAfter != null, $"{pieceType} partial survivor should keep a visible PieceSkin after incremental line-clear sync.");
+                Expect(skinAfter.gameObject.activeInHierarchy, $"{pieceType} partial survivor PieceSkin should be active.");
+                Expect(!skinAfter.BodyBuildUsesFullBoxSprite, $"{pieceType} partial survivor should not fall back to full-box art.");
+                Expect(skinAfter.RequiresManualUpdate, $"{pieceType} partial survivor should keep body/manual animation active.");
+                Expect(skinAfter.GetComponentsInChildren<SpriteRenderer>(true).Count(renderer => renderer && renderer.sprite) >= 2, $"{pieceType} partial survivor should keep body plus shadow/feature sprite renderers.");
+
+                var bodyRenderer = skinAfter.GetComponentsInChildren<SpriteRenderer>(true)
+                    .FirstOrDefault(renderer => renderer && renderer.name == "ConnectedBody" && renderer.sprite);
+                Expect(bodyRenderer != null, $"{pieceType} partial survivor should keep a body renderer.");
+                var initialSprite = bodyRenderer.sprite;
+                skinAfter.ManualUpdate(0.5f);
+                skinAfter.ManualUpdate(1.0f);
+                Expect(bodyRenderer.sprite != null, $"{pieceType} partial survivor body renderer should keep a sprite after manual animation updates.");
+                Expect(initialSprite != null, $"{pieceType} partial survivor should start with a valid body sprite.");
             }
         }
 
@@ -3285,6 +3366,40 @@ namespace MonStacka.Editor
                 board.SourceCellXs[row, col] = col % 2;
                 board.SourceCellYs[row, col] = col / 2;
             }
+        }
+
+        private static void ClearBoardArrays(BoardState board)
+        {
+            for (var row = 0; row < PieceDefinitions.TotalRows; row += 1)
+            {
+                for (var col = 0; col < PieceDefinitions.Columns; col += 1)
+                {
+                    board.Grid[row, col] = 0;
+                    board.PieceIds[row, col] = 0;
+                    board.SourceCellXs[row, col] = 0;
+                    board.SourceCellYs[row, col] = 0;
+                }
+            }
+        }
+
+        private static PieceSkin FindVisiblePieceSkin(int pieceId) =>
+            Resources.FindObjectsOfTypeAll<PieceSkin>()
+                .FirstOrDefault(skin =>
+                    skin &&
+                    skin.PieceId == pieceId &&
+                    skin.gameObject.scene.IsValid() &&
+                    skin.gameObject.scene.isLoaded &&
+                    skin.gameObject.activeInHierarchy);
+
+        private static void SetLockedPieceMetadata(BoardState board, int pieceId, PieceType type, int rotation, Vector2Int origin)
+        {
+            var pieceTypeById = (Dictionary<int, PieceType>)GetField(typeof(BoardState), board, "pieceTypeById");
+            var pieceRotationById = (Dictionary<int, int>)GetField(typeof(BoardState), board, "pieceRotationById");
+            var pieceOriginById = (Dictionary<int, Vector2Int>)GetField(typeof(BoardState), board, "pieceOriginById");
+
+            pieceTypeById[pieceId] = type;
+            pieceRotationById[pieceId] = rotation;
+            pieceOriginById[pieceId] = origin;
         }
 
         private static void FillTerritoryClaimCandidates(BoardState board, Vector2Int source, PieceType type, int pieceIdStart)
