@@ -2365,11 +2365,15 @@ namespace MonStacka.Editor
                 LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true),
                 new ReplayScenario("O.G.B.M. zany soak", MonStackaMode.Ogbm, true, null),
                 maxSteps: 64);
-            RunRuntimeSoakReplay(
-                "Story 1.3 soak",
-                LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3"),
-                new ReplayScenario("Story 1.3 soak", MonStackaMode.Story, false, "1.3"),
-                maxSteps: 64);
+
+            foreach (var chapterId in new[] { "1.3", "3.3", "4.1", "4.4", "5.1" })
+            {
+                RunRuntimeSoakReplay(
+                    $"Story {chapterId} timed enemy soak",
+                    LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: chapterId),
+                    new ReplayScenario($"Story {chapterId} timed enemy soak", MonStackaMode.Story, false, chapterId),
+                    maxSteps: 48);
+            }
         }
 
         private static void RunRuntimeSoakReplay(string name, GameManager manager, ReplayScenario scenario, int maxSteps)
@@ -2377,6 +2381,13 @@ namespace MonStacka.Editor
             var board = manager.Board;
             var lastScore = board.Score;
             var startingPieces = board.PiecesPlaced;
+            var chapter = scenario.Mode == MonStackaMode.Story ? StoryCatalog.GetChapter(scenario.Chapter) : null;
+            var storyModifiers = chapter != null ? GetStoryModifiers(manager) : null;
+            var storyEvents = storyModifiers != null ? CaptureModifierEvents(storyModifiers) : null;
+            if (chapter != null)
+            {
+                SeedRuntimeSoakModifierPreconditions(manager, chapter);
+            }
 
             for (var step = 0; step < maxSteps && !board.IsGameOver(); step += 1)
             {
@@ -2397,17 +2408,84 @@ namespace MonStacka.Editor
                 }
 
                 InvokePrivate(manager, "HardDropAndSpawn");
+                if (storyModifiers != null)
+                {
+                    AdvanceStoryModifierSoakTick(manager, storyModifiers, scenario, $"soak step {step} enemy timer", ref lastScore);
+                }
                 InvokePrivate(manager, "UpdateVisuals");
                 AssertReplayInvariants(manager, scenario, $"soak step {step}", ref lastScore);
             }
 
             Expect(board.PiecesPlaced > startingPieces + 8 || board.IsGameOver(), $"{name}: soak should place many pieces or end in explicit game over.");
+            if (chapter != null && storyEvents != null)
+            {
+                AssertTimedStoryModifierEventsObserved(name, chapter, storyEvents);
+            }
+
             if (board.IsGameOver())
             {
                 InvokePrivate(manager, "HandleRunCompletion");
                 Expect(manager.HasEndRunUi && manager.IsEndRunPanelActive, $"{name}: soak game over should show the end-run panel.");
             }
         }
+
+        private static void SeedRuntimeSoakModifierPreconditions(GameManager manager, StoryChapterSpec chapter)
+        {
+            if (!chapter.Modifiers.Any(modifier => modifier == StoryModifier.ResilientCells || modifier == StoryModifier.TerritoryCells))
+            {
+                return;
+            }
+
+            var board = manager.Board;
+            if (board.GetTerritorySourceCells().Count == 0)
+            {
+                board.SeedTerritorySource();
+            }
+
+            SeedClaimableNeighbor(board);
+            InvokePrivate(board, "RebuildLockedPiecesFromGrid");
+            InvokePrivate(manager, "RebuildBoardViews");
+            var ignoredScore = board.Score;
+            AssertReplayInvariants(manager, new ReplayScenario($"Story {chapter.Id} soak preconditions", MonStackaMode.Story, false, chapter.Id), "resilient claim setup", ref ignoredScore);
+        }
+
+        private static void AdvanceStoryModifierSoakTick(GameManager manager, StoryModifierSystem storyModifiers, ReplayScenario scenario, string checkpoint, ref int lastScore)
+        {
+            storyModifiers.Tick(1f);
+            UpdateStoryRuntimeViews(manager);
+            AssertReplayInvariants(manager, scenario, checkpoint, ref lastScore);
+        }
+
+        private static void AssertTimedStoryModifierEventsObserved(string name, StoryChapterSpec chapter, IReadOnlyList<StoryModifierTriggerEvent> events)
+        {
+            foreach (var modifier in chapter.Modifiers.Where(RequiresTimedSoakEvent))
+            {
+                Expect(
+                    events.Any(trigger => IsExpectedTimedSoakEvent(trigger, modifier)),
+                    $"{name}: timed soak should observe a runtime event for {modifier}. Events=[{string.Join(", ", events.Select(FormatModifierEvent))}]");
+            }
+        }
+
+        private static bool RequiresTimedSoakEvent(StoryModifier modifier) =>
+            modifier == StoryModifier.GuardPressure ||
+            modifier == StoryModifier.ResilientCells ||
+            modifier == StoryModifier.TerritoryCells ||
+            modifier == StoryModifier.GhostFlicker ||
+            modifier == StoryModifier.SedationWindows ||
+            modifier == StoryModifier.AdrenalineMonitor;
+
+        private static bool IsExpectedTimedSoakEvent(StoryModifierTriggerEvent trigger, StoryModifier modifier)
+        {
+            if (modifier == StoryModifier.ResilientCells || modifier == StoryModifier.TerritoryCells)
+            {
+                return trigger.Modifier == StoryModifier.ResilientCells && trigger.State == "CLAIM";
+            }
+
+            return trigger.Modifier == modifier && (trigger.State == "ACTIVE" || trigger.State == "END" || trigger.State == "CLEARED");
+        }
+
+        private static string FormatModifierEvent(StoryModifierTriggerEvent trigger) =>
+            $"{trigger.Modifier}:{trigger.State}:{trigger.Detail}";
 
         private static void RunReplayScenario(ReplayScenario scenario)
         {
