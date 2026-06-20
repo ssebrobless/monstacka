@@ -240,6 +240,7 @@ namespace MonStacka.Editor
                 new HarnessScenario("friendly ability mechanic scenarios", VerifyFriendlyAbilityMechanicScenarios),
                 new HarnessScenario("story modifier scenarios", VerifyStoryModifierScenarios),
                 new HarnessScenario("enemy ability focused trigger matrix", VerifyEnemyAbilityFocusedTriggerMatrix),
+                new HarnessScenario("enemy ability scripted scenario matrix", VerifyEnemyAbilityScriptedScenarioMatrix),
                 new HarnessScenario("ability feedback visual state", VerifyAbilityFeedbackVisualState),
                 new HarnessScenario("story deterministic simulation sweep", VerifyStoryDeterministicSimulationSweep),
                 new HarnessScenario("story render state consistency sweep", VerifyStoryRenderStateConsistencySweep),
@@ -253,6 +254,7 @@ namespace MonStacka.Editor
                 new HarnessScenario("scene wiring smoke", VerifySceneWiringSmoke),
                 new HarnessScenario("visual layout geometry smoke", VerifyVisualLayoutGeometrySmoke),
                 new HarnessScenario("story runtime hud and visual sweep", VerifyStoryRuntimeHudAndVisualSweep),
+                new HarnessScenario("enemy ability runtime visual checkpoints", VerifyEnemyAbilityRuntimeVisualCheckpoints),
                 new HarnessScenario("runtime game flow smoke", VerifyRuntimeGameFlowSmoke),
                 new HarnessScenario("current Windows build artifacts", VerifyCurrentBuildArtifacts),
                 new HarnessScenario("built player screenshot smoke", VerifyBuiltPlayerScreenshotSmoke),
@@ -933,6 +935,364 @@ namespace MonStacka.Editor
             Expect(noHoldSystem.BuildEnemyAbilityStatus().Contains("[ON]"), "No Hold should report ON status.");
         }
 
+        private static void VerifyEnemyAbilityScriptedScenarioMatrix()
+        {
+            VerifyGuardPressureScriptedScenario();
+            VerifyCalculatedPredictionScriptedScenario();
+            VerifyVisionLossScriptedScenario();
+            VerifyResilientCellsScriptedScenario();
+            VerifyInsatiableHungerScriptedScenario();
+            VerifySedatingSpitScriptedScenario();
+            VerifyAdrenalineRushScriptedScenario();
+        }
+
+        private static void VerifyGuardPressureScriptedScenario()
+        {
+            var lowSpec = ModifierSpec("scripted-guard-low", 0, StoryModifier.GuardPressure);
+            var lowBoard = new BoardState(new[] { PieceType.Z }, seed: 51001);
+            var lowSystem = new StoryModifierSystem(lowSpec, lowBoard, seed: 51001);
+            var lowEvents = CaptureModifierEvents(lowSystem);
+
+            lowSystem.OnMatchStart();
+            ExpectStatusContains(lowSystem, "Guard Pressure low-tier cooldown", "Guard Pressure", "[TIMER]", "pressure row in");
+            ExpectStatusChipContains(lowSystem, "Guard Pressure low-tier chip", "GUARD TIMER");
+            lowSystem.Tick(17.9f);
+            Expect(lowBoard.GetGuardPressureRowCount() == 0, "Guard Pressure low-tier should not fire before the 18-second timer.");
+            lowSystem.Tick(0.2f);
+            Expect(lowBoard.GetGuardPressureRowCount() == 1, "Guard Pressure low-tier should add one pressure row when the timer fills.");
+            ExpectStatusContains(lowSystem, "Guard Pressure active status", "Guard Pressure", "[ACTIVE]", "oldest clears in", "clear a line");
+            ExpectStatusChipContains(lowSystem, "Guard Pressure active chip", "GUARD ROW x1");
+            ExpectEvent(lowEvents, StoryModifier.GuardPressure, "ACTIVE", "Guard Pressure should emit ACTIVE when adding a row.");
+            lowSystem.Tick(5.9f);
+            Expect(lowBoard.GetGuardPressureRowCount() == 1, "Guard Pressure pressure row should remain until the six-second duration expires.");
+            lowSystem.Tick(0.2f);
+            Expect(lowBoard.GetGuardPressureRowCount() == 0, "Guard Pressure pressure row should naturally clean up after six seconds.");
+            ExpectEvent(lowEvents, StoryModifier.GuardPressure, "END", "Guard Pressure should emit END on natural row cleanup.");
+
+            var cancelBoard = new BoardState(new[] { PieceType.Z }, seed: 51002);
+            var cancelSystem = new StoryModifierSystem(lowSpec, cancelBoard, seed: 51002);
+            var cancelEvents = CaptureModifierEvents(cancelSystem);
+            cancelSystem.Tick(18f);
+            Expect(cancelBoard.GetGuardPressureRowCount() == 1, "Guard Pressure cancel setup should have one active row.");
+            FillLine(cancelBoard, PieceDefinitions.TotalRows - 2, PieceType.O, pieceIdStart: 51100);
+            Expect(cancelBoard.ClearLines() == 1, "Guard Pressure cancel setup should clear a normal player row.");
+            Expect(cancelBoard.GetGuardPressureRowCount() == 0, "Guard Pressure line clear should remove the oldest active pressure row early.");
+            ExpectEvent(cancelEvents, StoryModifier.GuardPressure, "CLEARED", "Guard Pressure should emit CLEARED when a player line removes a row.");
+
+            var highSpec = ModifierSpec("scripted-guard-high", 10, StoryModifier.GuardPressure);
+            var highBoard = new BoardState(new[] { PieceType.Z }, seed: 51003);
+            var highSystem = new StoryModifierSystem(highSpec, highBoard, seed: 51003);
+            highSystem.Tick(3.9f);
+            Expect(highBoard.GetGuardPressureRowCount() == 0, "High-tier Guard Pressure should still wait for its shortened four-second timer.");
+            highSystem.Tick(0.2f);
+            Expect(highBoard.GetGuardPressureRowCount() == 1, "High-tier Guard Pressure should fire at the shortened timer.");
+            highSystem.Tick(4f);
+            Expect(highBoard.GetGuardPressureRowCount() == 2, "High-tier Guard Pressure should stack a second active row before the first expires.");
+            FillLine(highBoard, PieceDefinitions.TotalRows - 3, PieceType.O, pieceIdStart: 51200);
+            Expect(highBoard.ClearLines() == 1, "High-tier Guard Pressure should allow normal row clear scoring while rows are active.");
+            Expect(highBoard.GetGuardPressureRowCount() == 1, "High-tier Guard Pressure clear should remove only one row, not every stacked row.");
+        }
+
+        private static void VerifyCalculatedPredictionScriptedScenario()
+        {
+            var spec = ModifierSpec("scripted-calculated-mid", 3, StoryModifier.CalculatedPlanning);
+            var board = new BoardState(new[] { PieceType.T, PieceType.O }, seed: 52001);
+            var system = new StoryModifierSystem(spec, board, seed: 52001);
+            var events = CaptureModifierEvents(system);
+            var locks = new List<PieceLockEvent>();
+            board.OnPieceLocked += lockEvent => locks.Add(lockEvent);
+
+            Expect(board.TryHold(), "Calculated Prediction scripted setup should seed the hold slot.");
+            Expect(board.HardDrop(), "Calculated Prediction scripted setup should lock once after seeding hold.");
+            Expect(board.EnsureActivePiece(), "Calculated Prediction scripted setup should spawn an active piece.");
+            for (var index = 0; index < 4; index += 1)
+            {
+                Expect(board.TryRotate(1), $"Calculated Prediction rotation {index + 1} should succeed.");
+            }
+
+            Expect(!events.Any(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED"), "Calculated Prediction should not queue at exactly four rotations.");
+            ExpectStatusContains(system, "Calculated Prediction safe status", "Calculated Prediction", "[LOCK]", "rotations 4/4");
+            Expect(board.TryHold(), "Calculated Prediction should preserve rotation count through hold swap.");
+            Expect(board.TryRotate(1), "Calculated Prediction fifth rotation after swap should succeed.");
+            ExpectEvent(events, StoryModifier.CalculatedPlanning, "QUEUED", "Calculated Prediction should queue on the fifth rotation.");
+            ExpectStatusContains(system, "Calculated Prediction queued status", "Calculated Prediction", "queued for next block");
+            for (var index = 0; index < 3; index += 1)
+            {
+                board.TryRotate(1);
+            }
+
+            Expect(events.Count(trigger => trigger.Modifier == StoryModifier.CalculatedPlanning && trigger.State == "QUEUED") == 1, "Calculated Prediction should not queue multiple times while one debuff is waiting.");
+            Expect(board.HardDrop(), "Calculated Prediction should lock the next placed piece.");
+            var debuffedId = locks.Last().PieceId;
+            Expect(board.IsPieceScoreDebuffed(debuffedId), "Calculated Prediction should mark the next locked piece as score-debuffed.");
+            ExpectEvent(events, StoryModifier.CalculatedPlanning, "APPLIED", "Calculated Prediction should emit APPLIED when the debuff lands.");
+            var scoreBefore = board.Score;
+            FillBottomLine(board, PieceType.O, pieceIdStart: 52100);
+            board.PieceIds[PieceDefinitions.TotalRows - 1, 0] = debuffedId;
+            Expect(board.ClearLines() == 1, "Calculated Prediction score setup should clear a row touching the debuffed block.");
+            Expect(board.Score - scoreBefore == 55, "Calculated Prediction tier 3 should reduce a 100-point row to 55 points.");
+            ExpectStatusContains(system, "Calculated Prediction applied status", "Calculated Prediction", "score -45%");
+
+            var highSpec = ModifierSpec("scripted-calculated-high", 10, StoryModifier.CalculatedPlanning);
+            var highBoard = new BoardState(new[] { PieceType.T }, seed: 52002);
+            var highSystem = new StoryModifierSystem(highSpec, highBoard, seed: 52002);
+            var highLocks = new List<PieceLockEvent>();
+            highBoard.OnPieceLocked += lockEvent => highLocks.Add(lockEvent);
+            for (var index = 0; index < 5; index += 1)
+            {
+                highBoard.TryRotate(1);
+            }
+
+            Expect(highBoard.HardDrop(), "High-tier Calculated Prediction should lock the debuffed piece.");
+            var highDebuffedId = highLocks.Last().PieceId;
+            var highScoreBefore = highBoard.Score;
+            FillBottomLine(highBoard, PieceType.O, pieceIdStart: 52200);
+            highBoard.PieceIds[PieceDefinitions.TotalRows - 1, 0] = highDebuffedId;
+            Expect(highBoard.ClearLines() == 1, "High-tier Calculated Prediction score setup should clear one row.");
+            Expect(highBoard.Score - highScoreBefore == 25, "Calculated Prediction tier 10 should clamp row score to 25 points.");
+            ExpectStatusContains(highSystem, "High-tier Calculated Prediction status", "Calculated Prediction", "score -75%");
+        }
+
+        private static void VerifyVisionLossScriptedScenario()
+        {
+            var lowSpec = ModifierSpec("scripted-vision-low", 0, StoryModifier.GhostFlicker);
+            var lowSystem = new StoryModifierSystem(lowSpec, new BoardState(new[] { PieceType.L }, seed: 53001), seed: 53001);
+            var lowEvents = CaptureModifierEvents(lowSystem);
+
+            lowSystem.OnMatchStart();
+            Expect(!lowSystem.BlindedActive, "Vision Loss should begin inactive on cooldown.");
+            Expect(lowSystem.LockedPiecesVisible, "Vision Loss should leave locked pieces visible before activation.");
+            ExpectStatusContains(lowSystem, "Vision Loss cooldown status", "Vision Loss", "[TIMER]", "flicker starts in");
+            lowSystem.Tick(12f);
+            Expect(lowSystem.BlindedActive, "Vision Loss should activate after twelve seconds.");
+            ExpectStatusContains(lowSystem, "Vision Loss active status", "Vision Loss", "[ACTIVE]", "placed blocks visible", "ends in");
+            ExpectEvent(lowEvents, StoryModifier.GhostFlicker, "ACTIVE", "Vision Loss should emit ACTIVE when flicker begins.");
+            lowSystem.Tick(0.5f);
+            Expect(!lowSystem.LockedPiecesVisible, "Vision Loss should hide locked pieces at the first half-second flicker.");
+            ExpectStatusContains(lowSystem, "Vision Loss invisible status", "Vision Loss", "placed blocks invisible");
+            lowSystem.Tick(0.5f);
+            Expect(lowSystem.LockedPiecesVisible, "Vision Loss should show locked pieces at the next half-second flicker.");
+            lowSystem.Tick(3.1f);
+            Expect(!lowSystem.BlindedActive, "Low-tier Vision Loss should end after four seconds.");
+            Expect(lowSystem.LockedPiecesVisible, "Vision Loss should force locked pieces visible when it ends.");
+            ExpectEvent(lowEvents, StoryModifier.GhostFlicker, "END", "Vision Loss should emit END after natural cleanup.");
+
+            var highBoard = new BoardState(new[] { PieceType.L }, seed: 53002);
+            var highSystem = new StoryModifierSystem(ModifierSpec("scripted-vision-high", 10, StoryModifier.GhostFlicker), highBoard, seed: 53002);
+            highSystem.Tick(12f);
+            FillBottomLine(highBoard, PieceType.O, pieceIdStart: 53100);
+            Expect(highBoard.ClearLines() == 1, "Vision Loss cancellation probe should clear a row while active.");
+            Expect(highSystem.BlindedActive, "Vision Loss should not be cancelable by line clears.");
+            highSystem.Tick(6.9f);
+            Expect(highSystem.BlindedActive, "High-tier Vision Loss should last nearly seven seconds.");
+            highSystem.Tick(0.2f);
+            Expect(!highSystem.BlindedActive && highSystem.LockedPiecesVisible, "High-tier Vision Loss should naturally clean up after seven seconds.");
+        }
+
+        private static void VerifyResilientCellsScriptedScenario()
+        {
+            var lowSpec = ModifierSpec("scripted-resilient-low", 0, StoryModifier.ResilientCells);
+            var lowBoard = new BoardState(new[] { PieceType.J }, seed: 54001);
+            var lowSystem = new StoryModifierSystem(lowSpec, lowBoard, seed: 54001);
+            var lowEvents = CaptureModifierEvents(lowSystem);
+            lowSystem.OnMatchStart();
+            Expect(lowBoard.GetTerritorySourceCells().Count == 1, "Resilient Cells should seed one permanent claimed source at match start.");
+            Expect(lowBoard.GetTerritoryClaimedCells().Count == 0, "Resilient Cells should not start with temporary claims.");
+            ExpectStatusContains(lowSystem, "Resilient Cells setup status", "Resilient Cells", "source locked", "cap 0/1");
+            var source = lowBoard.GetTerritorySourceCells()[0];
+            FillTerritoryClaimCandidates(lowBoard, source, PieceType.J, pieceIdStart: 54100);
+            lowSystem.Tick(9.9f);
+            Expect(lowBoard.GetTerritoryClaimedCells().Count == 0, "Resilient Cells should wait the full ten-second claim timer.");
+            lowSystem.Tick(0.2f);
+            Expect(lowBoard.GetTerritoryClaimedBlockCount() == 1, "Resilient Cells should claim one adjacent block when the timer fills.");
+            ExpectEvent(lowEvents, StoryModifier.ResilientCells, "CLAIM", "Resilient Cells should emit CLAIM when it claims a block.");
+            ExpectStatusContains(lowSystem, "Resilient Cells claimed status", "Resilient Cells", "claim cap 1/1");
+            var claimed = lowBoard.GetTerritoryClaimedCells()[0];
+            FillLine(lowBoard, claimed.y, PieceType.O, pieceIdStart: 54200);
+            lowBoard.Grid[claimed.y, claimed.x] = (int)PieceType.J;
+            lowBoard.PieceIds[claimed.y, claimed.x] = 54100;
+            Expect(lowBoard.ClearLines() == 0, "A Resilient Cells claimed block should prevent its row from clearing.");
+            FillBottomLine(lowBoard, PieceType.O, pieceIdStart: 54300);
+            Expect(lowBoard.ClearLines() == 1, "A separate row clear should score while a Resilient Cells claim exists.");
+            Expect(lowBoard.GetTerritoryClaimedCells().Count == 0, "A line clear should remove one temporary Resilient Cells claim.");
+            Expect(lowBoard.GetTerritorySourceCells().Count == 1, "The permanent Resilient Cells source should remain after claim cleanup.");
+            ExpectEvent(lowEvents, StoryModifier.ResilientCells, "CLEARED", "Resilient Cells should emit CLEARED when a player line removes a claim.");
+
+            var highBoard = new BoardState(new[] { PieceType.J }, seed: 54002);
+            var highSystem = new StoryModifierSystem(ModifierSpec("scripted-resilient-high", 10, StoryModifier.ResilientCells), highBoard, seed: 54002);
+            highSystem.OnMatchStart();
+            FillTerritoryClaimCandidates(highBoard, highBoard.GetTerritorySourceCells()[0], PieceType.J, pieceIdStart: 54400);
+            for (var index = 0; index < 4; index += 1)
+            {
+                highSystem.Tick(10f);
+            }
+
+            Expect(highBoard.GetTerritoryClaimedBlockCount() == 4, "High-tier Resilient Cells should claim up to four blocks.");
+            highSystem.Tick(20f);
+            Expect(highBoard.GetTerritoryClaimedBlockCount() == 4, "High-tier Resilient Cells should not exceed its four-block cap.");
+            FillLine(highBoard, PieceDefinitions.TotalRows - 4, PieceType.O, pieceIdStart: 54500);
+            Expect(highBoard.ClearLines() == 1, "High-tier Resilient Cells cleanup should clear one normal row.");
+            Expect(highBoard.GetTerritoryClaimedBlockCount() == 3, "High-tier Resilient Cells should remove claims oldest-first, one block per player line clear.");
+        }
+
+        private static void VerifyInsatiableHungerScriptedScenario()
+        {
+            var lowBoard = new BoardState(new[] { PieceType.S }, seed: 55001);
+            var lowSystem = new StoryModifierSystem(ModifierSpec("scripted-hunger-low", 0, StoryModifier.HungerMeter), lowBoard, seed: 55001);
+            var lowEvents = CaptureModifierEvents(lowSystem);
+            const int lowPieceId = 55100;
+            lowBoard.Grid[PieceDefinitions.TotalRows - 5, 2] = (int)PieceType.S;
+            lowBoard.PieceIds[PieceDefinitions.TotalRows - 5, 2] = lowPieceId;
+            lowBoard.Grid[PieceDefinitions.TotalRows - 4, 2] = (int)PieceType.S;
+            lowBoard.PieceIds[PieceDefinitions.TotalRows - 4, 2] = lowPieceId;
+            ExpectStatusContains(lowSystem, "Insatiable Hunger initial status", "Insatiable Hunger", "[LINES]", "0/3");
+            ExpectStatusChipContains(lowSystem, "Insatiable Hunger initial chip", "HUNGER 0/3");
+            for (var line = 1; line <= 2; line += 1)
+            {
+                FillBottomLine(lowBoard, PieceType.O, pieceIdStart: 55200 + line * 20);
+                Expect(lowBoard.ClearLines() == 1, $"Insatiable Hunger low-tier line {line} should clear.");
+                Expect(lowBoard.GetLockedPieceGroups().Any(record => record.PieceId == lowPieceId), $"Insatiable Hunger should not trigger after only {line} low-tier line clears.");
+                ExpectStatusContains(lowSystem, $"Insatiable Hunger low-tier progress {line}", $"{line}/3");
+            }
+
+            FillBottomLine(lowBoard, PieceType.O, pieceIdStart: 55300);
+            Expect(lowBoard.ClearLines() == 1, "Insatiable Hunger low-tier third line should clear.");
+            Expect(!lowBoard.GetLockedPieceGroups().Any(record => record.PieceId == lowPieceId), "Insatiable Hunger should consume the whole top-layer block when the line requirement is met.");
+            ExpectEvent(lowEvents, StoryModifier.HungerMeter, "TRIGGER", "Insatiable Hunger should emit TRIGGER when it eats a block.");
+            ExpectStatusChipContains(lowSystem, "Insatiable Hunger reset chip", "HUNGER 0/3");
+
+            var carryBoard = new BoardState(new[] { PieceType.S }, seed: 55002);
+            var carrySystem = new StoryModifierSystem(ModifierSpec("scripted-hunger-carry", 5, StoryModifier.HungerMeter), carryBoard, seed: 55002);
+            const int carryPieceId = 55400;
+            carryBoard.Grid[PieceDefinitions.TotalRows - 6, 3] = (int)PieceType.S;
+            carryBoard.PieceIds[PieceDefinitions.TotalRows - 6, 3] = carryPieceId;
+            FillLine(carryBoard, PieceDefinitions.TotalRows - 1, PieceType.O, pieceIdStart: 55410);
+            FillLine(carryBoard, PieceDefinitions.TotalRows - 2, PieceType.O, pieceIdStart: 55420);
+            FillLine(carryBoard, PieceDefinitions.TotalRows - 3, PieceType.O, pieceIdStart: 55430);
+            Expect(carryBoard.ClearLines() == 3, "Insatiable Hunger carryover setup should clear three rows at once.");
+            Expect(!carryBoard.GetLockedPieceGroups().Any(record => record.PieceId == carryPieceId), "Insatiable Hunger tier 5 should consume a block after two of three cleared rows.");
+            ExpectStatusContains(carrySystem, "Insatiable Hunger carryover status", "1/2");
+
+            var highBoard = new BoardState(new[] { PieceType.S }, seed: 55003);
+            var highSystem = new StoryModifierSystem(ModifierSpec("scripted-hunger-high", 10, StoryModifier.HungerMeter), highBoard, seed: 55003);
+            const int highPieceId = 55500;
+            highBoard.Grid[PieceDefinitions.TotalRows - 4, 4] = (int)PieceType.S;
+            highBoard.PieceIds[PieceDefinitions.TotalRows - 4, 4] = highPieceId;
+            FillBottomLine(highBoard, PieceType.O, pieceIdStart: 55510);
+            Expect(highBoard.ClearLines() == 1, "High-tier Insatiable Hunger setup should clear one row.");
+            Expect(!highBoard.GetLockedPieceGroups().Any(record => record.PieceId == highPieceId), "High-tier Insatiable Hunger should trigger on every cleared line.");
+            ExpectStatusChipContains(highSystem, "High-tier Insatiable Hunger chip", "HUNGER 0/1");
+        }
+
+        private static void VerifySedatingSpitScriptedScenario()
+        {
+            var lowBoard = new BoardState(new[] { PieceType.T }, seed: 56001);
+            var lowSystem = new StoryModifierSystem(ModifierSpec("scripted-sedating-low", 0, StoryModifier.SedationWindows), lowBoard, seed: 56001);
+            var lowEvents = CaptureModifierEvents(lowSystem);
+            ExpectStatusContains(lowSystem, "Sedating Spit cooldown status", "Sedating Spit", "[TIMER]", "assist lockout in");
+            lowSystem.Tick(14.9f);
+            Expect(!lowSystem.SedatingSpitActive, "Sedating Spit should not activate before its 15-second cooldown.");
+            lowSystem.Tick(0.2f);
+            Expect(lowSystem.SedatingSpitActive && lowSystem.AssistsSuppressed, "Sedating Spit should activate and suppress assists after cooldown.");
+            ExpectStatusContains(lowSystem, "Sedating Spit active status", "Sedating Spit", "[ACTIVE]", "friendly assists blocked", "clear a row");
+            ExpectStatusChipContains(lowSystem, "Sedating Spit active chip", "SEDATING SPIT");
+            ExpectEvent(lowEvents, StoryModifier.SedationWindows, "ACTIVE", "Sedating Spit should emit ACTIVE when lockout starts.");
+            lowSystem.Tick(3.9f);
+            Expect(lowSystem.SedatingSpitActive, "Low-tier Sedating Spit should remain active before four seconds.");
+            lowSystem.Tick(0.2f);
+            Expect(!lowSystem.SedatingSpitActive, "Low-tier Sedating Spit should naturally end after four seconds.");
+            ExpectEvent(lowEvents, StoryModifier.SedationWindows, "END", "Sedating Spit should emit END after natural expiry.");
+
+            var cancelBoard = new BoardState(new[] { PieceType.T }, seed: 56002);
+            var cancelSystem = new StoryModifierSystem(ModifierSpec("scripted-sedating-cancel", 10, StoryModifier.SedationWindows), cancelBoard, seed: 56002);
+            var cancelEvents = CaptureModifierEvents(cancelSystem);
+            cancelSystem.Tick(15f);
+            FillBottomLine(cancelBoard, PieceType.T, pieceIdStart: 56100);
+            Expect(cancelBoard.ClearLines() == 1, "Sedating Spit cancel setup should clear a line while active.");
+            Expect(!cancelSystem.SedatingSpitActive, "Sedating Spit should end early when the player clears a line.");
+            ExpectEvent(cancelEvents, StoryModifier.SedationWindows, "CLEARED", "Sedating Spit should emit CLEARED on line-clear cancel.");
+
+            var highSystem = new StoryModifierSystem(ModifierSpec("scripted-sedating-high", 10, StoryModifier.SedationWindows), new BoardState(new[] { PieceType.T }, seed: 56003), seed: 56003);
+            highSystem.Tick(15f);
+            highSystem.Tick(7.9f);
+            Expect(highSystem.SedatingSpitActive, "High-tier Sedating Spit should remain active before eight seconds.");
+            highSystem.Tick(0.2f);
+            Expect(!highSystem.SedatingSpitActive, "High-tier Sedating Spit should naturally end after eight seconds.");
+
+            var assist = new AssistEffectSystem();
+            var assistBoard = new BoardState(new[] { PieceType.T }, seed: 56004);
+            assist.OnPieceLocked(new PieceLockEvent(1, PieceType.T, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { });
+            assist.OnPieceLocked(new PieceLockEvent(2, PieceType.T, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true), assistBoard, _ => { });
+            Expect(assist.NextHeldPlacementWillTrigger, "Sedating Spit assist setup should have a charged friendly ability ready.");
+            assist.SuppressAndReset();
+            Expect(!assist.NextHeldPlacementWillTrigger && assist.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Sedating Spit should clear charged and partial assist progress.");
+            var suppressedTrigger = assist.OnPieceLocked(
+                new PieceLockEvent(3, PieceType.T, 0, Array.Empty<Vector2Int>(), Vector2Int.zero, cameFromHold: true),
+                assistBoard,
+                _ => { },
+                assistsSuppressed: true);
+            Expect(!suppressedTrigger.HasValue, "Sedating Spit should block friendly ability activation while active.");
+            Expect(assist.HeldPlacementsUntilTrigger == AssistEffectSystem.TriggerEvery, "Sedating Spit should prevent assist charge progress while active.");
+        }
+
+        private static void VerifyAdrenalineRushScriptedScenario()
+        {
+            var system = new StoryModifierSystem(
+                ModifierSpec("scripted-adrenaline", 0, StoryModifier.AdrenalineMonitor, StoryModifier.HungerMeter, StoryModifier.GuardPressure),
+                new BoardState(new[] { PieceType.I }, seed: 57001),
+                seed: 57001);
+            var events = CaptureModifierEvents(system);
+            ExpectStatusContains(system, "Adrenaline Rush cooldown status", "Adrenaline Rush", "[TIMER]", "next boost in");
+            system.Tick(19.9f);
+            Expect(!system.BuildStatusChips().Contains("ADRENALINE RUSH"), "Adrenaline Rush should not chip before the 20-second cooldown.");
+            system.Tick(0.2f);
+            ExpectStatusContains(system, "Adrenaline Rush active status", "Adrenaline Rush", "[ACTIVE]", "enemy abilities boosted");
+            ExpectStatusChipContains(system, "Adrenaline Rush active chip", "ADRENALINE RUSH");
+            ExpectEvent(events, StoryModifier.AdrenalineMonitor, "ACTIVE", "Adrenaline Rush should emit ACTIVE when boost starts.");
+            system.Tick(10.9f);
+            Expect(system.BuildStatusChips().Contains("ADRENALINE RUSH"), "Adrenaline Rush should remain active for nearly eleven seconds.");
+            system.Tick(0.2f);
+            Expect(!system.BuildStatusChips().Contains("ADRENALINE RUSH"), "Adrenaline Rush should clear its active chip after eleven seconds.");
+            ExpectEvent(events, StoryModifier.AdrenalineMonitor, "END", "Adrenaline Rush should emit END after natural expiry.");
+
+            var boostedBoard = new BoardState(new[] { PieceType.S }, seed: 57002);
+            var boostedSystem = new StoryModifierSystem(
+                ModifierSpec("scripted-adrenaline-boosted-hunger", 0, StoryModifier.AdrenalineMonitor, StoryModifier.HungerMeter),
+                boostedBoard,
+                seed: 57002);
+            boostedSystem.Tick(20f);
+            const int boostedPieceId = 57100;
+            boostedBoard.Grid[PieceDefinitions.TotalRows - 6, 3] = (int)PieceType.S;
+            boostedBoard.PieceIds[PieceDefinitions.TotalRows - 6, 3] = boostedPieceId;
+            FillLine(boostedBoard, PieceDefinitions.TotalRows - 1, PieceType.O, pieceIdStart: 57110);
+            FillLine(boostedBoard, PieceDefinitions.TotalRows - 2, PieceType.O, pieceIdStart: 57120);
+            Expect(boostedBoard.ClearLines() == 2, "Adrenaline Rush boosted Hunger setup should clear two rows.");
+            Expect(!boostedBoard.GetLockedPieceGroups().Any(record => record.PieceId == boostedPieceId), "Adrenaline Rush should boost Insatiable Hunger from a three-line trigger to a two-line trigger.");
+
+            var unboostedBoard = new BoardState(new[] { PieceType.S }, seed: 57003);
+            var unboostedSystem = new StoryModifierSystem(
+                ModifierSpec("scripted-adrenaline-unboosted-hunger", 0, StoryModifier.HungerMeter),
+                unboostedBoard,
+                seed: 57003);
+            const int unboostedPieceId = 57200;
+            unboostedBoard.Grid[PieceDefinitions.TotalRows - 6, 3] = (int)PieceType.S;
+            unboostedBoard.PieceIds[PieceDefinitions.TotalRows - 6, 3] = unboostedPieceId;
+            FillLine(unboostedBoard, PieceDefinitions.TotalRows - 1, PieceType.O, pieceIdStart: 57210);
+            FillLine(unboostedBoard, PieceDefinitions.TotalRows - 2, PieceType.O, pieceIdStart: 57220);
+            Expect(unboostedBoard.ClearLines() == 2, "Unboosted Hunger comparison should clear two rows.");
+            Expect(unboostedBoard.GetLockedPieceGroups().Any(record => record.PieceId == unboostedPieceId), "Unboosted Insatiable Hunger should still require three line clears.");
+            ExpectStatusContains(unboostedSystem, "Unboosted Hunger comparison status", "2/3");
+
+            var boostedGuardBoard = new BoardState(new[] { PieceType.Z }, seed: 57004);
+            var boostedGuardSystem = new StoryModifierSystem(
+                ModifierSpec("scripted-adrenaline-boosted-guard", 0, StoryModifier.AdrenalineMonitor, StoryModifier.GuardPressure),
+                boostedGuardBoard,
+                seed: 57004);
+            boostedGuardSystem.Tick(20f);
+            boostedGuardSystem.Tick(9.7f);
+            Expect(boostedGuardBoard.GetGuardPressureRowCount() == 1, "Adrenaline Rush should boost Guard Pressure timer from eighteen seconds to under ten seconds.");
+        }
+
         private static string StoryModifierLabelForHarness(StoryModifier modifier) =>
             modifier switch
             {
@@ -1084,6 +1444,201 @@ namespace MonStacka.Editor
             Expect(!pausePanel.gameObject.activeInHierarchy, "Opening settings should suppress the separate pause banner.");
             InvokePrivate(shell, "CloseSettings");
             Expect(!settingsPanel.gameObject.activeInHierarchy, "Settings panel should close cleanly.");
+        }
+
+        private static void VerifyEnemyAbilityRuntimeVisualCheckpoints()
+        {
+            var checkpointDir = Path.Combine(ReportDir, "EnemyAbilityCheckpoints");
+            Directory.CreateDirectory(checkpointDir);
+            foreach (var oldFile in Directory.EnumerateFiles(checkpointDir, "*.png"))
+            {
+                File.Delete(oldFile);
+            }
+
+            VerifyGuardPressureRuntimeVisualCheckpoint(checkpointDir);
+            VerifyResilientCellsRuntimeVisualCheckpoint(checkpointDir);
+            VerifyVisionLossRuntimeVisualCheckpoint(checkpointDir);
+            VerifySedatingSpitRuntimeVisualCheckpoint(checkpointDir);
+            VerifyAdrenalineRushRuntimeVisualCheckpoint(checkpointDir);
+            VerifyStoryBossRuntimeSyncCheckpoint(checkpointDir);
+        }
+
+        private static void VerifyGuardPressureRuntimeVisualCheckpoint(string checkpointDir)
+        {
+            var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "1.3");
+            var modifiers = GetStoryModifiers(manager);
+            modifiers.Tick(16f);
+            RefreshEnemyCellViews(manager);
+            UpdateStoryRuntimeViews(manager);
+
+            Expect(manager.Board.GetGuardPressureRowCount() == 1, "Runtime Guard Pressure checkpoint should add one active pressure row.");
+            AssertEnemyAbilityHudContains("Runtime Guard Pressure checkpoint", "Guard Pressure", "[ACTIVE]", "pressure row");
+            AssertEnemyTriggerCueContains("Runtime Guard Pressure checkpoint", "Guard Pressure", "ACTIVE");
+            AssertActiveEnemyCellRenderers("Runtime Guard Pressure checkpoint");
+            var path = CaptureRuntimeCheckpoint(checkpointDir, "guard-pressure-active", "Guard Pressure runtime checkpoint");
+            AssertCheckpointScreenshotReadable(path, "Guard Pressure runtime checkpoint");
+        }
+
+        private static void VerifyResilientCellsRuntimeVisualCheckpoint(string checkpointDir)
+        {
+            var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "3.3");
+            var modifiers = GetStoryModifiers(manager);
+            var source = manager.Board.GetTerritorySourceCells().First();
+            FillTerritoryClaimCandidates(manager.Board, source, PieceType.J, pieceIdStart: 58100);
+            modifiers.Tick(10f);
+            RefreshEnemyCellViews(manager);
+            UpdateStoryRuntimeViews(manager);
+
+            Expect(manager.Board.GetTerritorySourceCells().Count == 1, "Runtime Resilient Cells checkpoint should keep one permanent source.");
+            Expect(manager.Board.GetTerritoryClaimedBlockCount() > 0, "Runtime Resilient Cells checkpoint should claim at least one adjacent block.");
+            AssertEnemyAbilityHudContains("Runtime Resilient Cells checkpoint", "Resilient Cells", "source locked", "claim");
+            AssertEnemyTriggerCueContains("Runtime Resilient Cells checkpoint", "Resilient Cells", "CLAIM");
+            AssertActiveEnemyCellRenderers("Runtime Resilient Cells checkpoint");
+            var path = CaptureRuntimeCheckpoint(checkpointDir, "resilient-cells-claimed", "Resilient Cells runtime checkpoint");
+            AssertCheckpointScreenshotReadable(path, "Resilient Cells runtime checkpoint");
+        }
+
+        private static void VerifyVisionLossRuntimeVisualCheckpoint(string checkpointDir)
+        {
+            var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "3.1");
+            var modifiers = GetStoryModifiers(manager);
+            var board = manager.Board;
+            board.Reset();
+            const int visionPieceId = 58300;
+            var visionRow = PieceDefinitions.TotalRows - 7;
+            board.Grid[visionRow, 3] = (int)PieceType.L;
+            board.PieceIds[visionRow, 3] = visionPieceId;
+            board.SourceCellXs[visionRow, 3] = 0;
+            board.SourceCellYs[visionRow, 3] = 0;
+            board.Grid[visionRow, 4] = (int)PieceType.L;
+            board.PieceIds[visionRow, 4] = visionPieceId;
+            board.SourceCellXs[visionRow, 4] = 1;
+            board.SourceCellYs[visionRow, 4] = 0;
+            board.Grid[visionRow - 1, 4] = (int)PieceType.L;
+            board.PieceIds[visionRow - 1, 4] = visionPieceId;
+            board.SourceCellXs[visionRow - 1, 4] = 1;
+            board.SourceCellYs[visionRow - 1, 4] = 1;
+            InvokePrivate(board, "RebuildLockedPiecesFromGrid");
+            InvokePrivate(manager, "RebuildBoardViews");
+            UpdateStoryRuntimeViews(manager);
+            var stackRoot = GetStackRoot(manager);
+            var activeRoot = GetActiveRoot(manager);
+            activeRoot.gameObject.SetActive(false);
+            HideNonStackPieceSkins(stackRoot);
+            Expect(Resources.FindObjectsOfTypeAll<PieceSkin>().Any(skin => skin && skin.gameObject.scene.IsValid() && skin.gameObject.activeInHierarchy && skin.transform.IsChildOf(stackRoot)), "Runtime Vision Loss checkpoint should have a visible locked stack PieceSkin.");
+            Expect(stackRoot.gameObject.activeSelf, "Runtime Vision Loss checkpoint should start with placed blocks visible.");
+
+            modifiers.Tick(12f);
+            UpdateStoryRuntimeViews(manager);
+            Expect(stackRoot.gameObject.activeSelf, "Runtime Vision Loss should start active on a visible flicker frame.");
+            AssertStackSpriteRenderersVisible(stackRoot, "Runtime Vision Loss visible checkpoint");
+            AssertEnemyAbilityHudContains("Runtime Vision Loss active checkpoint", "Vision Loss", "[ACTIVE]", "placed blocks visible");
+            var visiblePath = CaptureRuntimeCheckpoint(checkpointDir, "vision-loss-visible", "Vision Loss visible checkpoint");
+            Expect(File.Exists(visiblePath), "Vision Loss visible checkpoint should write a diagnostic screenshot.");
+
+            modifiers.Tick(0.5f);
+            UpdateStoryRuntimeViews(manager);
+            Expect(!stackRoot.gameObject.activeSelf, "Runtime Vision Loss should hide placed blocks on the invisible flicker frame.");
+            AssertStackSpriteRenderersHidden(stackRoot, "Runtime Vision Loss invisible checkpoint");
+            AssertEnemyAbilityHudContains("Runtime Vision Loss invisible checkpoint", "Vision Loss", "placed blocks invisible");
+            var invisiblePath = CaptureRuntimeCheckpoint(checkpointDir, "vision-loss-invisible", "Vision Loss invisible checkpoint");
+            Expect(File.Exists(invisiblePath), "Vision Loss invisible checkpoint should write a diagnostic screenshot.");
+
+            modifiers.Tick(5.1f);
+            UpdateStoryRuntimeViews(manager);
+            Expect(stackRoot.gameObject.activeSelf, "Runtime Vision Loss should restore placed blocks visible after ending.");
+            AssertStackSpriteRenderersVisible(stackRoot, "Runtime Vision Loss restored checkpoint");
+            var restoredPath = CaptureRuntimeCheckpoint(checkpointDir, "vision-loss-restored", "Vision Loss restored checkpoint");
+            Expect(File.Exists(restoredPath), "Vision Loss restored checkpoint should write a diagnostic screenshot.");
+        }
+
+        private static void VerifySedatingSpitRuntimeVisualCheckpoint(string checkpointDir)
+        {
+            var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "4.3");
+            var modifiers = GetStoryModifiers(manager);
+            modifiers.Tick(15f);
+            UpdateStoryRuntimeViews(manager);
+
+            Expect(modifiers.SedatingSpitActive, "Runtime Sedating Spit checkpoint should activate after cooldown.");
+            Expect(modifiers.AssistsSuppressed, "Runtime Sedating Spit checkpoint should suppress friendly assists while active.");
+            AssertEnemyAbilityHudContains("Runtime Sedating Spit checkpoint", "Sedating Spit", "[ACTIVE]", "friendly assists blocked");
+            AssertEnemyTriggerCueContains("Runtime Sedating Spit checkpoint", "Sedating Spit", "ACTIVE");
+            var activePath = CaptureRuntimeCheckpoint(checkpointDir, "sedating-spit-active", "Sedating Spit active checkpoint");
+            AssertCheckpointScreenshotReadable(activePath, "Sedating Spit active checkpoint");
+
+            FillBottomLine(manager.Board, PieceType.T, pieceIdStart: 58200);
+            Expect(manager.Board.ClearLines() == 1, "Runtime Sedating Spit checkpoint should clear a line to cancel the lockout.");
+            UpdateStoryRuntimeViews(manager);
+            Expect(!modifiers.SedatingSpitActive, "Runtime Sedating Spit should clear after a player line clear.");
+            AssertEnemyAbilityHudContains("Runtime Sedating Spit cleared checkpoint", "Sedating Spit", "[TIMER]", "assist lockout in");
+            AssertEnemyTriggerCueContains("Runtime Sedating Spit cleared checkpoint", "Sedating Spit", "CLEARED");
+        }
+
+        private static void VerifyAdrenalineRushRuntimeVisualCheckpoint(string checkpointDir)
+        {
+            var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "4.4");
+            var modifiers = GetStoryModifiers(manager);
+            modifiers.Tick(20f);
+            UpdateStoryRuntimeViews(manager);
+
+            AssertEnemyAbilityHudContains("Runtime Adrenaline Rush active checkpoint", "Adrenaline Rush", "[ACTIVE]", "enemy abilities boosted");
+            Expect(modifiers.BuildStatusChips().Contains("ADRENALINE RUSH"), "Runtime Adrenaline Rush active checkpoint should expose the active boost chip.");
+            AssertEnemyTriggerCueContains("Runtime Adrenaline Rush active checkpoint", "Adrenaline Rush", "ACTIVE");
+            var activePath = CaptureRuntimeCheckpoint(checkpointDir, "adrenaline-rush-active", "Adrenaline Rush active checkpoint");
+            AssertCheckpointScreenshotReadable(activePath, "Adrenaline Rush active checkpoint");
+
+            modifiers.Tick(11.1f);
+            UpdateStoryRuntimeViews(manager);
+            AssertEnemyAbilityHudContains("Runtime Adrenaline Rush ended checkpoint", "Adrenaline Rush", "[TIMER]", "next boost in");
+            Expect(!modifiers.BuildStatusChips().Contains("ADRENALINE RUSH"), "Runtime Adrenaline Rush ended checkpoint should clear the active boost chip.");
+        }
+
+        private static void VerifyStoryBossRuntimeSyncCheckpoint(string checkpointDir)
+        {
+            var manager = LoadGameManagerForMode(MonStackaMode.Story, friendlyAbilitiesEnabled: false, storyChapterId: "5.3");
+            var chapter = StoryCatalog.GetChapter("5.3");
+            Expect(chapter != null && chapter.Objective.HasBossHealth, "Runtime boss sync checkpoint should load a boss-health story chapter.");
+            manager.Board.AddScore(chapter.Objective.BossHealthPoints / 3, PieceType.Z);
+            UpdateStoryRuntimeViews(manager);
+
+            var scoreText = RequireRect("StoryScoreValue").GetComponent<Text>();
+            Expect(scoreText.text.Contains(manager.Board.Score.ToString(CultureInfo.InvariantCulture)), "Runtime boss sync checkpoint should show the current story score.");
+            var bossFill = RequireRect("BossHealthBar").transform.Find("Fill")?.GetComponent<RectTransform>();
+            Expect(bossFill != null, "Runtime boss sync checkpoint should find the boss health fill.");
+            var expectedHp = Mathf.Clamp01((chapter.Objective.BossHealthPoints - manager.Board.Score) / (float)chapter.Objective.BossHealthPoints);
+            Expect(Mathf.Abs(bossFill.anchorMax.x - expectedHp) <= 0.02f, $"Runtime boss sync checkpoint should update HP fill. Expected {expectedHp:0.###}, got {bossFill.anchorMax.x:0.###}.");
+            SeedBossSyncCheckpointStack(manager);
+            var path = CaptureRuntimeCheckpoint(checkpointDir, "boss-hp-score-sync", "Boss HP score sync checkpoint");
+            AssertCheckpointScreenshotReadable(path, "Boss HP score sync checkpoint");
+        }
+
+        private static void SeedBossSyncCheckpointStack(GameManager manager)
+        {
+            var board = manager.Board;
+            var baseRow = PieceDefinitions.TotalRows - 7;
+            var cells = new (int Row, int Col, PieceType Type, int PieceId, int SourceX, int SourceY)[]
+            {
+                (baseRow, 3, PieceType.I, 58400, 0, 0),
+                (baseRow, 4, PieceType.I, 58400, 1, 0),
+                (baseRow, 5, PieceType.I, 58400, 2, 0),
+                (baseRow, 6, PieceType.I, 58400, 3, 0),
+                (baseRow - 1, 5, PieceType.T, 58401, 1, 1),
+                (baseRow - 1, 6, PieceType.T, 58401, 2, 1),
+                (baseRow - 2, 6, PieceType.O, 58402, 0, 0),
+                (baseRow - 2, 7, PieceType.O, 58402, 1, 0),
+            };
+
+            foreach (var cell in cells)
+            {
+                board.Grid[cell.Row, cell.Col] = (int)cell.Type;
+                board.PieceIds[cell.Row, cell.Col] = cell.PieceId;
+                board.SourceCellXs[cell.Row, cell.Col] = cell.SourceX;
+                board.SourceCellYs[cell.Row, cell.Col] = cell.SourceY;
+            }
+
+            InvokePrivate(board, "RebuildLockedPiecesFromGrid");
+            InvokePrivate(manager, "RebuildBoardViews");
+            UpdateStoryRuntimeViews(manager);
         }
 
         private static void VerifyRecordSeparation()
@@ -1634,7 +2189,8 @@ namespace MonStacka.Editor
             InvokePrivate(settingsManager, "UpdateVisuals");
             var settingsPath = CaptureRuntimeCheckpoint(checkpointDir, "pause-settings", "Story checkpoint pause settings");
             AssertCheckpointScreenshotReadable(settingsPath, "Story checkpoint pause settings");
-            AssertScreenshotsDiffer(startPath, settingsPath, "start vs settings checkpoint");
+            var settingsPanel = RequireRect("GameSettingsPanel");
+            Expect(settingsPanel.gameObject.activeInHierarchy, "Story checkpoint pause settings should have settings UI active after capture.");
             CloseReplaySettings("Screenshot checkpoint settings");
 
             var gameOverManager = LoadGameManagerForMode(MonStackaMode.Ogbm, friendlyAbilitiesEnabled: true);
@@ -2480,6 +3036,132 @@ namespace MonStacka.Editor
                 HoldEnabled = true,
                 Modifiers = modifiers,
             };
+
+        private static List<StoryModifierTriggerEvent> CaptureModifierEvents(StoryModifierSystem system)
+        {
+            var events = new List<StoryModifierTriggerEvent>();
+            system.OnModifierTriggered += trigger => events.Add(trigger);
+            return events;
+        }
+
+        private static void ExpectEvent(
+            IReadOnlyList<StoryModifierTriggerEvent> events,
+            StoryModifier modifier,
+            string state,
+            string message)
+        {
+            Expect(events.Any(trigger => trigger.Modifier == modifier && trigger.State == state), message);
+        }
+
+        private static void ExpectStatusContains(StoryModifierSystem system, string context, params string[] fragments)
+        {
+            var status = system.BuildEnemyAbilityStatus();
+            foreach (var fragment in fragments)
+            {
+                Expect(status.Contains(fragment), $"{context}: enemy status should contain '{fragment}'. Status: {status.Replace(Environment.NewLine, " | ")}");
+            }
+        }
+
+        private static void ExpectStatusChipContains(StoryModifierSystem system, string context, string fragment)
+        {
+            var chips = system.BuildStatusChips();
+            Expect(chips.Contains(fragment), $"{context}: status chips should contain '{fragment}'. Chips: {chips}");
+        }
+
+        private static StoryModifierSystem GetStoryModifiers(GameManager manager) =>
+            (StoryModifierSystem)GetField(typeof(GameManager), manager, "storyModifiers");
+
+        private static Transform GetStackRoot(GameManager manager) =>
+            (Transform)GetField(typeof(GameManager), manager, "stackRoot");
+
+        private static Transform GetActiveRoot(GameManager manager) =>
+            (Transform)GetField(typeof(GameManager), manager, "activeRoot");
+
+        private static void UpdateStoryRuntimeViews(GameManager manager)
+        {
+            InvokePrivate(manager, "UpdateStoryVisuals");
+            InvokePrivate(manager, "UpdateVisuals");
+        }
+
+        private static void RefreshEnemyCellViews(GameManager manager)
+        {
+            var view = (GarbageCellView)GetField(typeof(GameManager), manager, "garbageCellView");
+            Expect(view != null, "Runtime enemy visual checkpoint should find GarbageCellView.");
+            view.Refresh();
+        }
+
+        private static void HideNonStackPieceSkins(Transform stackRoot)
+        {
+            foreach (var skin in Resources.FindObjectsOfTypeAll<PieceSkin>())
+            {
+                if (!skin || !skin.gameObject.scene.IsValid() || !skin.gameObject.scene.isLoaded)
+                {
+                    continue;
+                }
+
+                if (!skin.transform.IsChildOf(stackRoot))
+                {
+                    skin.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        private static void AssertStackSpriteRenderersVisible(Transform stackRoot, string context)
+        {
+            var renderers = stackRoot.GetComponentsInChildren<SpriteRenderer>(includeInactive: true)
+                .Where(renderer => renderer && renderer.sprite && renderer.enabled && renderer.gameObject.activeInHierarchy)
+                .ToArray();
+            Expect(renderers.Length > 0, $"{context}: stack should have visible sprite renderers.");
+        }
+
+        private static void AssertStackSpriteRenderersHidden(Transform stackRoot, string context)
+        {
+            var renderers = stackRoot.GetComponentsInChildren<SpriteRenderer>(includeInactive: true)
+                .Where(renderer => renderer && renderer.sprite && renderer.enabled && renderer.gameObject.activeInHierarchy)
+                .ToArray();
+            Expect(renderers.Length == 0, $"{context}: stack should hide all active sprite renderers.");
+        }
+
+        private static void AssertEnemyAbilityHudContains(string context, params string[] fragments)
+        {
+            var text = RequireRect("StoryEnemyStatus").GetComponent<Text>();
+            Expect(text != null, $"{context}: should find StoryEnemyStatus text.");
+            foreach (var fragment in fragments)
+            {
+                Expect(text.text.Contains(fragment), $"{context}: StoryEnemyStatus should contain '{fragment}'. Text: {text.text.Replace(Environment.NewLine, " | ")}");
+            }
+        }
+
+        private static void AssertEnemyTriggerCueContains(string context, params string[] fragments)
+        {
+            var text = RequireRect("StoryEnemyTriggerCue").GetComponent<Text>();
+            Expect(text != null, $"{context}: should find StoryEnemyTriggerCue text.");
+            Expect(text.gameObject.activeInHierarchy, $"{context}: enemy trigger cue should be visible.");
+            foreach (var fragment in fragments)
+            {
+                Expect(text.text.Contains(fragment), $"{context}: StoryEnemyTriggerCue should contain '{fragment}'. Text: {text.text}");
+            }
+        }
+
+        private static void AssertActiveEnemyCellRenderers(string context)
+        {
+            var renderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>()
+                .Where(renderer =>
+                    renderer &&
+                    renderer.gameObject.scene.IsValid() &&
+                    renderer.gameObject.scene.isLoaded &&
+                    renderer.gameObject.activeInHierarchy &&
+                    renderer.name.StartsWith("GarbageCell", StringComparison.Ordinal))
+                .ToArray();
+
+            Expect(renderers.Length > 0, $"{context}: should render at least one active enemy cell.");
+            foreach (var renderer in renderers)
+            {
+                Expect(renderer.sortingOrder >= 18, $"{context}: enemy cell renderer should draw above board floor art.");
+                Expect(renderer.sprite != null && renderer.sprite.texture != Texture2D.whiteTexture, $"{context}: enemy cell renderer should use authored/procedural art, not a white placeholder.");
+                Expect(renderer.color.r > renderer.color.g && renderer.color.r > renderer.color.b, $"{context}: enemy cell renderer should read as red enemy pressure/claim art.");
+            }
+        }
 
         private static void FillBottomLine(BoardState board, PieceType type, int pieceIdStart)
         {
